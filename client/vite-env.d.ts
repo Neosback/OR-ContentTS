@@ -1,4 +1,4 @@
-/// <reference types="react-scripts" />
+/// <reference types="vite/client" />
 import type { JSX as ReactJSX } from "react";
 import React from "react";
 

@@ -11,6 +11,8 @@ import { send } from "./send";
 import { WebRtcGameSocket } from "./WebRtcGameSocket";
 import { CustomItemRegistry } from "../../../custom/items/CustomItemRegistry";
 import { CustomModelRegistry } from "../../../custom/items/CustomModelRegistry";
+import { isMobileMode } from "../../../common/utils/DeviceUtil";
+import { decodeBatchedServerPackets } from "../../packet/ServerBinaryDecoder";
 
 export function initServerConnection(url: string = DEFAULT_URL): void {
     state.lastUrl = url;
@@ -72,7 +74,7 @@ export function initServerConnection(url: string = DEFAULT_URL): void {
             setPacketSocket(ws);
             send({
                 type: "hello",
-                payload: { client: "osrs-typescript", version: getEnv("REACT_APP_VERSION") },
+                payload: { client: "osrs-typescript", version: getEnv("VITE_VERSION") },
             });
 
             // If reconnecting with stored credentials, automatically re-login
@@ -93,7 +95,6 @@ export function initServerConnection(url: string = DEFAULT_URL): void {
                 // Send handshake request with client type (mobile=1, desktop=0)
                 // Server uses this to decide which root interface to send (601 mobile, 161 desktop)
                 // isMobileMode combines actual touch detection + ?mobile=1 URL param override
-                const { isMobileMode } = require("../../../common/utils/DeviceUtil");
                 const clientType = isMobileMode ? 1 : 0;
                 // Send a default name so chat scripts work (server echoes it back)
                 send({ type: "handshake", payload: { clientType, name: "Player" } });
@@ -117,7 +118,6 @@ export function initServerConnection(url: string = DEFAULT_URL): void {
                 // Handle binary packets (ArrayBuffer) or JSON strings
                 if (raw instanceof ArrayBuffer) {
                     // Binary protocol - may contain batched packets
-                    const { decodeBatchedServerPackets } = require("../../packet/ServerBinaryDecoder");
                     const decoded = decodeBatchedServerPackets(raw);
                     if (!decoded || decoded.length === 0) {
                         console.warn("[ws] Failed to decode binary packet(s)");

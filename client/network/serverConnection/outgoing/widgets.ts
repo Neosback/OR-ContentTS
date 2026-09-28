@@ -1,6 +1,8 @@
 import type { WidgetActionClientPayload } from "../types";
 import { send } from "../connection/send";
 import { state } from "../state";
+import { createPacket, queuePacket } from "../../packet";
+import { ClientPacketId } from "../../../common/network/ClientPacketId";
 
 export function sendWidgetOpen(groupId: number, opts: { modal?: boolean } = {}): void {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
@@ -83,9 +85,6 @@ export function sendWidgetAction(payload: WidgetActionClientPayload): void {
 
     const opId = normalized.opId ?? 1;
 
-    // Import packet functions dynamically to avoid circular dependencies
-    const { createPacket, queuePacket } = require("../../packet");
-    const { ClientPacketId } = require("../../../common/network/ClientPacketId");
 
     // Ops invoked from an op submenu carry the op index and 0-based submenu index
     // in a dedicated packet, mirroring the second widget op packet in the client.
@@ -146,9 +145,6 @@ export function sendIfTriggerOpLocal(
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
     if (!Number.isFinite(widgetUid) || !Number.isFinite(childIndex)) return;
 
-    // Import packet functions dynamically to avoid circular dependencies
-    const { createPacket, queuePacket } = require("../../packet");
-    const { ClientPacketId } = require("../../packet/ClientPacket");
 
     const pkt = createPacket(ClientPacketId.IF_TRIGGEROPLOCAL);
     const buf = pkt.packetBuffer;
@@ -199,9 +195,6 @@ export function sendPlayerDesignConfirm(appearance: {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
     if (!appearance || !Number.isFinite(appearance.gender)) return;
 
-    // Import packet functions dynamically to avoid circular dependencies
-    const { createPacket, queuePacket } = require("../../packet");
-    const { ClientPacketId } = require("../../../common/network/ClientPacketId");
 
     // Payload: gender (1), kits[7] (14, signed short, -1=0xffff), colors[5] (5)
     const pkt = createPacket(ClientPacketId.APPEARANCE_SET);

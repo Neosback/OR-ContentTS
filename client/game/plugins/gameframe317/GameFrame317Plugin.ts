@@ -1,6 +1,7 @@
 import type { ClientPlugin, GameFrameDrawContext, GameFrameProvider } from "../ClientPluginManager";
 import type { GLRenderer } from "../../../widgets/gl/renderer";
 import { GAMEFRAME_LAYOUT_DROPDOWN, GAMEFRAME_317_OPTION, VARP_GAMEFRAME_317 } from "../../../common/ui/gameframeLayout";
+import { PUBLIC_PATH } from "../../../config/env";
 
 /**
  * Classic 317 chrome, drawn behind live OSRS widgets in fixed or resizable mode.
@@ -123,7 +124,7 @@ export class GameFrame317Plugin implements ClientPlugin {
     }
 
     private async loadAssets(): Promise<void> {
-        const base = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
+        const base = PUBLIC_PATH;
         const names = [
             "sideicons", "redstone1", "redstone2", "redstone3",
             // OSRS bottom-row icons for the two slots the 317 set gets wrong

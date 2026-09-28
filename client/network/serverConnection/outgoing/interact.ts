@@ -1,5 +1,6 @@
 import { send } from "../connection/send";
 import { state } from "../state";
+import { ClientPacket, createPacket, queuePacket } from "../../packet";
 
 export function sendInteractFollow(targetId: number, mode: "follow" | "trade" = "follow"): void {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
@@ -13,8 +14,7 @@ export function sendPlayerOption(targetId: number, option: number): void {
     const op = option | 0;
     if (target < 0 || op < 1 || op > 8) return;
 
-    const { ClientPacket, createPacket, queuePacket } = require("../../packet");
-    const packet = createPacket(ClientPacket[`OPPLAYER${op}` as const]);
+    const packet = createPacket(ClientPacket[`OPPLAYER${op}` as keyof typeof ClientPacket]);
     const buffer = packet.packetBuffer;
     switch (op) {
         case 1:
@@ -54,7 +54,6 @@ export function sendInteractStop(): void {
 export function sendNpcOption(npcId: number, opNum: number, modifierFlags: number = 0): void {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
     if (npcId == null) return;
-    const { ClientPacket, createPacket, queuePacket } = require("../../packet");
     const ctrl = (modifierFlags & 1) !== 0 ? 1 : 0;
     const op = opNum | 0;
     const pkt =

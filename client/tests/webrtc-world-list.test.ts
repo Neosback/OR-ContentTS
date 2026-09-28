@@ -11,15 +11,12 @@ assert.deepEqual(getWebRtcRelayConfig(), {
     iceServers: [{ urls: "stun:stun.rsps.app:3478" }],
 });
 
-const previousPublicUrl = process.env.PUBLIC_URL;
-process.env.PUBLIC_URL = "/play";
-assert.equal(getServerListUrl(), "/play/servers.json");
-assert.equal(getCacheBaseUrl(), "/play/caches/");
-if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-else process.env.PUBLIC_URL = previousPublicUrl;
+// The Studio is served from the root (Vite base "/").
+assert.equal(getServerListUrl(), "/servers.json");
+assert.equal(getCacheBaseUrl(), "/caches/");
 
-const previousSignalUrl = process.env.REACT_APP_WEBRTC_SIGNAL_URL;
-process.env.REACT_APP_WEBRTC_SIGNAL_URL = "ws://127.0.0.1:8787";
+const previousSignalUrl = process.env.VITE_WEBRTC_SIGNAL_URL;
+process.env.VITE_WEBRTC_SIGNAL_URL = "ws://127.0.0.1:8787";
 (globalThis as any).window = { location: { search: "?browser-host-client=1&browser-host-world=browser-test" } };
 assert.equal(getWebRtcRelayConfig()?.signalUrl, "wss://worlds.rsps.app");
 assert.deepEqual(getBrowserHostWorldConfig(), {
@@ -30,8 +27,8 @@ assert.deepEqual(getBrowserHostWorldConfig(), {
 setServerUrl("ws://127.0.0.1:43594");
 assert.deepEqual(connectionState.webRtcConfig, getBrowserHostWorldConfig());
 delete (globalThis as any).window;
-if (previousSignalUrl === undefined) delete process.env.REACT_APP_WEBRTC_SIGNAL_URL;
-else process.env.REACT_APP_WEBRTC_SIGNAL_URL = previousSignalUrl;
+if (previousSignalUrl === undefined) delete process.env.VITE_WEBRTC_SIGNAL_URL;
+else process.env.VITE_WEBRTC_SIGNAL_URL = previousSignalUrl;
 
 const discovered = relayWorldEntries("ws://127.0.0.1:8787", [], {
     worlds: [

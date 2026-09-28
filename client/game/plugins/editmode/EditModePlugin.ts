@@ -120,6 +120,8 @@ export class EditModePlugin {
     private buildingSelect = false;
     private preview?: EditModeEdit;
     private scenePreview = false;
+    /** Studio map editor: there is no game to return to, so Esc never disarms. */
+    private standalone = false;
     private world: EditModePluginState["world"] = { loading: false };
     private worldDefinitionDirty = false;
     private searchToken = 0;
@@ -311,10 +313,15 @@ export class EditModePlugin {
         );
     }
 
+    /** Standalone editors stay armed: Esc and Ctrl+E no longer drop to the login screen. */
+    setStandalone(standalone: boolean): void {
+        this.standalone = standalone;
+    }
+
     /** Ctrl+E arms or disarms the tools; the only in-game way in. */
     private readonly onShortcut = (event: KeyboardEvent): void => {
         if (!event.ctrlKey || (event.key !== "e" && event.key !== "E")) return;
-        if (!this.config.enabled) return;
+        if (!this.config.enabled || this.standalone) return;
         event.preventDefault();
         event.stopPropagation();
         this.setConfig({ active: !this.config.active });
@@ -1185,7 +1192,7 @@ export class EditModePlugin {
                 this.commit();
                 return;
             }
-            this.setConfig({ active: false });
+            if (!this.standalone) this.setConfig({ active: false });
         }
     };
 

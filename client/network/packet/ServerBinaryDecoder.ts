@@ -14,6 +14,7 @@ import { SERVER_PACKET_LENGTHS, ServerPacketId } from "../../common/packets/Serv
 import type { ProjectileLaunch } from "../../common/projectiles/ProjectileLaunch";
 import type { FriendsChatSnapshot } from "../../common/social/FriendsChat";
 import type { WorldEntityBuildArea } from "../../common/worldentity/WorldEntityTypes";
+import pako from "pako";
 
 /**
  * Binary packet buffer for client decoding
@@ -1921,7 +1922,6 @@ export function decodeServerPacket(data: Uint8Array | ArrayBuffer): DecodedServe
             const rawBytes = reader.readBytes(reader.remaining);
             let jsonStr: string;
             if (compressed) {
-                const pako = require("pako");
                 const inflated = pako.inflate(rawBytes);
                 jsonStr = new TextDecoder().decode(inflated);
             } else {

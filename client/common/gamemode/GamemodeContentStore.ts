@@ -4,6 +4,8 @@ import type {
     LeagueRelicRow,
     LeagueTaskRow,
 } from "./GamemodeDataTypes";
+import { CustomItemRegistry } from "../../custom/items/CustomItemRegistry";
+import { CustomModelRegistry, type CustomModelRow } from "../../custom/items/CustomModelRegistry";
 
 export type WorldLocChangeRow = {
     oldId: number;
@@ -167,7 +169,6 @@ export function loadFromPayload(payload: {
                 break;
             case "customItems":
                 try {
-                    const { CustomItemRegistry } = require("../../custom/items/CustomItemRegistry");
                     CustomItemRegistry.clear();
                     for (const def of dataset.rows as any[]) {
                         CustomItemRegistry.register(def, def.objType?.name);
@@ -180,9 +181,8 @@ export function loadFromPayload(payload: {
                 }
                 break;
             case "customModels": {
-                const { CustomModelRegistry } = require("../../custom/items/CustomModelRegistry");
                 if (dataset.rows.length === 0) CustomModelRegistry.clear();
-                for (const row of dataset.rows) CustomModelRegistry.register(row);
+                for (const row of dataset.rows) CustomModelRegistry.register(row as CustomModelRow);
                 break;
             }
             case "worldLocChanges":

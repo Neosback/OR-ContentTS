@@ -27,11 +27,6 @@ for (const file of envFiles.filter(existsSync)) {
 }
 const env = { ...loadedEnv, ...process.env };
 
-if (packageDir === resolve(rootDir, "client")) {
-  env.REACT_APP_WEBRTC_SIGNAL_URL ??= env.WEBRTC_SIGNAL_URL;
-  env.REACT_APP_WEBRTC_ICE_SERVERS ??= env.WEBRTC_ICE_SERVERS;
-}
-
 const result = spawnSync(
   process.execPath,
   command,

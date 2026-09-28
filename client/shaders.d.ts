@@ -8,7 +8,8 @@ declare module "*.wgsl?source" {
     export default value;
 }
 
-declare module "*.css" {
-    const content: { readonly [className: string]: string };
-    export default content;
+// Untyped JS modules (previously loaded with require()).
+declare module "bzip2";
+declare module "picogl/build/module/texture.js" {
+    export const Texture: any;
 }

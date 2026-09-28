@@ -2,6 +2,8 @@ import { PlayerAppearance } from "../../rs/config/player/PlayerAppearance";
 import type { SeqTypeLoader } from "../../rs/config/seqtype/SeqTypeLoader";
 import { NO_INTERACTION, decodeInteractionIndex } from "../../rs/interaction/InteractionIndex";
 import { faceAngleRs } from "../../rs/utils/rotation";
+import { NpcModelLoader } from "../../rs/config/npctype/NpcModelLoader";
+import { PlayerModelLoader } from "../../rs/config/player/PlayerModelLoader";
 
 export type PlayerAnimKey =
     | "idle"
@@ -1345,8 +1347,6 @@ export class PlayerEcs {
             const npcTransformationId = app.npcTransformationId ?? -1;
             let base: any;
             if (npcTransformationId >= 0) {
-                const NpcModelLoader =
-                    require("../../rs/config/npctype/NpcModelLoader").NpcModelLoader;
                 const nml = new NpcModelLoader(
                     deps.npcTypeLoader,
                     deps.modelLoader,
@@ -1360,8 +1360,6 @@ export class PlayerEcs {
                 base = npcType ? nml.getModel(npcType, -1, -1) : undefined;
             } else {
                 // Lazy-require to avoid heavy static deps and circular refs in the client
-                const PlayerModelLoader =
-                    require("../../rs/config/player/PlayerModelLoader").PlayerModelLoader;
                 const pml = new PlayerModelLoader(
                     deps.idkTypeLoader,
                     deps.objTypeLoader,
@@ -1376,8 +1374,6 @@ export class PlayerEcs {
 
             // Align baseline and pivot to humanoid reference (NPC "man") for consistency
             if (npcTransformationId < 0) try {
-                const NpcModelLoader =
-                    require("../../rs/config/npctype/NpcModelLoader").NpcModelLoader;
                 const nml = new NpcModelLoader(
                     deps.npcTypeLoader,
                     deps.modelLoader,

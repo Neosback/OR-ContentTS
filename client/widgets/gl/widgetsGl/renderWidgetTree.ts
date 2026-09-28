@@ -51,6 +51,7 @@ import { scaleLogicalPixels } from "./scaleLogicalPixels";
 import { ps } from "./profilingState";
 import { FONT_VERDANA_11, FONT_VERDANA_13, FONT_VERDANA_15 } from "../../../ui/fonts";
 import type { WorldMapLabelDraw, WorldMapLabelMetrics } from "./worldMapLabels";
+import { widgetEntriesToSimple } from "../../../ui/menu/MenuBridge";
 
 export type { WidgetNode };
 type Widget = WidgetNode;
@@ -421,7 +422,6 @@ export function renderWidgetTreeGL(glr: GLRenderer, root: Widget, opts: GLRender
                             if (real) {
                                 ui.mouseX = x | 0;
                                 ui.mouseY = y | 0;
-                                const { widgetEntriesToSimple } = require("../../../ui/menu/MenuBridge");
                                 const menuState = new MenuState();
                                 const mapped = widgetEntriesToSimple(candEntries, {
                                     ui,
@@ -584,7 +584,6 @@ export function renderWidgetTreeGL(glr: GLRenderer, root: Widget, opts: GLRender
                 ui.mouseX = x | 0;
                 ui.mouseY = y | 0;
                 // Map entries using the shared bridge and central hooks
-                const { widgetEntriesToSimple } = require("../../../ui/menu/MenuBridge");
                 const menuState = new MenuState();
                 const mapped = widgetEntriesToSimple(entries, {
                     ui,
@@ -623,7 +622,6 @@ export function renderWidgetTreeGL(glr: GLRenderer, root: Widget, opts: GLRender
             if (blockingWidget) {
                 ui.mouseX = x | 0;
                 ui.mouseY = y | 0;
-                const { widgetEntriesToSimple } = require("../../../ui/menu/MenuBridge");
                 const menuState = new MenuState();
                 const mapped = widgetEntriesToSimple([{ option: "Cancel" }], {
                     ui,

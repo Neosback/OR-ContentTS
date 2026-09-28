@@ -1,6 +1,6 @@
 import WasmBzip2 from "@foxglove/wasm-bz2";
 
-const bzip2 = require("bzip2");
+import bzip2 from "bzip2";
 
 export class Bzip2 {
     static bzip2Header = new Uint8Array("BZh1".split("").map((char) => char.charCodeAt(0)));

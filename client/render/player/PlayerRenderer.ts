@@ -13,6 +13,7 @@ import { resolveHeightSamplePlaneForLocal } from "../../game/scene/PlaneResolver
 import { DrawRange, NULL_DRAW_RANGE, newDrawRange } from "../DrawRange";
 import { WebGLMapSquare } from "../WebGLMapSquare";
 import type { WebGLOsrsRenderer } from "../WebGLOsrsRenderer";
+import * as SceneBufferMod from "../buffer/SceneBuffer";
 
 /**
  * PlayerRenderer encapsulates player-specific render passes and instance data handling.
@@ -795,7 +796,6 @@ export class PlayerRenderer {
         const textureLoader = this.renderer.osrsClient.textureLoader;
         const textureIdIndexMap =
             (this.renderer as any).textureIdIndexMap ?? new Map<number, number>();
-        const SceneBufferMod = require("../buffer/SceneBuffer");
         const SceneBufferCls = SceneBufferMod.SceneBuffer;
         const getFaces = SceneBufferMod.getModelFaces;
         const isTrans = SceneBufferMod.isModelFaceTransparent;
@@ -1300,7 +1300,7 @@ export class PlayerRenderer {
                 };
             }
         }
-        const ModelMod = require("../../rs/model/Model").Model;
+        const ModelMod = Model;
         // Do not shallow-copy face alpha: sequences (frame-based or skeletal) can mutate faceAlphas via ALPHA transforms.
         // Sharing would leak those mutations back into the cached base model and cause visual artifacts (e.g., "blur"/ghosting).
         let model = ModelMod.copyAnimated(baseModel, false, true);
@@ -1343,7 +1343,6 @@ export class PlayerRenderer {
         const textureLoader = this.renderer.osrsClient.textureLoader;
         const textureIdIndexMap =
             (this.renderer as any).textureIdIndexMap ?? new Map<number, number>();
-        const SceneBufferMod = require("../buffer/SceneBuffer");
         const SceneBufferCls = SceneBufferMod.SceneBuffer;
         const isTrans = SceneBufferMod.isModelFaceTransparent;
 

@@ -1,7 +1,7 @@
 import pako from "pako";
 import init, { decompress } from "wasm-gzip";
 
-const wasmGzipUrl = require("wasm-gzip/wasm_gzip.wasm");
+import wasmGzipUrl from "wasm-gzip/wasm_gzip.wasm?url";
 
 export class Gzip {
     static wasmLoaded = false;

@@ -1,6 +1,7 @@
 import { clamp } from "../../common/utils/MathUtil";
 import { formatActorNameWithLevel } from "../../ui/menu/MenuBridge";
 import type { SdMapData } from "../loader/SdMapData";
+import { PUBLIC_PATH } from "../../config/env";
 
 const MAX_TEXTURES = 1024;
 const TEXTURE_SIZE = 128;
@@ -8,7 +9,6 @@ const MATERIAL_TEXTURE_ROWS = 6;
 const WATER_FLAG_HAS_FOAM = 1;
 const WATER_FLAG_NORMAL_MAP_2 = 2;
 const WATER_TEXTURE_SIZE = 128;
-const PUBLIC_PATH = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
 const WATER_TEXTURE_ASSETS = [
     `${PUBLIC_PATH}/images/water/water_normal_map_1.png`,
     `${PUBLIC_PATH}/images/water/water_normal_map_2.png`,

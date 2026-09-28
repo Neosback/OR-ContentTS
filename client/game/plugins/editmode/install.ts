@@ -30,6 +30,7 @@ import {
 } from "./hostProtocol/regionPackMessage";
 import { browserHostOrigin, browserHostWindow } from "./hostProtocol/origin";
 import { isBrowserHostClient } from "../../../config/clientEnv";
+import { isMapEditorMode } from "../../../config/studioMode";
 import {
     NPC_SPAWN_MESSAGE,
     NPC_SPAWN_REQUEST_MESSAGE,
@@ -1914,9 +1915,11 @@ export function installEditMode(client: OsrsClient): EditModePlugin {
     plugin.subscribe(syncEditorUi);
     syncEditorUi();
 
-    // ?edit=1 opens the client straight in the editor instead of changing the
-    // normal welcome-screen button.
-    if (new URLSearchParams(window.location.search).has("edit")) {
+    // /map-editor (or the older ?edit=1) opens the client straight in the
+    // editor instead of changing the normal welcome-screen button. There is no
+    // login screen to fall back to, so Esc must not leave the editor.
+    if (isMapEditorMode()) {
+        plugin.setStandalone(true);
         // ponytail: polled, because the cache load and the world definition
         // fetch settle independently and neither has a ready event to hook.
         const timer = window.setInterval(() => {

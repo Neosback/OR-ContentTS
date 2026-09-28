@@ -4,6 +4,7 @@ import { initServerConnection } from "./connection/init";
 import { send } from "./connection/send";
 import { state } from "./state";
 import type { GameSocket } from "./connection/GameSocket";
+import { isMobileMode } from "../../common/utils/DeviceUtil";
 
 export function setAutoSendHandshake(auto: boolean): void {
     state.autoSendHandshake = auto;
@@ -161,7 +162,6 @@ export function sendHandshake(name?: string): void {
         console.warn("[ws] Cannot send handshake - state.socket not open");
         return;
     }
-    const { isMobileMode } = require("../../common/utils/DeviceUtil");
     const clientType = isMobileMode ? 1 : 0;
     send({
         type: "handshake",

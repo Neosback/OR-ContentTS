@@ -1,4 +1,5 @@
 import { state } from "./state";
+import { PUBLIC_PATH } from "../../config/env";
 
 /**
  * Base URL for the game server's read-only JSON endpoints. They are served by the same
@@ -45,7 +46,7 @@ export async function fetchInterfaceDefinition(groupId: number): Promise<any | u
     } catch (error) {
         console.warn("[content-api] live interface fetch failed; trying static definition", error);
     }
-    const publicUrl = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
+    const publicUrl = PUBLIC_PATH;
     const urls = [
         // Browser-host definitions are deployed as static files. A timestamp avoids a
         // stale CDN entry from a prior deployment being treated as a valid 200 response.

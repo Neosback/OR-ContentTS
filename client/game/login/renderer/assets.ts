@@ -6,8 +6,8 @@ import { IndexedSprite } from "../../../rs/sprite/IndexedSprite";
 import { SpriteLoader } from "../../../rs/sprite/SpriteLoader";
 import { LoginScreenAnimation } from "../LoginScreenAnimation";
 import type { LoginRendererHost } from "./host";
+import { PUBLIC_PATH } from "../../../config/env";
 
-const PUBLIC_PATH = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
 
 function loadSprite(spriteIndex: CacheIndex, name: string) {
 

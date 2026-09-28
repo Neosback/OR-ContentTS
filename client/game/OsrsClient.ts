@@ -48,6 +48,7 @@ import {
     getDefaultServerSecure,
     getDefaultWsUrl,
 } from "../config/clientEnv";
+import { isMapEditorMode } from "../config/studioMode";
 import {
     type BankServerUpdate,
     getClientCycle,
@@ -339,6 +340,7 @@ import { resolveWidgetIdentifiers } from "./widgets/widgetActionPayload";
 import { RenderDataWorkerPool } from "./worker/RenderDataWorkerPool";
 import { WorldMapController, type WorldMapRenderedIcon } from "./worldMap/WorldMapController";
 import { WorldViewManager } from "./worldview/WorldViewManager";
+import { GraphicsDefaults } from "../rs/config/defaults/GraphicsDefaults";
 
 const DEVICE_OPTION_INTERFACE_SCALING = 27;
 
@@ -1185,7 +1187,7 @@ export class OsrsClient {
         this.gameFrame317Plugin = new GameFrame317Plugin(this);
         this.clientPlugins.add(this.gameFrame317Plugin);
         this.syncSidebarPlugins(true);
-        if (new URLSearchParams(window.location.search).has("edit")) {
+        if (isMapEditorMode()) {
             this.loadEditModePlugin();
         }
         this.groundItemsPlugin.subscribe(() => {
@@ -6472,7 +6474,6 @@ export class OsrsClient {
             await showPhase(90, "Preparing interface...");
             this.widgetManager = new WidgetManager(this.cacheSystem);
             try {
-                const { GraphicsDefaults } = require("../rs/config/defaults/GraphicsDefaults");
                 const graphicsDefaults = GraphicsDefaults.load(cache.info, this.cacheSystem);
                 if (graphicsDefaults?.compass >= 0) {
                     this.widgetManager.compassSpriteId = graphicsDefaults.compass;

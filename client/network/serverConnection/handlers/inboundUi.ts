@@ -41,6 +41,7 @@ import type { WidgetServerPayload } from "../types/widgets";
 import { decodeBase64 } from "../utils/decodeBase64";
 import { applyGroundItemsDelta, cloneGroundItemsPayload } from "../utils/groundItems";
 import { sanitizeBankSlotMessage, sanitizeInventorySlotMessage, sanitizeSpellResult } from "../utils/sanitize";
+import { loadFromPayload } from "../../../common/gamemode/GamemodeContentStore";
 
 export function handleInboundUi(msg: any): boolean {
     if (msg.type === "inventory") {
@@ -243,7 +244,6 @@ export function handleInboundUi(msg: any): boolean {
     }
     if (msg.type === "gamemode_data") {
         try {
-            const { loadFromPayload } = require("../../../common/gamemode/GamemodeContentStore");
             loadFromPayload(msg.payload);
             const g: any = (typeof window !== "undefined" ? window : globalThis) as any;
             const mv = g?.__osrsClient;

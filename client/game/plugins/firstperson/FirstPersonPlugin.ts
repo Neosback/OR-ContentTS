@@ -2,7 +2,8 @@ import type { Camera } from "../../Camera";
 import type { InputKeyHandler, InputManager, InputMouseHandler } from "../../InputManager";
 import type { CameraFollowContext, CameraInputContext, ClientPlugin } from "../ClientPluginManager";
 
-if (typeof document !== "undefined") require("./FirstPersonPlugin.css");
+// Loaded lazily so the node tests, which import this module, never see CSS.
+if (typeof document !== "undefined") void import("./FirstPersonPlugin.css");
 
 type FirstPersonClient = {
     camera: Camera;

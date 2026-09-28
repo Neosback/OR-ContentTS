@@ -51,8 +51,7 @@ WebFont.load({
 
 const cachesPromise = fetchCacheList();
 
-// --- HMR-aware nonce to force worker pool re-creation on Fast Refresh ---
-declare const module: any;
+// --- HMR-aware nonce to force worker pool re-creation on hot updates ---
 
 type LoginUnsubscriber = () => void;
 function readWorkerPoolNonce(): number {
@@ -76,8 +75,8 @@ if (typeof window !== "undefined" && window.__rsWorkerPoolNonce === undefined) {
     window.__rsWorkerPoolNonce = 0;
 }
 // On hot-reload, dispose the existing OsrsClient and increment the nonce
-if (typeof module !== "undefined" && module.hot) {
-    module.hot.dispose(() => {
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
         if (typeof window !== "undefined") {
             // Dispose existing OsrsClient to stop audio and free resources
             const existingClient = window.osrsClient;

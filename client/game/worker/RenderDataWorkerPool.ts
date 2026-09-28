@@ -1,7 +1,7 @@
 import { ModuleThread, Pool, spawn } from "threads";
-import { QueuedTask } from "threads/dist/master/pool";
-import { WorkerDescriptor } from "threads/dist/master/pool-types";
-import { ObservablePromise } from "threads/dist/observable-promise";
+import type { QueuedTask } from "threads/dist/master/pool";
+import type { WorkerDescriptor } from "threads/dist/master/pool-types";
+import type { ObservablePromise } from "threads/dist/observable-promise";
 
 import { LoadedCache } from "../Caches";
 import { CustomItemRegistry } from "../../custom/items/CustomItemRegistry";
@@ -14,11 +14,11 @@ import type { RenderDataWorker } from "./RenderDataWorker";
 type RenderDataWorkerThread = ModuleThread<RenderDataWorker>;
 
 function spawnWorker(): Promise<RenderDataWorkerThread> {
-    // Keep this exact `new Worker(new URL(...))` shape so webpack emits a real
-    // worker chunk. Do not wrap Safari in an importScripts/blob bootstrap:
-    // production skips COEP on Safari, and blob workers break webpack's
-    // relative importScripts for lazy chunks ("string did not match pattern").
-    const worker = new Worker(new URL("./RenderDataWorker.ts", import.meta.url));
+    // Keep this exact `new Worker(new URL(...), { type: "module" })` shape so
+    // Vite emits a real worker chunk. Do not wrap Safari in a blob bootstrap:
+    // production skips COEP on Safari, and blob workers cannot resolve the
+    // worker's relative chunk imports.
+    const worker = new Worker(new URL("./RenderDataWorker.ts", import.meta.url), { type: "module" });
     return spawn<RenderDataWorker>(worker);
 }
 

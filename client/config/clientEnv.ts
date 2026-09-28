@@ -1,8 +1,9 @@
 /**
- * Build-time client config from CRA `REACT_APP_*` env vars.
- * IMPORTANT: CRA only inlines env vars referenced as static property access
- * (`process.env.REACT_APP_FOO`). Dynamic `process.env[key]` is left undefined.
+ * Build-time client config from Vite `VITE_*` env vars (client/.env*).
  */
+
+import { PUBLIC_PATH, readEnv } from "./env";
+import { isMapEditorMode } from "./studioMode";
 
 function read(value: string | undefined): string | undefined {
     // Strip BOM + whitespace; Windows/PowerShell env writes often include U+FEFF.
@@ -53,9 +54,9 @@ function isIceServer(value: unknown): value is RTCIceServer {
 
 /** Base URL for OSRS cache files. Trailing slash always present. */
 export function getCacheBaseUrl(): string {
-    const fromEnv = read(process.env.REACT_APP_CACHE_BASE_URL);
+    const fromEnv = read(readEnv("VITE_CACHE_BASE_URL"));
     if (!fromEnv) {
-        const publicUrl = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
+        const publicUrl = PUBLIC_PATH;
         return `${publicUrl}/caches/`;
     }
     return fromEnv.endsWith("/") ? fromEnv : `${fromEnv}/`;
@@ -63,19 +64,19 @@ export function getCacheBaseUrl(): string {
 
 /** Default WebSocket URL used before the player picks a server. */
 export function getDefaultWsUrl(): string {
-    return read(process.env.REACT_APP_DEFAULT_WS_URL) ?? "ws://localhost:43594";
+    return read(readEnv("VITE_DEFAULT_WS_URL")) ?? "ws://localhost:43594";
 }
 
 export function getDefaultServerAddress(): string {
-    return read(process.env.REACT_APP_DEFAULT_SERVER_ADDRESS) ?? "localhost:43594";
+    return read(readEnv("VITE_DEFAULT_SERVER_ADDRESS")) ?? "localhost:43594";
 }
 
 export function getDefaultServerName(): string {
-    return read(process.env.REACT_APP_DEFAULT_SERVER_NAME) ?? "Local Development";
+    return read(readEnv("VITE_DEFAULT_SERVER_NAME")) ?? "Local Development";
 }
 
 export function getDefaultServerSecure(): boolean {
-    const raw = read(process.env.REACT_APP_DEFAULT_SERVER_SECURE)?.toLowerCase();
+    const raw = read(readEnv("VITE_DEFAULT_SERVER_SECURE"))?.toLowerCase();
     if (raw === "true" || raw === "1") return true;
     if (raw === "false" || raw === "0") return false;
     return getDefaultWsUrl().startsWith("wss://");
@@ -86,7 +87,7 @@ export function getDefaultServerSecure(): boolean {
  * When set, this takes precedence over fetching `/servers.json`.
  */
 export function getConfiguredServers(): ConfiguredServer[] | undefined {
-    const raw = read(process.env.REACT_APP_SERVERS_JSON);
+    const raw = read(readEnv("VITE_SERVERS_JSON"));
     if (!raw) return undefined;
     try {
         const parsed = JSON.parse(raw);
@@ -186,7 +187,9 @@ export function parseWorldIdFromPath(pathname: string, publicUrl: string): strin
 /** World id from the URL path, e.g. /play/world-1 -> "world-1". */
 function worldIdFromPath(): string | undefined {
     if (typeof window === "undefined") return undefined;
-    return parseWorldIdFromPath(window.location.pathname ?? "", process.env.PUBLIC_URL ?? "");
+    // Studio routes share the path space with world ids; /map-editor is not a world.
+    if (isMapEditorMode()) return undefined;
+    return parseWorldIdFromPath(window.location.pathname ?? "", PUBLIC_PATH);
 }
 
 /**
@@ -214,9 +217,9 @@ export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
         return getPublicWebRtcRelayConfig();
     }
 
-    const signalUrl = read(process.env.REACT_APP_WEBRTC_SIGNAL_URL) ?? DEFAULT_WEBRTC_SIGNAL_URL;
+    const signalUrl = read(readEnv("VITE_WEBRTC_SIGNAL_URL")) ?? DEFAULT_WEBRTC_SIGNAL_URL;
 
-    const rawIceServers = read(process.env.REACT_APP_WEBRTC_ICE_SERVERS);
+    const rawIceServers = read(readEnv("VITE_WEBRTC_ICE_SERVERS"));
     if (!rawIceServers) return { signalUrl, iceServers: DEFAULT_WEBRTC_ICE_SERVERS };
     try {
         const parsed = JSON.parse(rawIceServers);
@@ -232,9 +235,9 @@ export function getWebRtcRelayConfig(): WebRtcRelayConfig | undefined {
 
 /** Optional override for the remote server-list URL. */
 export function getServerListUrl(): string {
-    const publicUrl = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
+    const publicUrl = PUBLIC_PATH;
     return (
-        read(process.env.REACT_APP_SERVER_LIST_URL) ??
+        read(readEnv("VITE_SERVER_LIST_URL")) ??
         `${publicUrl}/servers.json`
     );
 }

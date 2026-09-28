@@ -1,6 +1,8 @@
 import { INVENTORY_SLOT_COUNT } from "../constants";
 import { send } from "../connection/send";
 import { state } from "../state";
+import { createPacket, queuePacket } from "../../packet";
+import { ClientPacketId } from "../../packet/ClientPacket";
 
 export function sendBankDepositInventory(tab?: number): void {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
@@ -83,9 +85,6 @@ export function sendWidgetDrag(
         return;
     }
 
-    // Import packet functions dynamically to avoid circular dependencies
-    const { createPacket, queuePacket } = require("../../packet");
-    const { ClientPacketId } = require("../../packet/ClientPacket");
 
     const pkt = createPacket(ClientPacketId.IF_BUTTOND);
     pkt.packetBuffer.writeShortLE(targetItemId | 0);
