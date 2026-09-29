@@ -2,5 +2,9 @@ node_modules/
 .yarn/
 .DS_Store
 .env
-client/build/
-client/public/browser-host/
+client/.next/
+client/caches
+client/.tauri-frontend/
+client/src-tauri/target/
+reference/tsps-client/build/
+reference/tsps-client/public/browser-host/

@@ -1,15 +1,13 @@
 import fs from "fs";
-import path from "path";
 
-import { CacheList, LoadedCache, XteaMap } from "../../game/Caches";
-import { CacheFiles } from "../../rs/cache/CacheFiles";
-import { CacheInfo, getLatestCache } from "../../rs/cache/CacheInfo";
-import { detectCacheType } from "../../rs/cache/CacheType";
-
-const SERVER_CACHES = path.resolve(__dirname, "../../../server/caches");
+import { CacheList, LoadedCache, XteaMap } from "../../src/mapviewer/Caches";
+import { CacheFiles } from "../../src/rs/cache/CacheFiles";
+import { CacheInfo, getLatestCache } from "../../src/rs/cache/CacheInfo";
+import { cacheRequiresMapXteas, parseXteaMapFromJsonText } from "../../src/rs/cache/map-xtea";
+import { detectCacheType } from "../../src/rs/cache/CacheType";
 
 export function loadCacheInfos(): CacheInfo[] {
-    const json = fs.readFileSync(path.join(SERVER_CACHES, "caches.json"), "utf8");
+    const json = fs.readFileSync("./caches/caches.json", "utf8");
     return JSON.parse(json);
 }
 
@@ -25,17 +23,20 @@ export function loadCacheList(caches: CacheInfo[]): CacheList {
 }
 
 export function loadCacheFiles(cache: CacheInfo): CacheFiles {
-    const cachePath = path.join(SERVER_CACHES, cache.name) + path.sep;
+    const cachePath = "./caches/" + cache.name + "/";
 
     const files = new Map<string, ArrayBuffer>();
 
     fs.readdirSync(cachePath).forEach((fileName: string) => {
         const buffer = fs.readFileSync(cachePath + fileName);
-        const arrayBuffer = buffer.buffer.slice(
-            buffer.byteOffset,
-            buffer.byteOffset + buffer.byteLength,
-        );
-        files.set(fileName, arrayBuffer);
+
+        const newBuffer = new ArrayBuffer(buffer.byteLength);
+        const newView = new Uint8Array(newBuffer);
+        for (let i = 0; i < buffer.byteLength; i++) {
+            newView[i] = buffer[i];
+        }
+
+        files.set(fileName, newBuffer);
     });
 
     return new CacheFiles(files);
@@ -53,8 +54,19 @@ export function loadCache(info: CacheInfo): LoadedCache {
 }
 
 export function loadXteas(cache: CacheInfo): XteaMap {
-    const cachePath = path.join(SERVER_CACHES, cache.name) + path.sep;
-    const json = fs.readFileSync(cachePath + "keys.json", "utf8");
-    const data: Record<string, number[]> = JSON.parse(json);
-    return new Map(Object.keys(data).map((key) => [parseInt(key), data[key]]));
+    if (!cacheRequiresMapXteas(cache)) {
+        return new Map();
+    }
+    const cachePath = "./caches/" + cache.name + "/";
+    const keysPath = cachePath + "keys.json";
+    const xteasPath = cachePath + "xteas.json";
+    if (fs.existsSync(keysPath)) {
+        const json = fs.readFileSync(keysPath, "utf8");
+        return parseXteaMapFromJsonText(json);
+    }
+    if (fs.existsSync(xteasPath)) {
+        const json = fs.readFileSync(xteasPath, "utf8");
+        return parseXteaMapFromJsonText(json);
+    }
+    return new Map();
 }

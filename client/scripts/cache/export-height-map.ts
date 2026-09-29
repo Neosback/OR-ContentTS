@@ -1,10 +1,10 @@
 import fs from "fs";
 import sharp from "sharp";
 
-import { CacheSystem } from "../../rs/cache/CacheSystem";
-import { getCacheLoaderFactory } from "../../rs/cache/loader/CacheLoaderFactory";
-import { LocModelLoader } from "../../rs/config/loctype/LocModelLoader";
-import { LocLoadType, SceneBuilder } from "../../rs/scene/SceneBuilder";
+import { CacheSystem } from "../../src/rs/cache/CacheSystem";
+import { getCacheLoaderFactory } from "../../src/rs/cache/loader/CacheLoaderFactory";
+import { LocModelLoader } from "../../src/rs/config/loctype/LocModelLoader";
+import { LocLoadType, SceneBuilder } from "../../src/rs/scene/SceneBuilder";
 import { loadCache, loadCacheInfos, loadCacheList } from "./load-util";
 
 function saveHeightMapToPng(
@@ -41,7 +41,7 @@ const cacheInfo = cacheList.latest;
 
 const loadedCache = loadCache(cacheInfo);
 
-const cacheSystem = CacheSystem.fromFiles(cacheInfo, loadedCache.files);
+const cacheSystem = CacheSystem.fromFiles(loadedCache.type, loadedCache.files);
 const loaderFactory = getCacheLoaderFactory(cacheInfo, cacheSystem);
 
 const underlayTypeLoader = loaderFactory.getUnderlayTypeLoader();
@@ -88,7 +88,15 @@ function exportHeightMap() {
 
     const maxHeight = 2040;
 
-    const scene = sceneBuilder.buildScene(baseX, baseY, sizeX, sizeY, false, LocLoadType.NO_MODELS);
+    const scene = sceneBuilder.buildScene(
+        baseX,
+        baseY,
+        sizeX,
+        sizeY,
+        true,
+        false,
+        LocLoadType.NO_MODELS,
+    );
 
     const heightMap = new Uint8Array(sizeX * sizeY);
     for (let y = 0; y < sizeY; y++) {

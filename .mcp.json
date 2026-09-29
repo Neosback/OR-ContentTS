@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "osrs-render-inspector": {
+      "command": "npx",
+      "args": ["tsx", "/Users/tylercovalt/Documents/OSRS_Render_MCP/bridge/src/index.ts"],
+      "cwd": "/Users/tylercovalt/Documents/OSRS_Render_MCP/bridge"
+    }
+  }
+}

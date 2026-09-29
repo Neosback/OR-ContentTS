@@ -8,7 +8,7 @@ See [ROADMAP.md](ROADMAP.md) for where the project is going.
 
 ## Packages
 
-- [`client/`](client/): the Studio frontend (Vite, TypeScript, React, WebGL2).
+- [`client/`](client/): the Studio frontend (Vite, TypeScript, Svelte 5 with dockview for the Studio UI, WebGL2 rendering). The legacy game client inside it is React.
 - [`server/`](server/): the legacy TypeScript game server. The Studio only uses it to download the OSRS cache (`server/scripts/ensure-cache.ts`) and, optionally, for `/api/world` spawn and zone data. It is kept for reference and will be replaced by the OpenRune Studio backend (see the roadmap).
 
 ## Quick start
@@ -25,7 +25,7 @@ Open <http://localhost:3000>. The first start downloads the OSRS cache (about 20
 | Route | What it opens |
 | --- | --- |
 | `/` | Studio home |
-| `/map-editor` | Map editor, straight into the scene, no login |
+| `/map-editor` | Map editor workspace: dockable Scene, Inspector, Search, Paint and Layers panels, no login |
 | `/play` | Legacy game client (login screen), kept for later tooling |
 
 `yarn start` from the root still starts the legacy game server and the client together, if you need `/api/world` data.
@@ -39,7 +39,7 @@ Run these from `client/`:
 | `npm run start` | Ensure the cache is downloaded, then start the Vite dev server on port 3000 |
 | `npm run build` | Production build into `client/build` |
 | `npm run preview` | Serve the production build locally (also serves `/caches`) |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run typecheck` | `svelte-check` (TypeScript and Svelte) |
 | `npm test` | Node tests (tsx) |
 
 ## Configuration

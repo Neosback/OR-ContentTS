@@ -24,19 +24,32 @@ The RSPSi backend has a long way to go, so the frontend is built first. Everythi
 
 - `/` Studio home, `/map-editor` opens the editor directly with no login, `/play` keeps the legacy client.
 - The editor runs standalone: Esc and Ctrl+E no longer drop to the login screen.
-- Build moved from CRA/craco/webpack to Vite 8. Dev start went from minutes to under a second, and production builds take about 5 seconds.
+- Build moved from CRA/craco/webpack to Vite 8. Dev start went from minutes to under a second, and production builds take a few seconds.
 
-## Phase 1: Studio UI foundation
+## Phase 1: Studio UI foundation (in progress)
 
 Goal: a real workspace for the map editor, with a framework-neutral panel model.
 
-- [ ] Decide the shell framework: **Svelte 5** or keep **React 19**. The choice is cheap either way: only about 19 files use React, and the editor UI (`EditorUi`, toolbar, palette, world map) is plain DOM.
-- [ ] Dockable layout with **dockview** (`dockview-core` plus a small Svelte adapter, or `dockview-react`).
-- [ ] Panel contract: `mount(element, context) → dispose`. Tools never import the shell framework directly.
-- [ ] The scene canvas becomes one dock panel. Keep a **single WebGL2 context**: WebGL2 cannot share GPU resources between contexts, so extra 3D views (model preview, minimap) render into the same canvas with scissored viewports.
-- [ ] Move the existing editor UI into panels: tool palette, inspector, search, world map, settings.
-- [ ] Shared command and keyboard-shortcut registry instead of per-tool key handlers.
-- [ ] Studio visual style (theme tokens, dark and light).
+Done so far:
+
+- [x] Shell framework: **Svelte 5** for Studio UI. React stays only inside the legacy client (the scene panel and `/play`).
+- [x] Dockable layout with **dockview-core** and a small in-house adapter (`client/studio/workspace/dock.ts`). The community `dockview-svelte` package depends on the React `dockview` package, so it is not used.
+- [x] Panel contract: `mount(element) → dispose` (`client/studio/workspace/panel.ts`). Panels can be Svelte, React or plain DOM.
+- [x] The scene is a dock panel that keeps the **single WebGL2 context** (`renderer: "always"`, fixed tab). It sizes the client through `--app-vw/--app-vh`.
+- [x] Framework-free bridges between the editor and the Studio (`client/studio/bridge/`): the editor publishes its plugin, and the workspace offers named slots for the editor's DOM chrome.
+- [x] **Layers** panel (native Svelte): height level, view toggles, zone overlays. Replaces the floating top bar and settings drawer.
+- [x] **Inspector** panel, native Svelte: selection summary, right-click options, object/area/building actions, image capture, definition fields. (NPC shop assignment stays in the legacy `/play?edit` editor until world/content data comes from the Companion.)
+- [x] **Search** panel: NPC/object/item search with keyboard navigation, pick-to-place, and definitions. The editor toolbar's search button opens it.
+- [x] **Paint** panel: terrain overlay swatches for the paint and path tools. The toolbar's overlay button opens it.
+- [x] Layout remembered per browser; a **Panels** menu in the header toggles panels and resets the layout.
+- [x] Studio theme tokens (dark and light) applied to the Studio UI and dock.
+
+Next:
+
+- [ ] Shops and the world map as dock panels (they still float inside the scene panel).
+- [ ] Shared command and keyboard-shortcut registry. The editor currently listens on `window` in capture phase, so this needs care.
+- [ ] Bring the remaining editor chrome onto the theme tokens (it is still dark-only).
+- [ ] Extra 3D views (model preview, minimap) share the scene's WebGL2 context through scissored viewports. WebGL2 cannot share GPU resources between contexts.
 
 ## Phase 2: backend-ready seams
 
@@ -74,6 +87,7 @@ Tracked mostly in RSPSi. The frontend side:
 - [ ] Render-backend interface above today's picogl code (`DrawBackend` only covers draw calls today). WebGL2 remains the reference backend.
 - [ ] Optional **WebGPU** backend: one device for several canvases, compute culling.
 - [ ] **meshoptimizer** for simplified distant terrain (zoomed-out world view), only if profiling shows triangle count matters.
+- [ ] **Rust → WASM** for the hot paths profiling points at (likely candidates: region/scene building, model decoding, terrain lighting). Run it in the existing render workers behind the same TypeScript interfaces, keep the TypeScript version as the reference, and test both against the same fixtures.
 
 ## Phase 6: more Studio tools
 

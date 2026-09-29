@@ -1,8 +1,8 @@
 import fs from "fs";
 import sharp from "sharp";
 
-import { CacheSystem } from "../../rs/cache/CacheSystem";
-import { getCacheLoaderFactory } from "../../rs/cache/loader/CacheLoaderFactory";
+import { CacheSystem } from "../../src/rs/cache/CacheSystem";
+import { getCacheLoaderFactory } from "../../src/rs/cache/loader/CacheLoaderFactory";
 import { loadCache, loadCacheInfos, loadCacheList } from "./load-util";
 
 function saveArgbArrayToPng(pixels: Int32Array, width: number, height: number, outputPath: string) {
@@ -36,7 +36,7 @@ const cacheInfo = cacheList.latest;
 
 const loadedCache = loadCache(cacheInfo);
 
-const cacheSystem = CacheSystem.fromFiles(cacheInfo, loadedCache.files);
+const cacheSystem = CacheSystem.fromFiles(loadedCache.type, loadedCache.files);
 const cacheLoaderFactory = getCacheLoaderFactory(cacheInfo, cacheSystem);
 
 const textureLoader = cacheLoaderFactory.getTextureLoader();

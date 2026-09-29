@@ -6,10 +6,10 @@
     "node": ">=22.16.0"
   },
   "scripts": {
-    "setup": "npm exec --yes --package @yarnpkg/cli-dist@4.12.0 -- yarn install --immutable && npm exec --yes --package @yarnpkg/cli-dist@4.12.0 -- yarn --cwd server install --immutable && npm exec --yes --package @yarnpkg/cli-dist@4.12.0 -- yarn --cwd client install --immutable",
-    "start": "yarn --cwd server ensure-cache && yarn concurrently --kill-others --names server,client \"yarn --cwd server dev\" \"yarn --cwd client start\"",
+    "setup": "npm exec --yes --package @yarnpkg/cli-dist@4.12.0 -- yarn install --immutable && npm exec --yes --package @yarnpkg/cli-dist@4.12.0 -- yarn --cwd server install --immutable && npm --prefix client ci",
+    "start": "yarn --cwd server ensure-cache && yarn concurrently --kill-others --names server,client \"yarn --cwd server dev\" \"npm --prefix client run dev\"",
     "server": "yarn --cwd server dev",
-    "client": "npm --prefix client run start"
+    "client": "npm --prefix client run dev"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

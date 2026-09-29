@@ -6,7 +6,7 @@
       "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
         "-c",
-        "cd client && npm run start"
+        "cd client && npx next dev -p 3000"
       ],
       "port": 3000,
       "autoPort": false

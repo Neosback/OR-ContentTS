@@ -1,0 +1,213 @@
+/*
+ * Studio design tokens. Everything Studio-owned reads these; dark is the
+ * default, light follows the OS unless data-theme="dark" is set on <html>.
+ * The map editor's older floating chrome (EditorUi) is still dark-only.
+ */
+:root {
+    --studio-bg: #0f1115;
+    --studio-surface: #171a21;
+    --studio-surface-2: #1e232c;
+    --studio-border: #2a303b;
+    --studio-text: #e6e8eb;
+    --studio-muted: #8b93a1;
+    --studio-accent: #e0a526;
+    --studio-accent-text: #1a1406;
+    --studio-focus: #60a5fa;
+    --studio-zone-pvp: #f87171;
+    --studio-zone-multi: #fbbf24;
+    --studio-zone-duel: #a78bfa;
+    --studio-zone-safe: #4ade80;
+    --studio-radius: 6px;
+    --studio-font:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --studio-bg: #f5f6f8;
+        --studio-surface: #ffffff;
+        --studio-surface-2: #eef0f3;
+        --studio-border: #d6dae1;
+        --studio-text: #1b1f24;
+        --studio-muted: #5b6472;
+        --studio-accent: #b7791f;
+        --studio-accent-text: #ffffff;
+        --studio-focus: #2563eb;
+        --studio-zone-pvp: #dc2626;
+        --studio-zone-multi: #b45309;
+        --studio-zone-duel: #7c3aed;
+        --studio-zone-safe: #16a34a;
+        color-scheme: light;
+    }
+}
+
+#root {
+    background: var(--studio-bg);
+}
+
+/* dockview theme built on the tokens (sizes follow dockview's dark theme). */
+.dockview-theme-studio {
+    --dv-tabs-and-actions-container-font-size: 12px;
+    --dv-tabs-and-actions-container-height: 32px;
+    --dv-overlay-z-index: 999;
+    --dv-tab-font-size: inherit;
+    --dv-border-radius: 0px;
+    --dv-tab-margin: 0;
+    --dv-spacing-padding: 0px;
+    --dv-tab-border-radius: 0px;
+    --dv-sash-border-radius: 0px;
+    --dv-dropdown-border-radius: 4px;
+    --dv-tab-close-icon-size: inherit;
+    --dv-active-sash-transition-duration: 0.1s;
+    --dv-active-sash-transition-delay: 0.3s;
+    --dv-floating-group-border: none;
+    --dv-drag-over-border: none;
+    --dv-floating-group-dragging-opacity: 0.5;
+    --dv-floating-titlebar-height: 22px;
+    --dv-floating-titlebar-background-color: var(--dv-tabs-and-actions-container-background-color);
+    --dv-floating-titlebar-border-bottom: var(--dv-floating-border);
+    --dv-floating-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
+    --dv-floating-border: 1px solid var(--studio-border);
+    --dv-tab-group-chip-padding: 4px 8px;
+    --dv-tab-group-chip-border-radius: 6px;
+    --dv-tab-group-chip-font-size: 11px;
+    --dv-tab-group-line-height: 2px;
+    --dv-tab-group-line-opacity: 0.6;
+
+    --dv-group-view-background-color: var(--studio-bg);
+    --dv-tabs-and-actions-container-background-color: var(--studio-surface);
+    --dv-activegroup-visiblepanel-tab-background-color: var(--studio-bg);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--studio-surface);
+    --dv-inactivegroup-visiblepanel-tab-background-color: var(--studio-bg);
+    --dv-inactivegroup-hiddenpanel-tab-background-color: var(--studio-surface);
+    --dv-tab-divider-color: var(--studio-border);
+    --dv-activegroup-visiblepanel-tab-color: var(--studio-text);
+    --dv-activegroup-hiddenpanel-tab-color: var(--studio-muted);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--studio-muted);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--studio-muted);
+    --dv-separator-border: var(--studio-border);
+    --dv-paneview-header-border-color: var(--studio-border);
+    --dv-paneview-active-outline-color: var(--studio-focus);
+    --dv-drag-over-background-color: color-mix(in srgb, var(--studio-accent) 22%, transparent);
+    --dv-drag-over-border-color: var(--studio-accent);
+    --dv-edge-dock-indicator-color: var(--studio-accent);
+    --dv-icon-hover-background-color: color-mix(in srgb, var(--studio-text) 12%, transparent);
+    --dv-sash-color: transparent;
+    --dv-active-sash-color: var(--studio-accent);
+    --dv-tabs-container-scrollbar-color: var(--studio-muted);
+    --dv-scrollbar-background-color: var(--studio-border);
+    --dv-context-menu-background-color: var(--studio-surface-2);
+    --dv-context-menu-color: var(--studio-text);
+    --dv-tab-group-color-grey: #5f6368;
+    --dv-tab-group-color-blue: #1a73e8;
+    --dv-tab-group-color-red: #d93025;
+    --dv-tab-group-color-yellow: #f9ab00;
+    --dv-tab-group-color-green: #188038;
+    --dv-tab-group-color-pink: #d01884;
+    --dv-tab-group-color-purple: #a142f4;
+    --dv-tab-group-color-cyan: #007b83;
+    --dv-tab-group-color-orange: #e8710a;
+
+    font-family: var(--studio-font);
+}
+
+.studio-panel {
+    height: 100%;
+    overflow: auto;
+    color: var(--studio-text);
+    font: 13px/1.4 var(--studio-font);
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.studio-fixed-tab {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 12px;
+}
+
+/* The scene panel is the containing block for the editor's floating tools. */
+.studio-panel.studio-scene {
+    position: relative;
+    overflow: hidden;
+    contain: layout;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.studio-scene__client {
+    position: absolute;
+    inset: 0;
+}
+
+/* The game's minimum window size protects game widgets; the editor has none. */
+.studio-scene .game-viewport {
+    min-width: 0;
+    min-height: 0;
+}
+
+
+
+/* Shared Studio controls, used by panels. */
+.studio-section-title {
+    margin: 0 0 8px;
+    color: var(--studio-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.studio-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+    background: var(--studio-surface);
+    color: var(--studio-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.studio-button:hover:not(:disabled) {
+    background: var(--studio-surface-2);
+}
+
+.studio-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.studio-button.danger {
+    color: var(--studio-zone-pvp);
+}
+
+.studio-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 8px;
+    border: 1px solid var(--studio-border);
+    border-radius: var(--studio-radius);
+    background: var(--studio-bg);
+    color: var(--studio-text);
+    font: inherit;
+}
+
+.studio-button:focus-visible,
+.studio-input:focus-visible {
+    outline: 2px solid var(--studio-focus);
+    outline-offset: 1px;
+}
+
+.studio-empty {
+    margin: 0;
+    color: var(--studio-muted);
+    font-size: 12px;
+}
