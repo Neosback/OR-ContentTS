@@ -63,7 +63,7 @@ Next:
 
 Goal: the frontend works fully offline, with every server dependency behind an interface the OpenRune server can implement later.
 
-- [ ] Formalize `CacheSource`: static/range-backed local cache today, backend-served later.
+- [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches and browser-imported IndexedDB profiles behind one contract; future OpenRune cache delivery implements the same interface.
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
@@ -84,7 +84,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 ## Phase 4: OpenRune backend integration
 
 - [ ] OpenRune Studio server module on top of the OpenRune FileStore/domain layer.
-- [ ] Serve caches with Range support and versioned names.
+- [ ] Add an OpenRune-backed `CacheSource` serving versioned caches with Range support.
 - [ ] Implement `WorldSource` and project APIs.
 - [ ] Accept edit batches, validate and save projects.
 - [ ] Explicit **Publish Cache** and **Build OpenRune Project** actions with structured results.
