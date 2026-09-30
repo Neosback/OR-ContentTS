@@ -12,13 +12,14 @@
     } from "../../mapviewer/MapViewerRenderers";
     import type { MapViewerUiState } from "./map-viewer-state.svelte";
 
-    enum VarType {
-        VARP = 0,
-        VARBIT = 1,
-    }
+    const VarType = {
+        VARP: 0,
+        VARBIT: 1,
+    } as const;
+    type VarType = (typeof VarType)[keyof typeof VarType];
 
-    let { state }: { state: MapViewerUiState } = $props();
-    const mapViewer = state.mapViewer;
+    let { state: viewerState }: { state: MapViewerUiState } = $props();
+    const mapViewer = viewerState.mapViewer;
 
     let projectionType = $state(mapViewer.camera.projectionType);
     let fov = $state(mapViewer.camera.fov);
@@ -138,7 +139,7 @@
 <div class="map-controls-panel flex h-full max-h-full min-h-0 flex-col overflow-hidden">
     <div class="flex items-center justify-between border-b border-border bg-muted/30 px-2.5 py-1.5">
         <p class="text-[11px] font-semibold tracking-wide text-muted-foreground">Map Controls</p>
-        <button type="button" class="rounded-md border border-input px-1.5 py-0.5 text-[10px] hover:bg-background" onclick={() => state.toggleUi()}>
+        <button type="button" class="rounded-md border border-input px-1.5 py-0.5 text-[10px] hover:bg-background" onclick={() => viewerState.toggleUi()}>
             Hide UI
         </button>
     </div>
@@ -217,10 +218,10 @@
                     <span class="text-muted-foreground">Renderer</span>
                     <select
                         class="h-8 w-full rounded-md border border-input bg-background px-2"
-                        value={state.renderer?.type}
+                        value={viewerState.renderer?.type}
                         onchange={(event) => {
                             const type = event.currentTarget.value as MapViewerRendererType;
-                            if (state.renderer?.type !== type) state.setRenderer(createRenderer(type, mapViewer));
+                            if (viewerState.renderer?.type !== type) viewerState.setRenderer(createRenderer(type, mapViewer));
                         }}
                     >
                         {#each rendererOptions as option (option.value)}
@@ -235,9 +236,9 @@
                         type="number"
                         min="1"
                         max="999"
-                        value={state.renderer?.fpsLimit ?? 60}
+                        value={viewerState.renderer?.fpsLimit ?? 60}
                         onchange={(event) => {
-                            if (state.renderer) state.renderer.fpsLimit = Number(event.currentTarget.value || 60);
+                            if (viewerState.renderer) viewerState.renderer.fpsLimit = Number(event.currentTarget.value || 60);
                         }}
                     />
                 </label>
@@ -297,6 +298,6 @@
             </div>
         </details>
 
-        <div class="content-text px-1 text-[11px]">{state.debugText ?? ""}</div>
+        <div class="content-text px-1 text-[11px]">{viewerState.debugText ?? ""}</div>
     </div>
 </div>

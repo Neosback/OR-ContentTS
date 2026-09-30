@@ -7,7 +7,7 @@
     import Minimap from "./Minimap.svelte";
     import type { MapViewerUiState } from "./map-viewer-state.svelte";
 
-    let { state }: { state: MapViewerUiState } = $props();
+    let { state: viewerState }: { state: MapViewerUiState } = $props();
     let host = $state<HTMLDivElement>();
     let dock: StudioDock | undefined;
 
@@ -18,14 +18,14 @@
                 id: "controls",
                 title: "Controls",
                 component: MapViewerControls,
-                props: { state },
+                props: { state: viewerState },
                 isolateInput: true,
             }),
             sveltePanel({
                 id: "minimap",
                 title: "Minimap",
                 component: Minimap,
-                props: { state },
+                props: { state: viewerState },
                 isolateInput: true,
             }),
         ];

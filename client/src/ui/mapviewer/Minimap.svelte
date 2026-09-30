@@ -1,18 +1,18 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
 
-    import "../../../components/rs/minimap/MinimapContainer.css";
-    import compassSrc from "../../../components/rs/minimap/compass.png";
-    import frameSrc from "../../../components/rs/minimap/minimap-frame.png";
-    import minimapBlack from "../../../components/rs/minimap/minimap-black.png";
-    import { RS_TO_DEGREES } from "../../../rs/MathConstants";
+    import "../../components/rs/minimap/MinimapContainer.css";
+    import compassSrc from "../../components/rs/minimap/compass.png";
+    import frameSrc from "../../components/rs/minimap/minimap-frame.png";
+    import minimapBlack from "../../components/rs/minimap/minimap-black.png";
+    import { RS_TO_DEGREES } from "../../rs/MathConstants";
     import type { MapViewerUiState } from "./map-viewer-state.svelte";
 
-    let { state }: { state: MapViewerUiState } = $props();
+    let { state: viewerState }: { state: MapViewerUiState } = $props();
     let imageHost = $state<HTMLDivElement>();
     let raf = 0;
 
-    const yawDegrees = $derived((2047 - state.cameraYaw) * RS_TO_DEGREES);
+    const yawDegrees = $derived((2047 - viewerState.cameraYaw) * RS_TO_DEGREES);
 
     $effect(() => {
         const host = imageHost;
@@ -31,7 +31,7 @@
         }
 
         const frame = (): void => {
-            const pos = state.getPosition();
+            const pos = viewerState.getPosition();
             const cameraMapX = pos.x >> 6;
             const cameraMapY = pos.y >> 6;
             const offsetX = (-128 + (pos.x % 64) * 4) | 0;
@@ -45,7 +45,7 @@
                     const image = images[index++]!;
                     image.style.left = `${mx * 255 - offsetX}px`;
                     image.style.top = `${255 * 2 - my * 255 + offsetY}px`;
-                    const nextSrc = state.loadMinimapImageUrl(mapX, mapY) ?? minimapBlack;
+                    const nextSrc = viewerState.loadMinimapImageUrl(mapX, mapY) ?? minimapBlack;
                     if (image.src !== new URL(nextSrc, window.location.href).href) image.src = nextSrc;
                 }
             }
@@ -75,12 +75,12 @@
             style:transform="rotate({yawDegrees}deg)"
             alt=""
             src={compassSrc}
-            onclick={() => state.mapViewer.camera.setYaw(0)}
+            onclick={() => viewerState.mapViewer.camera.setYaw(0)}
         />
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="worldmap-icon" onclick={() => state.openWorldMap()}></div>
+        <div class="worldmap-icon" onclick={() => viewerState.openWorldMap()}></div>
     </div>
-    <div class="fps-counter content-text text-[11px]">{state.fps}</div>
-    <div class="fps-counter content-text text-[11px]">{state.debugText ?? ""}</div>
+    <div class="fps-counter content-text text-[11px]">{viewerState.fps}</div>
+    <div class="fps-counter content-text text-[11px]">{viewerState.debugText ?? ""}</div>
 </div>
