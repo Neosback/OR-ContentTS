@@ -1,6 +1,5 @@
 import { vec3 } from "gl-matrix";
 import type { AddPanelOptions } from "dockview-core";
-import { URLSearchParamsInit } from "react-router-dom";
 
 
 
@@ -1363,7 +1362,7 @@ export class MapEditor {
         );
     }
 
-    getSearchParams(): URLSearchParamsInit {
+    getSearchParams(): Record<string, string> {
         return {};
     }
 
