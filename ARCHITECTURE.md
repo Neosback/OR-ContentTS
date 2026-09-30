@@ -93,6 +93,28 @@ The OpenRune backend will eventually own:
 
 The frontend should continue to implement local/offline versions of these interfaces first so the UI remains usable without a running OpenRune server.
 
+### Cache access
+
+Cache acquisition is framework-neutral and sits behind `CacheSource`:
+
+```text
+Cache Repository / map viewer / map editor
+              |
+     profile source resolution
+              |
+          CacheSource
+          /         \
+StaticRangeCacheSource   IndexedDbProfileCacheSource
+          |
+ future OpenRuneCacheSource
+```
+
+`client/src/cache/cache-source.ts` defines the shared loaded-cache contract and load options. `StaticRangeCacheSource` owns the Studio-served `/caches` source and preserves HTTP Range-capable loading through `CacheFiles`. `IndexedDbProfileCacheSource` adapts browser-imported cache files to the same contract.
+
+Persisted `server:<cache-name>` profile ids remain supported as a compatibility binding, but the prefix is resolved by the cache-source layer rather than by IndexedDB storage. `profile-cache-store.ts` only stores imported cache bytes.
+
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. Future OpenRune cache delivery should implement `CacheSource` rather than adding backend-aware branches to Svelte screens or map/rendering code.
+
 ### Project persistence
 
 Project persistence is framework-neutral:
