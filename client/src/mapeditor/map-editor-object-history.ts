@@ -1,6 +1,6 @@
 import { getMapSquareId } from "../rs/map/MapFileIndex";
 import { Loc } from "../rs/scene/Loc";
-import type { MapEditorHistoryTool } from "./map-editor-history";
+import { runEditTransaction, type EditorTransactionSource } from "./editor-transaction";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import type { EditorMapSquare } from "./webgl/EditorMapSquare";
 import { getObjectChunkIdsForTileRect } from "./webgl/objectChunk";
@@ -311,7 +311,7 @@ export function applyObjectSnapshotEntries(
     markChunksForEntries(map, mapId, renderer, [...clearEntries, ...applyEntries]);
 }
 
-export function recordHistoryObjectMutation(
+export function recordEditObjectMutation(
     host: IEditorPluginHost,
     map: EditorMapSquare,
     level: number,
@@ -319,28 +319,31 @@ export function recordHistoryObjectMutation(
     readBefore: () => SceneTileLocData[],
     mutate: () => boolean,
     readAfter: () => SceneTileLocData[],
-    tool: MapEditorHistoryTool = "object-selector",
+    source: EditorTransactionSource = "object-selector",
 ): boolean {
     if (host.isHistoryApplying()) {
         return mutate();
     }
 
-    const before = readBefore();
-    host.beginHistoryStroke(tool, label);
-    const ok = mutate();
-    if (!ok) {
-        host.cancelHistoryStroke();
-        return false;
-    }
-    const after = readAfter();
-    if (!entriesEqual(before, after)) {
-        host.recordHistoryObjectChange(
-            getMapSquareId(map.mapX, map.mapY),
-            level,
-            cloneSceneTileLocEntries(before),
-            cloneSceneTileLocEntries(after),
-        );
-    }
-    host.commitHistoryStroke();
-    return true;
+    return runEditTransaction(host, { source, label }, () => {
+        const before = readBefore();
+        const ok = mutate();
+        if (!ok) return false;
+
+        const after = readAfter();
+        if (!entriesEqual(before, after)) {
+            host.recordEditMutation({
+                kind: "map.objects",
+                mapId: getMapSquareId(map.mapX, map.mapY),
+                level,
+                before: cloneSceneTileLocEntries(before),
+                after: cloneSceneTileLocEntries(after),
+            });
+        }
+        return true;
+    });
 }
+
+
+/** @deprecated Use recordEditObjectMutation. */
+export const recordHistoryObjectMutation = recordEditObjectMutation;
