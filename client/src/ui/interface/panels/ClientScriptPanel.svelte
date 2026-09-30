@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
-    import ComingSoonPanel from "./ComingSoonPanel.svelte";
     import Cs2ManualRunner from "./Cs2ManualRunner.svelte";
     import Cs1Simulator from "./Cs1Simulator.svelte";
 
