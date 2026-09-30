@@ -50,11 +50,11 @@ Run these from `client/`:
 | `npm run validate` | Run all blocking client gates: UI boundary, Svelte, TypeScript, tests and production build |
 | `npm run validate:types` | Run full-tree Svelte and TypeScript diagnostics |
 
-## Configuration
+## Local cache configuration
 
-Client settings live in `client/.env` (see [`client/.env.example`](client/.env.example)). Vite inlines `VITE_*` variables at build time, so never put secrets in them. The most useful one is `VITE_CACHE_BASE_URL`, which points the client at a cache served from somewhere other than `/caches/`.
+The committed `client/cache-target.json` controls the local development cache revision. `npm run ensure-cache` resolves that revision against OpenRS2 and writes it to the gitignored `client/caches` directory.
 
-The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` with HTTP Range support. `npm run ensure-cache` bootstraps the configured revision without requiring a game server. The client streams only the cache ranges it needs and keeps them in browser storage.
+The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` with HTTP Range support. The client streams only the cache ranges it needs and keeps imported/profile caches in browser storage.
 
 ## OpenRune backend
 
