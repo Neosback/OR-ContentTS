@@ -20,10 +20,9 @@ This is the active Studio UI layer.
 
 - Svelte 5 is the UI framework.
 - It may import framework-neutral TypeScript services, renderers, decoders, editor hosts, and data models.
-- It must not import React, React DOM, `dockview-react`, or TSX modules.
 - New Studio UI belongs here unless there is a strong architectural reason otherwise.
 
-The CI boundary check enforces this rule.
+The client-wide CI boundary check rejects JSX/TSX, React-family imports, and React-era direct dependencies anywhere under the active client source tree.
 
 ### Framework-neutral TypeScript
 
@@ -36,16 +35,9 @@ The RuneScape/cache/rendering/editor runtime lives outside the Svelte component 
 
 These modules should avoid depending on a UI framework when practical. UI components consume these modules, not the other way around.
 
-### Retained legacy TSX
+### React migration status
 
-The repository still contains legacy React/TSX sources outside `src/ui/`. They are retained temporarily because the migration removed the active React entrypoint before removing every historical/reference component.
-
-Important rules:
-
-1. Legacy TSX must not be imported back into the active Svelte UI.
-2. React build/type dependencies remain temporarily while retained TSX is still included by TypeScript.
-3. Removal of legacy TSX and React-only dependencies should happen as a dedicated cleanup after references are classified and validation remains green.
-4. Do not add new features to the legacy React surface.
+The active client source tree is now Svelte/TypeScript only. The retained React/TSX migration surface and its direct React-only dependency/tooling stack have been removed. Framework-neutral TypeScript remains outside `src/ui/` for rendering, cache, editor, and game-domain code.
 
 ## Rendering
 
@@ -70,4 +62,4 @@ npm test
 npm run build
 ```
 
-Retained legacy TSX is quarantined from the active typecheck root. If active code imports a retained TSX module, TypeScript still follows that dependency and checks it. The Svelte UI boundary separately prevents React/TSX from re-entering `src/ui`.
+The architecture gate scans the full active client source tree and package manifest so JSX/TSX and React-era dependencies cannot silently re-enter the Studio.
