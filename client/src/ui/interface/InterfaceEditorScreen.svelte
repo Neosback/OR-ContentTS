@@ -84,8 +84,8 @@
 <div class="App max-height flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     {#if errorMessage}
         <div class="center-container max-height content-text">{errorMessage}</div>
-    {:else if state}
-        <InterfaceWorkbench {state} />
+    {:else if editorState}
+        <InterfaceWorkbench state={editorState} />
     {:else}
         <div class="center-container max-height">
             <OsrsLoadingBar text={`${loadingLabel} - ${progress}%`} {progress} />
