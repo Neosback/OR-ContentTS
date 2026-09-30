@@ -59,6 +59,18 @@ Transactions are framework-neutral TypeScript. Current mutation kinds cover map 
 
 History entries retain compatibility projections for existing map replay/UI code, but the transaction mutation list is the forward-facing representation for persistence and backend integration.
 
+### Edit Format v1
+
+The persistence/backend contract is defined by:
+
+- `client/src/project/edit-format-v1.schema.json` — machine-readable JSON Schema
+- `client/src/project/edit-format-v1.ts` — TypeScript normalization, validation, encoding, and decoding
+- `client/src/project/fixtures/edit-format-v1.golden.json` — canonical cross-language parity fixture
+
+Edit Format v1 deliberately does not expose packed runtime ids or renderer-local scene coordinates. Tile mutations use explicit map/local coordinates. Object mutations use semantic loc placements (`id`, `flags`, `worldX`, `worldY`).
+
+Derived metadata such as affected maps and tile counts is validated against the mutation list. Unknown fields and unsupported versions are rejected. New mutation families that cannot be expressed by the v1 schema should be introduced through an explicit schema version rather than silently extending v1 payloads.
+
 ## Backend boundary
 
 The frontend is designed to work offline today. Server-backed behavior should sit behind explicit interfaces so the future RSPSi/OpenRune Studio backend can replace local/static implementations without rewriting the UI.
