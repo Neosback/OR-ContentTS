@@ -4,12 +4,15 @@ import { getActiveProfileIdAsync, loadLocalCacheProfilesAsync } from "../../lib/
 import { resolveActiveProfileCache } from "../../lib/resolve-active-profile-cache";
 import { MapEditor } from "../../mapeditor/MapEditor";
 import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
+import { collectEditReplayMapRefs, replayEditBatchV1 } from "../../project/edit-format-v1-replay";
+import type { Project } from "../../project/project-store";
 import type { CacheList } from "../../mapviewer/Caches";
 import { getMapRenderWorkerPool } from "../../mapviewer/map-render-worker-pool";
 import { renderDataLoaderSerializer } from "../../mapviewer/worker/RenderDataLoader";
 import { isIos } from "../../util/DeviceUtil";
 import { readJson, readStorage, writeStorage } from "../lib/persisted";
 import { router } from "../lib/router.svelte";
+import type { ProjectSessionController } from "./project-session.svelte";
 
 registerSerializer(renderDataLoaderSerializer);
 
@@ -192,10 +195,12 @@ function boundsAround(mapX: number, mapY: number, radius: number): Bounds {
  * the editor, run the Region/Sandbox launch card, and track "last loaded" maps.
  */
 export class LaunchController {
+    constructor(readonly projects: ProjectSessionController) {}
     // ── loading ──────────────────────────────────────────────
     loadingLabel = $state("Loading selected cache...");
     loadingProgress = $state(0);
     errorMessage = $state<string | undefined>();
+    projectMessage = $state<string | undefined>();
     mapEditor = $state.raw<MapEditor | undefined>();
     pluginHost = $state.raw<IEditorPluginHost | undefined>();
     activeCacheProfileId = $state("");
@@ -259,6 +264,9 @@ export class LaunchController {
     start(): void {
         if (this.started) return;
         this.started = true;
+        this.projects.start().catch((error: unknown) => {
+            this.projectMessage = error instanceof Error ? error.message : String(error);
+        });
         window.addEventListener("beforeunload", this.saveOnExit);
 
         if (isIos) {
@@ -320,6 +328,7 @@ export class LaunchController {
         this.loadingProgress = 100;
         this.mapEditor = editor;
         this.pluginHost = editor.pluginHost;
+        this.projects.bindHost(editor.pluginHost);
         router.setSearchParams({});
     }
 
@@ -405,6 +414,120 @@ export class LaunchController {
         const mapY = Math.max(0, Math.min(199, target.mapY));
         const radius = Math.max(0, Math.floor(mode === "sandbox" ? this.sandboxRegionRadius : this.regionRadius));
         this.launch({ mode, mapX, mapY, regionId: mapX * 256 + mapY, radius }, mode, true);
+    }
+
+    async createProject(name: string, discardChanges = false): Promise<Project> {
+        const normalized = name.trim();
+        if (!normalized) throw new Error("Project name is required.");
+        const project = await this.projects.createProject(
+            normalized,
+            this.activeCacheProfileId,
+            this.activeCacheProfileName,
+            discardChanges,
+        );
+        this.projectMessage = `Created project "${project.name}". Choose a region to start editing.`;
+        return project;
+    }
+
+    async openProject(id: string, discardChanges = false): Promise<void> {
+        this.projectMessage = undefined;
+        const project = await this.projects.openProject(id, discardChanges);
+        await this.enterProject(project);
+    }
+
+    async importProject(serialized: string, discardChanges = false): Promise<void> {
+        this.projectMessage = undefined;
+        const project = await this.projects.importProject(serialized, discardChanges);
+        await this.enterProject(project);
+    }
+
+    private async enterProject(project: Project): Promise<void> {
+        const editor = this.mapEditor;
+        const host = this.pluginHost;
+        if (!editor || !host) throw new Error("Editor cache is not ready.");
+
+        const refs = collectEditReplayMapRefs(project.edits);
+        if (refs.length === 0) {
+            this.projectMessage = `Opened "${project.name}". Choose a region to start editing.`;
+            return;
+        }
+
+        const minX = Math.min(...refs.map((ref) => ref.mapX));
+        const minY = Math.min(...refs.map((ref) => ref.mapY));
+        const maxX = Math.max(...refs.map((ref) => ref.mapX));
+        const maxY = Math.max(...refs.map((ref) => ref.mapY));
+        host.mapManager.setAllowedBounds(minX, minY, maxX, maxY);
+
+        const first = refs[0]!;
+        editor.camera.pos[0] = first.mapX * 64 + 32;
+        editor.camera.pos[2] = first.mapY * 64 + 32;
+        editor.camera.updated = true;
+        editor.camera.updatedPosition = true;
+
+        this.isEnteringEditor = true;
+        this.enteringProgress = 5;
+        this.enteringLoaded = 0;
+        this.enteringTotal = refs.length;
+        for (const ref of refs) host.mapManager.loadMap(ref.mapX, ref.mapY);
+        this.pollProjectReady(project, refs, performance.now());
+    }
+
+    private pollProjectReady(
+        project: Project,
+        refs: ReturnType<typeof collectEditReplayMapRefs>,
+        startedAt: number,
+    ): void {
+        this.later(() => {
+            const host = this.pluginHost;
+            if (!host || !this.isEnteringEditor) return;
+
+            let loaded = 0;
+            for (const ref of refs) {
+                if (host.mapManager.getMapById(ref.mapId)) {
+                    loaded++;
+                } else {
+                    host.mapManager.loadMap(ref.mapX, ref.mapY);
+                }
+            }
+            this.enteringLoaded = loaded;
+            this.enteringProgress = Math.max(5, Math.round((loaded / Math.max(1, refs.length)) * 90));
+
+            if (loaded < refs.length) {
+                if (performance.now() - startedAt > 20000) {
+                    this.isEnteringEditor = false;
+                    this.projects.pauseHistorySync();
+                    this.projects.resetEditorToBase();
+                    this.projectMessage = `Could not load every map square required by "${project.name}".`;
+                    return;
+                }
+                this.pollProjectReady(project, refs, startedAt);
+                return;
+            }
+
+            try {
+                replayEditBatchV1(host, project.edits);
+                this.projects.resumeHistorySync(true);
+                this.enteringProgress = 100;
+                this.isEnteringEditor = false;
+                this.showLaunchPanel = false;
+                this.projectMessage = undefined;
+            } catch (error) {
+                this.projects.pauseHistorySync();
+                this.projects.resetEditorToBase();
+                this.isEnteringEditor = false;
+                this.projectMessage = error instanceof Error ? error.message : String(error);
+            }
+        }, READY_POLL_MS);
+    }
+
+    returnToLaunch(): void {
+        this.projects.pauseHistorySync();
+        this.showLaunchPanel = true;
+        this.isEnteringEditor = false;
+        this.launchMode = null;
+        this.enteringProgress = 0;
+        this.enteringLoaded = 0;
+        this.enteringTotal = 0;
     }
 
     /** Re-opens an entry from the Last Loaded list. */
@@ -505,6 +628,9 @@ export class LaunchController {
     private finishEntering(): void {
         this.launchMode = null;
         if (this.launchMeta) this.saveLastLoadedEntry(this.launchMeta, "enter");
+        if (this.projects.snapshot.project) {
+            this.projects.resumeHistorySync(true);
+        }
         this.showLaunchPanel = false;
     }
 
