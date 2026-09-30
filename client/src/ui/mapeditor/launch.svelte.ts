@@ -240,6 +240,9 @@ export class LaunchController {
     readonly isRegionIdValid = $derived(/^\d+$/.test(this.targetRegion.trim()));
     readonly isRegionCoordsValid = $derived(/^\d+$/.test(this.targetRegionX.trim()) && /^\d+$/.test(this.targetRegionY.trim()));
     readonly canOpenRegion = $derived(this.isRegionIdValid || this.isRegionCoordsValid);
+    readonly canLaunchManualRegion = $derived(
+        (this.projects.snapshot.workingEdits?.transactions.length ?? 0) === 0,
+    );
     readonly regionPreview = $derived(previewCells(this.regionRadius));
     readonly sandboxPreview = $derived(previewCells(this.sandboxRegionRadius));
     /** The sandbox preview grid is fitted into a fixed-size footprint. */
@@ -401,7 +404,12 @@ export class LaunchController {
     }
 
     launchRegion(mode: LaunchMode = this.activeMode): void {
-        if (!this.mapEditor || !this.pluginHost || (mode === "region" && !this.canOpenRegion)) return;
+        if (
+            !this.mapEditor ||
+            !this.pluginHost ||
+            !this.canLaunchManualRegion ||
+            (mode === "region" && !this.canOpenRegion)
+        ) return;
 
         let target: { mapX: number; mapY: number } | undefined;
         if (mode === "sandbox") {
