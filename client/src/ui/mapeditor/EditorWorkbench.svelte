@@ -11,8 +11,17 @@
     import TitleBar from "./TitleBar.svelte";
     import { Workbench } from "./workbench-controller.svelte";
     import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
+    import type { ProjectSessionController } from "./project-session.svelte";
 
-    let { host }: { host: IEditorPluginHost } = $props();
+    let {
+        host,
+        projectSession,
+        onCloseProject,
+    }: {
+        host: IEditorPluginHost;
+        projectSession: ProjectSessionController;
+        onCloseProject: (discardChanges: boolean) => void;
+    } = $props();
 
     const editor = new EditorState(host);
     provideEditorState(editor);
@@ -54,7 +63,7 @@
 </script>
 
 <div class="map-editor-container">
-    <TitleBar />
+    <TitleBar {projectSession} {onCloseProject} />
     <div class="map-editor-workbench-body">
         <div bind:this={dockHost} class="map-editor-workbench-dockview h-full w-full min-h-0 min-w-0"></div>
     </div>
