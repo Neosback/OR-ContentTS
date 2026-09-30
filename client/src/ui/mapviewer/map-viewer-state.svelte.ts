@@ -1,4 +1,4 @@
-import type { OsrsMenuProps } from "../components/rs/OsrsMenu.svelte";
+import type { OsrsMenuProps } from "../components/rs/osrs-menu";
 import { router } from "../lib/router.svelte";
 import type { MapViewer } from "../../mapviewer/MapViewer";
 import type { MapViewerRenderer } from "../../mapviewer/MapViewerRenderer";
