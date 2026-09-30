@@ -16,10 +16,10 @@
 </script>
 
 <div class="flex items-center gap-1">
-    <Button size="icon-xs" variant={state.mode === "fixed" ? "default" : "outline"} title="Fixed mode (512×334)" onclick={() => (state.mode = "fixed")}>
+    <Button size="icon" class="size-6" variant={state.mode === "fixed" ? "default" : "outline"} title="Fixed mode (512×334)" onclick={() => (state.mode = "fixed")}>
         <Monitor class="size-3.5" />
     </Button>
-    <Button size="icon-xs" variant={state.mode === "resizable" ? "default" : "outline"} title="Resizable mode" onclick={() => (state.mode = "resizable")}>
+    <Button size="icon" class="size-6" variant={state.mode === "resizable" ? "default" : "outline"} title="Resizable mode" onclick={() => (state.mode = "resizable")}>
         <Maximize2 class="size-3.5" />
     </Button>
     <details class="group relative">
