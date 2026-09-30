@@ -335,8 +335,22 @@ function preflightObjectMutation(
 ): void {
     const map = requireMap(renderer, mutation.mapX, mutation.mapY);
     findRuntimeEntries(map, mutation.level, mutation.before, "BASE_MISMATCH", "before");
+
+    const currentEntries = serializeSceneLocData(map.scene, map.borderSize).tiles
+        .filter((entry) => entry.level === mutation.level)
+        .map((entry) => semanticLocForEntry(map, entry))
+        .filter((entry): entry is EditLocV1 => entry !== undefined);
+
     for (const loc of mutation.after) {
         host.locTypeLoader.load(loc.id);
+        const alreadyExpected = mutation.before.some((before) => semanticLocEqual(before, loc));
+        if (!alreadyExpected && currentEntries.some((current) => semanticLocEqual(current, loc))) {
+            throw new EditReplayError(
+                "BASE_MISMATCH",
+                `Object target already exists for ${loc.id} at ${loc.worldX},${loc.worldY} on level ${mutation.level}.`,
+                [`${mutation.mapX},${mutation.mapY},${mutation.level},${loc.id},${loc.worldX},${loc.worldY}`],
+            );
+        }
     }
 }
 
