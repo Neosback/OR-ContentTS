@@ -6,7 +6,6 @@ import { useCacheType } from "@/context/cache-type-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cacheProxyHeaders } from "@/lib/cache-proxy-client";
-import type { RsInterfaceMode } from "@/components/ui/rs-interface";
 import { adaptInterfaceEntryFromApi, type ComponentType, type InterfaceEntry } from "@/lib/interface-renderer/component-types";
 import { openInterface, setCs1InterfaceEntry } from "@/lib/interface-renderer/interface-manager";
 import { applyCs2RuntimeFromSim } from "@/lib/interface-renderer/cs2/runtime-context";
@@ -25,138 +24,27 @@ import {
 } from "@/lib/interface-renderer/cs2/cs2-console-sink";
 import {
   InterfaceEditorWorkbenchProvider,
+  type InterfaceContextMenuEvent,
   type InterfaceEditorWorkbench,
   type InterfaceLegacyFilter,
   type InterfaceListEntry,
-  type TreeNode,
   type TreeRow,
 } from "./interface-editor-workbench-context";
 import { InterfaceEditorDock } from "./interface-editor-dock";
+import type { RsInterfaceMode } from "./interface-editor-workbench-model";
+import {
+  buildComponentTree,
+  flattenTree,
+  getRootWidgetV3,
+  interfaceRootLegacy,
+  legacyForInterfaceGroup,
+  unhideComponentSubtree,
+} from "./interface-editor-model-utils";
 
 function cs2DiagLineLevel(body: string): Cs2LogLevel {
   const u = body.toLowerCase();
   if (u.includes("missing") || u.includes("invalid") || u.includes("error")) return "warn";
   return "load";
-}
-
-/** Legacy flag for the interface group, matching index-3 combined ids used in `ComponentDecoder.loadLegacyMap`. */
-function interfaceRootLegacy(
-  legacy: Record<number, boolean>,
-  groupId: number,
-  componentFileIds: number[],
-): boolean | null {
-  if (componentFileIds.length === 0) return null;
-  const files = [...componentFileIds].sort((a, b) => a - b);
-  const tryOrder = files.includes(0) ? [0, ...files.filter((f) => f !== 0)] : files;
-  for (const file of tryOrder) {
-    const combined = (groupId << 16) | (file & 0xffff);
-    if (Object.prototype.hasOwnProperty.call(legacy, combined)) {
-      return legacy[combined]!;
-    }
-  }
-  return null;
-}
-
-function runtimeId(comp: ComponentType): number {
-  return typeof comp.packedId === "number" ? comp.packedId : comp.id;
-}
-
-function buildComponentTree(entry: InterfaceEntry | null, fallbackRootLayer: number): TreeNode[] {
-  if (!entry) return [];
-  const values: ComponentType[] = [];
-  const seen = new Set<ComponentType>();
-  const visit = (comp: ComponentType) => {
-    if (seen.has(comp)) return;
-    seen.add(comp);
-    values.push(comp);
-    if (Array.isArray(comp.children)) {
-      for (const ch of comp.children) {
-        if (ch) visit(ch);
-      }
-    }
-  };
-  for (const comp of Object.values(entry.components)) {
-    visit(comp);
-  }
-  const byLayer = new Map<number, ComponentType[]>();
-  for (const comp of values) {
-    const arr = byLayer.get(comp.layer);
-    if (arr) arr.push(comp);
-    else byLayer.set(comp.layer, [comp]);
-  }
-  for (const arr of byLayer.values()) {
-    arr.sort((a, b) => a.id - b.id);
-  }
-
-  const rootLayer = byLayer.has(-1) ? -1 : fallbackRootLayer;
-  const visited = new Set<ComponentType>();
-
-  const isDynamicCreated = (comp: ComponentType): boolean =>
-    Boolean((comp as ComponentType & { __dynamicCreated?: boolean }).__dynamicCreated);
-
-  const makeNode = (comp: ComponentType, keyPath: string): TreeNode => {
-    const rid = runtimeId(comp);
-    const node: TreeNode = {
-      id: comp.id,
-      runtimeId: rid,
-      type: comp.type,
-      dynamicCreated: isDynamicCreated(comp),
-      nodeKey: keyPath,
-      component: comp,
-      children: [],
-    };
-    if (visited.has(comp)) return node;
-    visited.add(comp);
-    const children = byLayer.get(rid) ?? [];
-    node.children = children.map((child, i) => makeNode(child, `${keyPath}.${i}`));
-    return node;
-  };
-
-  return (byLayer.get(rootLayer) ?? []).map((root, i) => makeNode(root, `r${i}`));
-}
-
-function getRootWidgetV3(entry: InterfaceEntry, interfaceId: number): boolean | null {
-  const values = Object.values(entry.components);
-  const byLayer = new Map<number, ComponentType[]>();
-  for (const comp of values) {
-    const arr = byLayer.get(comp.layer);
-    if (arr) arr.push(comp);
-    else byLayer.set(comp.layer, [comp]);
-  }
-  for (const arr of byLayer.values()) {
-    arr.sort((a, b) => a.id - b.id);
-  }
-  const rootLayer = byLayer.has(-1) ? -1 : interfaceId;
-  const roots = byLayer.get(rootLayer) ?? [];
-  const first = roots[0];
-  return first ? first.v3 : null;
-}
-
-/** Pre-order flatten without deep recursion or `push(...hugeArray)` (both can exceed the call stack). */
-function unhideComponentSubtree(comp: ComponentType): void {
-  comp.hide = false;
-  const ch = comp.children;
-  if (!ch) return;
-  for (const c of ch) {
-    if (c) unhideComponentSubtree(c);
-  }
-}
-
-function flattenTree(nodes: TreeNode[], depth = 0): TreeRow[] {
-  const out: TreeRow[] = [];
-  const stack: Array<{ node: TreeNode; depth: number }> = [];
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    stack.push({ node: nodes[i]!, depth });
-  }
-  while (stack.length > 0) {
-    const frame = stack.pop()!;
-    out.push({ ...frame.node, depth: frame.depth });
-    const ch = frame.node.children;
-    for (let i = ch.length - 1; i >= 0; i--) {
-      stack.push({ node: ch[i]!, depth: frame.depth + 1 });
-    }
-  }
-  return out;
 }
 
 type JsonDialogProps = {
@@ -175,20 +63,6 @@ type InterfaceViewerJsonExportDialogProps = {
   /** Interface id shown in the title when export ran for a selection. */
   exportInterfaceId: number | null;
 };
-
-function legacyForInterfaceGroup(
-  legacy: Record<number, boolean>,
-  groupId: number,
-): Record<number, boolean> {
-  const out: Record<number, boolean> = {};
-  for (const key of Object.keys(legacy)) {
-    const combined = Number(key);
-    if ((combined >>> 16) === groupId) {
-      out[combined] = legacy[combined]!;
-    }
-  }
-  return out;
-}
 
 function InterfaceViewerJsonExportDialog({
   open,
@@ -545,7 +419,7 @@ export function OpenRuneInterfaceViewer({ viewer }: OpenRuneInterfaceViewerProps
   const selectedComponentId = selectedTreeNode?.id ?? null;
 
   const handleComponentRightClick = React.useCallback(
-    (e: React.MouseEvent, nodeKey: string) => {
+    (e: InterfaceContextMenuEvent, nodeKey: string) => {
       e.preventDefault();
       setJsonDialogComponentNodeKey(nodeKey);
       setJsonDialogOpen(true);

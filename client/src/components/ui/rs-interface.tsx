@@ -15,6 +15,9 @@ import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeL
 import { applyCs2RuntimeFromSim } from "@/lib/interface-renderer/cs2/runtime-context";
 import type { CacheIndex } from "@/rs/cache/CacheIndex";
 import type { Sprite } from "@/rs/sprite/InterfaceCanvasSprite";
+import type { RsInterfaceMode } from "@/interface/interface-editor-workbench-model";
+
+export type { RsInterfaceMode } from "@/interface/interface-editor-workbench-model";
 
 const FIXED_CANVAS_WIDTH = 765;
 const FIXED_CANVAS_HEIGHT = 503;
@@ -23,7 +26,6 @@ const FIXED_VIEWPORT_HEIGHT = 334;
 const FIXED_VIEWPORT_OFFSET_X = 4;
 const FIXED_VIEWPORT_OFFSET_Y = 4;
 
-export type RsInterfaceMode = "fixed" | "resizable";
 
 export type RsInterfaceProps = {
   interfaceId: number | null;
