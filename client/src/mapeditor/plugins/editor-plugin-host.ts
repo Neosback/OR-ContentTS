@@ -3,7 +3,6 @@
  * `EditorPluginHost` forwards to the concrete editor; the interface is what you type against.
  */
 import type { AddPanelOptions } from "dockview-core";
-import type { URLSearchParamsInit } from "react-router-dom";
 
 import type { CacheList, LoadedCache } from "../../mapviewer/Caches";
 import type { Camera } from "../../mapviewer/Camera";
@@ -161,7 +160,7 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     getGizmoAppearance(): MapEditorGizmoAppearance;
     setGizmoAppearance(partial: Partial<MapEditorGizmoAppearance>): MapEditorGizmoAppearance;
 
-    getSearchParams(): URLSearchParamsInit;
+    getSearchParams(): Record<string, string>;
     applySearchParams(searchParams: URLSearchParams): void;
     updateSearchParams(): void;
     setViewMode(mode: MapEditorViewMode): void;
@@ -546,7 +545,7 @@ export class EditorPluginHost implements IEditorPluginHost {
         return this._e.setGizmoAppearance(partial);
     }
 
-    getSearchParams(): URLSearchParamsInit {
+    getSearchParams(): Record<string, string> {
         return this._e.getSearchParams();
     }
     applySearchParams(searchParams: URLSearchParams): void {
