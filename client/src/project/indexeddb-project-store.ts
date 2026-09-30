@@ -36,6 +36,10 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
     });
 }
 
+function hasErrorName(error: unknown, name: string): boolean {
+    return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === name;
+}
+
 function defaultIdFactory(): string {
     if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
     return "project-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
@@ -122,7 +126,7 @@ export class IndexedDbProjectStore implements ProjectStore {
             transaction.objectStore(PROJECT_STORE_OBJECT_STORE).add(cloneProject(project));
             await done;
         } catch (error) {
-            if (error instanceof DOMException && error.name === "ConstraintError") {
+            if (hasErrorName(error, "ConstraintError")) {
                 throw new ProjectStoreError(
                     "CONFLICT",
                     'A project with id "' + project.id + '" already exists.',
