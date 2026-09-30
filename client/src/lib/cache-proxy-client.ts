@@ -2,7 +2,7 @@ import type { CacheType } from "@/lib/cache-types";
 
 const CACHE_TYPE_COOKIE = "cache-type";
 
-/** Header value for `fetch` calls to `/api/cache-proxy/*`. */
+/** Header value for requests routed through the Vite `/api/cache-proxy/*` plugin. */
 export function cacheProxyHeaders(cacheType: Pick<CacheType, "ip" | "port">) {
   return {
     "x-cache-type": JSON.stringify({ ip: cacheType.ip, port: cacheType.port }),
@@ -10,8 +10,8 @@ export function cacheProxyHeaders(cacheType: Pick<CacheType, "ip" | "port">) {
 }
 
 /**
- * Keeps `document.cookie` in sync so requests (and e.g. `<img src="/api/cache-proxy/...">`) can reach
- * the right cache server via the Next proxy route.
+ * Keeps the cache target cookie in sync for proxy requests that cannot attach
+ * custom headers, such as image URLs used by the Interface Workbench.
  */
 export function syncCacheTypeCookie(cacheType: Pick<CacheType, "ip" | "port">) {
   if (typeof document === "undefined") return;

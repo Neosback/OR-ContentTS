@@ -1,7 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** ProjectStore + Studio-owned cache bootstrap; legacy TypeScript server removed
+**Current baseline:** ProjectStore + ProjectLifecycle/replay + CacheSource; legacy TypeScript server removed
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -219,6 +219,7 @@ These PRs establish the current baseline:
 | #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
 | #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
 | #28 | Wired ProjectLifecycle into the Svelte map-editor workflow and added strict Edit Format v1 replay into live editor history |
+| #29 | Added framework-neutral `CacheSource`, static/Range and IndexedDB implementations, profile source resolution, and Cache Repository integration |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -227,10 +228,10 @@ Do not reintroduce systems replaced by these PRs.
 The complete client gate remains the merge requirement:
 
 - clean `npm ci`
-- Svelte-only client architecture boundary: **531 files scanned**
-- Svelte check: **0 errors**
+- Svelte-only client architecture boundary: pass
+- Svelte check: pass
 - TypeScript: pass
-- Vitest: **11 files / 42 tests**
+- Vitest: pass, including cache-source, project, editor, and UI coverage
 - Vite production build: pass
 
 Run from `client/`:
@@ -344,13 +345,21 @@ After local project persistence, continue in roughly this order:
 
 Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content. Publish/build remain unavailable until the OpenRune backend implementation exists.
 
-### B. CacheSource
+### B. CacheSource — completed
 
-Formalize cache access behind a source interface.
+Cache acquisition now sits behind `client/src/cache/cache-source.ts`.
 
-Current static/range-backed cache loading should become the local implementation.
+Current implementations:
 
-The future OpenRune implementation should be able to serve versioned cache data with Range support without changing map/editor UI code.
+- `StaticRangeCacheSource` for Studio-owned `/caches` data served with Range support
+- `IndexedDbProfileCacheSource` for cache folders imported into browser storage
+- `profile-cache-source.ts` for profile-to-source resolution and compatibility with existing `server:<cache-name>` profile ids
+
+The Cache Repository and active map/editor cache resolver consume these source seams rather than selecting transport/storage implementations themselves. `profile-cache-store.ts` is storage-only and no longer owns cache loading.
+
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing callers, but generic cache acquisition belongs in the cache-source layer.
+
+A future OpenRune implementation should implement the same `CacheSource` contract and serve versioned cache data with Range support without changing the map/editor UI.
 
 ### C. WorldSource
 
@@ -447,9 +456,9 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-The project lifecycle/replay slice is complete. The next backend-ready seam is **CacheSource**: formalize current local/static cache access behind a framework-neutral source interface so a future OpenRune implementation can serve versioned cache data with Range support without rewriting the map/editor UI.
+The project lifecycle/replay and CacheSource slices are complete. The next backend-ready seam is **WorldSource**: move NPC spawn, zone/area, and other world/content data behind a framework-neutral source so offline bundled data and future OpenRune-backed data share one contract.
 
-After CacheSource, continue with **WorldSource**, then the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
+After WorldSource, continue with the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
 
 The key architectural requirement is simple:
 
