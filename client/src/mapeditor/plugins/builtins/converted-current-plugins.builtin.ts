@@ -2,9 +2,21 @@ import {
     BUILTIN_BRUSH_TYPE_PLUGINS,
     BUILTIN_WORKBENCH_UI_PLUGINS,
 } from "./current-plugin-layout.builtin";
-import type { MapEditorPlugin } from "../types";
 
 export type ConvertedPluginKind = "tool" | "toolset" | "brushes" | "workbench";
+export interface ConvertedMapEditorPlugin {
+    id: string;
+    manifest: {
+        icon: string;
+        name: string;
+        description: string;
+        author: string;
+        version: string;
+        tags: string[];
+        showInHub?: boolean;
+    };
+}
+
 const CONVERTED_PLUGIN_PREFIX = "openrune.internal";
 
 export function toConvertedPluginId(kind: ConvertedPluginKind, id: string): string {
@@ -34,7 +46,7 @@ export function parseConvertedPluginId(
     return { kind, id };
 }
 
-export const terrainPaintToolsPlugin: MapEditorPlugin = {
+export const terrainPaintToolsPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("toolset", "terrain-paint"),
     manifest: {
         icon: "🧩",
@@ -47,7 +59,7 @@ export const terrainPaintToolsPlugin: MapEditorPlugin = {
     },
 };
 
-export const heightToolPlugin: MapEditorPlugin = {
+export const heightToolPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("tool", "height"),
     manifest: {
         icon: "🧩",
@@ -60,7 +72,7 @@ export const heightToolPlugin: MapEditorPlugin = {
     },
 };
 
-export const brushesPlugin: MapEditorPlugin = {
+export const brushesPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("brushes", "all"),
     manifest: {
         icon: "🧩",
@@ -73,7 +85,7 @@ export const brushesPlugin: MapEditorPlugin = {
     },
 };
 
-export const paintToolsStripWorkbenchPlugin: MapEditorPlugin = {
+export const paintToolsStripWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[0].id),
     manifest: {
         icon: "🧩",
@@ -86,7 +98,7 @@ export const paintToolsStripWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const brushWorkspaceWorkbenchPlugin: MapEditorPlugin = {
+export const brushWorkspaceWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[1].id),
     manifest: {
         icon: "🧩",
@@ -99,7 +111,7 @@ export const brushWorkspaceWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const scene2dWorkbenchPlugin: MapEditorPlugin = {
+export const scene2dWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[2].id),
     manifest: {
         icon: "🧩",
@@ -112,7 +124,7 @@ export const scene2dWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const sceneLiveWorkbenchPlugin: MapEditorPlugin = {
+export const sceneLiveWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[3].id),
     manifest: {
         icon: "🧩",
@@ -125,7 +137,7 @@ export const sceneLiveWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const historyWorkbenchPlugin: MapEditorPlugin = {
+export const historyWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[4].id),
     manifest: {
         icon: "🧩",
@@ -138,7 +150,7 @@ export const historyWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const minimapWorkbenchPlugin: MapEditorPlugin = {
+export const minimapWorkbenchPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("workbench", BUILTIN_WORKBENCH_UI_PLUGINS[5].id),
     manifest: {
         icon: "🧩",
@@ -151,7 +163,7 @@ export const minimapWorkbenchPlugin: MapEditorPlugin = {
     },
 };
 
-export const objectSelectorToolPlugin: MapEditorPlugin = {
+export const objectSelectorToolPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("tool", "object-selector"),
     manifest: {
         icon: "🧩",
@@ -164,7 +176,7 @@ export const objectSelectorToolPlugin: MapEditorPlugin = {
     },
 };
 
-export const objectDeleteToolPlugin: MapEditorPlugin = {
+export const objectDeleteToolPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("tool", "object-delete"),
     manifest: {
         icon: "🗑",
@@ -177,7 +189,7 @@ export const objectDeleteToolPlugin: MapEditorPlugin = {
     },
 };
 
-export const regionStampToolPlugin: MapEditorPlugin = {
+export const regionStampToolPlugin: ConvertedMapEditorPlugin = {
     id: toConvertedPluginId("tool", "region-stamp"),
     manifest: {
         icon: "📋",
@@ -190,7 +202,7 @@ export const regionStampToolPlugin: MapEditorPlugin = {
     },
 };
 
-export const convertedCurrentBuiltinPlugins: readonly MapEditorPlugin[] = [
+export const convertedCurrentBuiltinPlugins: readonly ConvertedMapEditorPlugin[] = [
     terrainPaintToolsPlugin,
     heightToolPlugin,
     objectSelectorToolPlugin,

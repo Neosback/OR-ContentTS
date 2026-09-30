@@ -8,7 +8,8 @@
     import InterfaceDialogs from "./InterfaceDialogs.svelte";
     import type { InterfaceEditorState } from "./interface-editor-state.svelte";
     import ComponentTreePanel from "./panels/ComponentTreePanel.svelte";
-    import ComingSoonPanel from "./panels/ComingSoonPanel.svelte";
+    import ComponentEditorPanel from "./panels/ComponentEditorPanel.svelte";
+    import ClientScriptPanel from "./panels/ClientScriptPanel.svelte";
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
     import PreviewPanel from "./panels/PreviewPanel.svelte";
 
@@ -26,15 +27,15 @@
             sveltePanel({
                 id: "ifaceClientScript",
                 title: "Client script",
-                component: ComingSoonPanel,
-                props: { title: "Client script", note: "CS1 and CS2 tooling is the next interface migration slice." },
+                component: ClientScriptPanel,
+                props: { state: editor },
                 isolateInput: true,
             }),
             sveltePanel({
                 id: "ifaceComponentEditor",
                 title: "Component editor",
-                component: ComingSoonPanel,
-                props: { title: "Component editor", note: "Component property editing is the next interface migration slice." },
+                component: ComponentEditorPanel,
+                props: { state: editor },
                 isolateInput: true,
             }),
         ];
@@ -48,10 +49,7 @@
         });
     });
 
-    onDestroy(() => {
-        dock?.dispose();
-        editor.dispose();
-    });
+    onDestroy(() => dock?.dispose());
 </script>
 
 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">

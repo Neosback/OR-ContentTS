@@ -13,7 +13,6 @@
     import InterfaceEditorScreen from "./interface/InterfaceEditorScreen.svelte";
     import HomeScreen from "./screens/HomeScreen.svelte";
     import MapHubScreen from "./screens/MapHubScreen.svelte";
-    import NotPortedScreen from "./screens/NotPortedScreen.svelte";
     import Sidebar from "./shell/Sidebar.svelte";
     import DockLabScreen from "./dev/DockLabScreen.svelte";
 
@@ -28,11 +27,11 @@
     const isMapRoute = $derived(path.startsWith("/map"));
     const isInterfaceRoute = $derived(path.startsWith("/interface"));
     const hideSidebar = $derived(isInterfaceRoute || isPopout);
-    const fullBleed = $derived(isMapRoute || isInterfaceRoute || path === "/__dock" || path === "/__interface");
+    const fullBleed = $derived(isMapRoute || isInterfaceRoute || path === "/__dock");
 
     // Unknown routes go home, like the React router's catch-all.
     $effect(() => {
-        const known = path === "/" || (import.meta.env.DEV && (path === "/__dock" || path === "/__interface")) || path === "/cache-test" || isMapRoute || isInterfaceRoute;
+        const known = path === "/" || (import.meta.env.DEV && path === "/__dock") || path === "/cache-test" || isMapRoute || isInterfaceRoute;
         if (!known) router.navigate("/", { replace: true });
     });
 </script>
@@ -60,8 +59,6 @@
                     <HomeScreen />
                 {:else if import.meta.env.DEV && path === "/__dock"}
                     <DockLabScreen />
-                {:else if import.meta.env.DEV && path === "/__interface"}
-                    <InterfaceEditorScreen />
                 {:else if path === "/map"}
                     <MapHubScreen />
                 {:else if path === "/cache-test"}
@@ -71,7 +68,7 @@
                 {:else if path.startsWith("/map/editor")}
                     <MapEditorScreen />
                 {:else if isInterfaceRoute}
-                    <NotPortedScreen name="Interface editor" />
+                    <InterfaceEditorScreen />
                 {/if}
             </div>
         </main>

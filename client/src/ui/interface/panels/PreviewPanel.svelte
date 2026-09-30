@@ -5,6 +5,7 @@
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     let { state }: { state: InterfaceEditorState } = $props();
+    const proxyHeaders = cacheProxyHeaders(state.selectedCacheType);
 </script>
 
 <div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
@@ -49,7 +50,7 @@
                 isInterfaceLoaded={state.isInterfaceLoaded}
                 interfaceData={state.interfaceData}
                 revision={state.revision}
-                cacheHeaders={cacheProxyHeaders(state.selectedCacheType)}
+                cacheHeaders={proxyHeaders}
                 spritesById={state.viewer.spritesById}
                 clientScriptIndex={state.viewer.clientScriptIndex}
                 viewportColor={state.viewportColor}
