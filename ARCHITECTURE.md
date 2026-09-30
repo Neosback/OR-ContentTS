@@ -64,14 +64,10 @@ Every pull request that changes the client must pass the clean, reproducible blo
 ```bash
 npm ci
 npm run check:ui-boundaries
+npm run check
+npm run typecheck
 npm test
 npm run build
 ```
 
-Full-tree Svelte and TypeScript diagnostics also run in CI, but remain advisory while retained migration code and existing engine typing debt are being removed:
-
-```bash
-npm run validate:types
-```
-
-The goal is to make those diagnostics blocking once the existing debt is cleared, without allowing new React/TSX coupling back into the active Svelte UI.
+Retained legacy TSX is quarantined from the active typecheck root. If active code imports a retained TSX module, TypeScript still follows that dependency and checks it. The Svelte UI boundary separately prevents React/TSX from re-entering `src/ui`.
