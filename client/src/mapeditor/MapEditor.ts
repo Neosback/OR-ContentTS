@@ -369,7 +369,7 @@ export class MapEditor {
             this.cancelObjectCopyPlacement();
             this.clearSelectedObject();
         }
-        if (tool === "object-delete" || (this.editorTool === "object-delete" && tool !== "object-delete")) {
+        if (tool === "object-delete" || this.editorTool === "object-delete") {
             this.hoveredObject = undefined;
         }
         if (tool === "object-delete") {
