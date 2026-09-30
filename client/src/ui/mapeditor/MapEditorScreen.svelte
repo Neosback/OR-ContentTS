@@ -2,15 +2,25 @@
     import { onDestroy, onMount } from "svelte";
 
     import OsrsLoadingBar from "../components/rs/OsrsLoadingBar.svelte";
+    import EditorWorkbench from "./EditorWorkbench.svelte";
     import { LaunchController } from "./launch.svelte";
     import LaunchScreen from "./launch/LaunchScreen.svelte";
-    import EditorWorkbench from "./EditorWorkbench.svelte";
+    import { ProjectSessionController } from "./project-session.svelte";
 
-    const launch = new LaunchController();
+    const projects = new ProjectSessionController();
+    const launch = new LaunchController(projects);
     const progress = $derived(Math.max(0, Math.min(100, launch.loadingProgress)));
 
     onMount(() => launch.start());
-    onDestroy(() => launch.dispose());
+    onDestroy(() => {
+        launch.dispose();
+        projects.dispose();
+    });
+
+    function closeProjectToLaunch(discardChanges: boolean): void {
+        projects.closeProject(discardChanges);
+        launch.returnToLaunch();
+    }
 </script>
 
 <div class="App max-height flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -23,6 +33,10 @@
     {:else if launch.phase === "error"}
         <div class="center-container max-height content-text">{launch.errorMessage}</div>
     {:else if launch.pluginHost}
-        <EditorWorkbench host={launch.pluginHost} />
+        <EditorWorkbench
+            host={launch.pluginHost}
+            projectSession={projects}
+            onCloseProject={closeProjectToLaunch}
+        />
     {/if}
 </div>

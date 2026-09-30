@@ -786,6 +786,13 @@ export class MapEditor {
         this.mapEditHistory.recordMutation(mutation);
     };
 
+    appendAppliedHistoryTransaction = (
+        transaction: import("./editor-transaction").EditorTransaction,
+    ): void => {
+        this.mapEditHistory.appendAppliedTransaction(transaction);
+        this.notifyHistoryChanged();
+    };
+
     /** Compatibility wrappers while paint-stroke call sites migrate to transactions. */
     beginHistoryStroke = (tool: MapEditorHistoryTool, label?: string): void => {
         this.beginEditTransaction(tool, label);

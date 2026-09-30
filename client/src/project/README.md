@@ -50,7 +50,7 @@ Imports are strictly validated before persistence. Importing a project whose sta
 - per-record validation during listing
 - typed errors for missing, conflicting, invalid, or unavailable storage
 
-Svelte components must not access this IndexedDB database directly. The next layer is the project lifecycle service, which will own open/save/close/dirty-state behavior and feed authoritative project content through `ProjectStore`.
+Svelte components must not access this IndexedDB database directly. `ProjectLifecycle` owns open/save/close/dirty-state behavior and feeds authoritative project content through `ProjectStore`. The map-editor UI consumes it through the thin `ProjectSessionController` adapter.
 
 
 ### Validation baseline
@@ -77,3 +77,22 @@ The lifecycle deliberately persists only the **applied** portion of map-editor h
 Export includes current unsaved working edits without implicitly saving them to `ProjectStore`. Closing, creating, importing, or switching away from a dirty project requires an explicit discard decision.
 
 The lifecycle remains framework-neutral. Svelte should consume it through a thin reactive adapter rather than implementing project rules in components.
+
+
+## Edit replay and Svelte integration
+
+`edit-format-v1-replay.ts` applies persisted Edit Format v1 data back into a live map editor without making Svelte responsible for mutation semantics.
+
+The replay contract is intentionally strict:
+
+- the editor history must be clean before replay
+- every affected map square must be loaded first
+- sparse terrain `before` snapshots must match the active base cache
+- semantic loc/object `before` state must match before replacement
+- object placements are rebuilt through the real scene builder
+- replayed transactions are reconstructed into the existing Undo/Redo history with stable metadata
+- failures roll back the current transaction and any earlier replayed project transactions
+
+`ui/mapeditor/project-session.svelte.ts` is the reactive UI adapter. It binds editor-history changes back into `ProjectLifecycle`, provides local project list/create/open/save/Save As/import/export operations, enforces cache game/revision compatibility, and resets the live editor back to its base scene when switching or closing projects.
+
+The setup screen owns New/Open/Import orchestration and required-map loading. The editor title bar owns Save/Save As/Export/Close. Dirty project transitions and browser exit are guarded explicitly.

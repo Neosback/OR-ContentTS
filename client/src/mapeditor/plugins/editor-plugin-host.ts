@@ -128,6 +128,7 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     commitEditTransaction(): void;
     cancelEditTransaction(): void;
     recordEditMutation(mutation: import("../editor-transaction").EditorMutation): void;
+    appendAppliedHistoryTransaction(transaction: import("../editor-transaction").EditorTransaction): void;
 
     /** Compatibility wrappers for existing paint-stroke code. */
     beginHistoryStroke(tool: import("../map-editor-history").MapEditorHistoryTool, label?: string): void;
@@ -491,6 +492,11 @@ export class EditorPluginHost implements IEditorPluginHost {
     };
     recordEditMutation = (mutation: import("../editor-transaction").EditorMutation): void => {
         this._e.recordEditMutation(mutation);
+    };
+    appendAppliedHistoryTransaction = (
+        transaction: import("../editor-transaction").EditorTransaction,
+    ): void => {
+        this._e.appendAppliedHistoryTransaction(transaction);
     };
     beginHistoryStroke = (tool: import("../map-editor-history").MapEditorHistoryTool, label?: string): void => {
         this._e.beginHistoryStroke(tool, label);

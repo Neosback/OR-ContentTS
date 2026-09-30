@@ -402,6 +402,80 @@ export class MapEditHistory {
         return entry;
     }
 
+    /**
+     * Appends an already-applied transaction to history.
+     *
+     * Project replay applies persisted edits to the live scene first, then calls this method
+     * with runtime mutations reconstructed from that scene. This preserves the persisted
+     * transaction id/label/source/timestamp while rebuilding the compatibility projections
+     * still used by Undo/Redo.
+     */
+    appendAppliedTransaction(transaction: EditorTransaction): MapEditorHistoryEntry {
+        if (transaction.mutations.length === 0) {
+            throw new Error("Cannot append an empty applied transaction.");
+        }
+
+        const tileGroups = new Map<string, MapSquareTileDelta>();
+        const objectDeltas: MapSquareObjectDelta[] = [];
+
+        for (const mutation of transaction.mutations) {
+            if (mutation.kind === "map.tile") {
+                const key = `${mutation.mapId}:${mutation.level}`;
+                let group = tileGroups.get(key);
+                if (!group) {
+                    group = { mapId: mutation.mapId, level: mutation.level, tiles: [] };
+                    tileGroups.set(key, group);
+                }
+                group.tiles.push([
+                    mutation.localTileId,
+                    structuredClone(mutation.before),
+                    structuredClone(mutation.after),
+                ]);
+            } else {
+                objectDeltas.push({
+                    mapId: mutation.mapId,
+                    level: mutation.level,
+                    sceneBorderSize: mutation.sceneBorderSize,
+                    before: structuredClone(mutation.before),
+                    after: structuredClone(mutation.after),
+                });
+            }
+        }
+
+        const deltas = [...tileGroups.values()];
+        const mapIds = [
+            ...new Set(
+                transaction.mutations.map((mutation) => mutation.mapId),
+            ),
+        ];
+        const tileCount = transaction.mutations.filter(
+            (mutation) => mutation.kind === "map.tile",
+        ).length;
+
+        if (this.currentIndex < this.entries.length - 1) {
+            this.entries.length = this.currentIndex + 1;
+        }
+
+        const entry: MapEditorHistoryEntry = {
+            ...structuredClone(transaction),
+            tool: transaction.source,
+            deltas,
+            objectDeltas,
+            mapIds,
+            tileCount,
+        };
+        this.entries.push(entry);
+        this.currentIndex = this.entries.length - 1;
+
+        const numericId = Number.parseInt(transaction.id, 10);
+        if (Number.isSafeInteger(numericId) && numericId >= this.nextId) {
+            this.nextId = numericId + 1;
+        }
+
+        this.notify();
+        return entry;
+    }
+
     /** Compatibility wrapper for paint-stroke call sites during transaction migration. */
     commitStroke(): void {
         this.commitTransaction();

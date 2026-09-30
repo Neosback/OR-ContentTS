@@ -218,6 +218,7 @@ These PRs establish the current baseline:
 | #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
 | #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
 | #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
+| #28 | Wired ProjectLifecycle into the Svelte map-editor workflow and added strict Edit Format v1 replay into live editor history |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -319,9 +320,9 @@ Use an IndexedDB test implementation or a focused test dependency if browser Ind
 
 After local project persistence, continue in roughly this order:
 
-### A. Project lifecycle API — completed
+### A. Project lifecycle + replay — completed
 
-`client/src/project/project-lifecycle.ts` now owns:
+`client/src/project/project-lifecycle.ts` owns:
 
 - create/open/save/Save As/close
 - current project + working edits
@@ -330,9 +331,18 @@ After local project persistence, continue in roughly this order:
 - explicit dirty-project discard guards
 - applied-history cursor -> Edit Format v1 conversion
 
-Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content.
+`client/src/project/edit-format-v1-replay.ts` now owns strict project edit application into the live editor:
 
-The next project-facing slice should wire this service into the Svelte project/launch workflow and add edit-batch replay/application when opening an existing project. Publish/build remain unavailable until the OpenRune backend implementation exists.
+- validates Edit Format v1 before replay
+- requires all referenced map squares to be loaded
+- verifies terrain and semantic loc `before` state against the active base cache
+- rebuilds semantic loc placements through the scene builder
+- reconstructs persisted transactions into normal Undo/Redo history
+- rolls back replayed work on failure
+
+`client/src/ui/mapeditor/project-session.svelte.ts` is intentionally thin. It binds the framework-neutral lifecycle to Svelte reactivity, editor history, and local project operations. The setup screen now supports New/Open/Import and the editor title bar supports Save/Save As/Export/Close. Dirty project transitions and browser exit are guarded.
+
+Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content. Publish/build remain unavailable until the OpenRune backend implementation exists.
 
 ### B. CacheSource
 
@@ -437,7 +447,9 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-Then wire **ProjectLifecycle into the Svelte project/launch workflow** and implement safe replay/application of a project's Edit Format v1 data into the editor. Keep Svelte as orchestration only; lifecycle and edit application rules stay framework-neutral.
+The project lifecycle/replay slice is complete. The next backend-ready seam is **CacheSource**: formalize current local/static cache access behind a framework-neutral source interface so a future OpenRune implementation can serve versioned cache data with Range support without rewriting the map/editor UI.
+
+After CacheSource, continue with **WorldSource**, then the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
 
 The key architectural requirement is simple:
 

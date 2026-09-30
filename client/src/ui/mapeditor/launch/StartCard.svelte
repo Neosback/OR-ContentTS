@@ -104,7 +104,8 @@
                 type="button"
                 class="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm hover:bg-accent disabled:opacity-60"
                 onclick={() => launch.launchRegion(mode)}
-                disabled={!active || (mode === "region" && !launch.canOpenRegion)}
+                disabled={!active || !launch.canLaunchManualRegion || (mode === "region" && !launch.canOpenRegion)}
+                title={!launch.canLaunchManualRegion ? "This saved project must replay its existing edits before editing." : undefined}
             >
                 <Layers3 class="size-4" />
                 {mode === "sandbox" ? "Generate" : "Open Region"}
