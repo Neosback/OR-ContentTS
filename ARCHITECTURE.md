@@ -77,9 +77,9 @@ The frontend is designed to work offline today. Server-backed behavior must sit 
 
 ### Target backend
 
-The target backend is the **OpenRune server**, using the OpenRune FileStore/domain layer for cache and project operations.
+The target backend is **OpenRune Server** (`Neosback/OpenRune-Server`), using its FileStore/domain and map/content layers for cache and project operations.
 
-The repository's current `server/` directory is legacy/reference infrastructure. It may continue to support temporary local cache bootstrap and legacy world-data compatibility while replacements are built, but new Studio APIs, persistence, encoding, validation, publishing, and build workflows must not be designed around that server.
+The legacy TypeScript game server has been removed from this repository. Local cache bootstrap is owned by the Studio itself, and bundled spawn data keeps the current viewer/editor independent of a game server. Do not recreate a second backend in this repository.
 
 The OpenRune backend will eventually own:
 
@@ -98,7 +98,7 @@ The frontend should continue to implement local/offline versions of these interf
 Project persistence is framework-neutral:
 
 ```text
-project lifecycle service
+ProjectLifecycle
     -> ProjectStore
        -> IndexedDbProjectStore (local/offline)
        -> OpenRuneProjectStore (future)
@@ -108,7 +108,27 @@ The portable project envelope is `openrune.project` v1. It contains stable proje
 
 The local cache profile id is only a binding hint. Portable identity must not depend on a browser-specific profile id because project exports need to remain meaningful on another installation.
 
-IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. The next application layer is the project lifecycle service that will own open/save/close/dirty-state behavior.
+IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. `ProjectLifecycle` now owns current-project state, create/open/save/Save As/close, dirty-state tracking, import/export, and conversion of the applied editor-history cursor into authoritative Edit Format v1 data.
+
+Undo/Redo history beyond the current applied cursor is never project content. The Svelte map-editor workflow uses a thin `ProjectSessionController` adapter that subscribes to `ProjectLifecycle` and editor history; project rules remain outside the components.
+
+### Project replay
+
+Opening a saved project follows a strict replay path:
+
+```text
+Project v1
+  -> Edit Format v1 validation
+  -> required map-square load
+  -> base-state preflight
+  -> live terrain / semantic loc application
+  -> runtime transaction reconstruction
+  -> normal Undo/Redo history
+```
+
+`client/src/project/edit-format-v1-replay.ts` owns this framework-neutral application boundary. It rejects unsupported renderers, non-empty history, missing required maps, terrain base mismatches, and semantic object mismatches. Replayed transactions preserve their persisted ids, labels, sources, and timestamps. If replay fails, applied work is rolled back before control returns to the UI.
+
+The Svelte launch workflow only orchestrates project selection, required-map loading, progress, and user-facing errors. It does not implement terrain/object mutation rules.
 
 ## Validation
 

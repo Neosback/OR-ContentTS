@@ -1,8 +1,4 @@
-server/caches
-server/cache
-server/data/gamemodes/*/game.sqlite*
-server/data/gamemodes/*/player-state.json
-server/data/gamemodes/*/accounts.json
+client/caches
 node_modules
 tmp
 .git

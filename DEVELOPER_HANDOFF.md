@@ -1,7 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** project persistence slice following PR #24
+**Current baseline:** ProjectStore + Studio-owned cache bootstrap; legacy TypeScript server removed
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -11,14 +11,9 @@ This document is the current engineering handoff for developers continuing OpenR
 
 New Studio backend work must target the **OpenRune server** and its FileStore/domain model.
 
-The repository's current `server/` directory is **legacy/reference infrastructure**. It is not the architecture to extend.
+The legacy TypeScript `server/` has been removed from this repository.
 
-Today it is still useful for two temporary compatibility paths:
-
-- bootstrapping/downloading the cache through `server/scripts/ensure-cache.ts`
-- optional legacy `/api/world` spawn/zone data
-
-Do not add new project APIs, Studio persistence, cache encoding, publishing, validation, or build workflows to that legacy server.
+The only intended backend target is `Neosback/OpenRune-Server`. Local Studio cache bootstrap lives under `client/scripts/ensure-cache.ts`, and current spawn snapshots are bundled in the client, so no compatibility server is required to run the editor.
 
 The intended direction is:
 
@@ -221,6 +216,9 @@ These PRs establish the current baseline:
 | #23 | Added Edit Format v1, strict codec/schema, and golden parity fixture |
 | #24 | Made OpenRune the explicit backend target and added this developer handoff |
 | #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
+| #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
+| #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
+| #28 | Wired ProjectLifecycle into the Svelte map-editor workflow and added strict Edit Format v1 replay into live editor history |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -322,21 +320,29 @@ Use an IndexedDB test implementation or a focused test dependency if browser Ind
 
 After local project persistence, continue in roughly this order:
 
-### A. Project lifecycle API
+### A. Project lifecycle + replay — completed
 
-Formalize application-level operations such as:
+`client/src/project/project-lifecycle.ts` owns:
 
-- open project
-- save project
-- close project
-- import/export
-- validate
-- publish
-- build OpenRune project
+- create/open/save/Save As/close
+- current project + working edits
+- dirty-state tracking
+- import/export orchestration
+- explicit dirty-project discard guards
+- applied-history cursor -> Edit Format v1 conversion
 
-Local implementations should handle operations that can work offline. Publish/build can remain unavailable until the OpenRune backend implementation exists.
+`client/src/project/edit-format-v1-replay.ts` now owns strict project edit application into the live editor:
 
-The UI should consume this project service rather than IndexedDB directly.
+- validates Edit Format v1 before replay
+- requires all referenced map squares to be loaded
+- verifies terrain and semantic loc `before` state against the active base cache
+- rebuilds semantic loc placements through the scene builder
+- reconstructs persisted transactions into normal Undo/Redo history
+- rolls back replayed work on failure
+
+`client/src/ui/mapeditor/project-session.svelte.ts` is intentionally thin. It binds the framework-neutral lifecycle to Svelte reactivity, editor history, and local project operations. The setup screen now supports New/Open/Import and the editor title bar supports Save/Save As/Export/Close. Dirty project transitions and browser exit are guarded.
+
+Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content. Publish/build remain unavailable until the OpenRune backend implementation exists.
 
 ### B. CacheSource
 
@@ -394,25 +400,13 @@ command -> transaction -> typed mutation -> Edit Format
 
 Do not create isolated per-panel save systems.
 
-## 10. Legacy server rules
+## 10. Backend rules
 
-The current `server/` directory is not the long-term Studio backend.
+There is no game server in this repository anymore.
 
-Allowed temporary uses:
+Do not recreate one here. New server-side work belongs in `Neosback/OpenRune-Server` and should be reached through stable Studio interfaces such as `ProjectStore`, `CacheSource`, `WorldSource`, and the future OpenRune Studio service client.
 
-- cache bootstrap
-- existing compatibility paths while replacements are implemented
-- reference when understanding old behavior
-
-Do not:
-
-- add new Studio project persistence there
-- add new authoritative validation there
-- define the new project protocol around its current endpoints
-- send pre-encoded map/cache bytes from the frontend to match it
-- couple new panels directly to its socket/API model
-
-If a new feature appears to require the legacy server, first ask whether it should instead be a `ProjectStore`, `CacheSource`, `WorldSource`, or OpenRune service interface.
+The Studio must continue to start and support local editing without OpenRune Server running.
 
 ## 11. Development conventions
 
@@ -453,7 +447,9 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-Then implement the **project lifecycle service** on top of `ProjectStore`: current project state, open/save/close, dirty-state tracking, authoritative applied-edit snapshots, and import/export orchestration. Keep publish/build unavailable until the OpenRune implementation exists.
+The project lifecycle/replay slice is complete. The next backend-ready seam is **CacheSource**: formalize current local/static cache access behind a framework-neutral source interface so a future OpenRune implementation can serve versioned cache data with Range support without rewriting the map/editor UI.
+
+After CacheSource, continue with **WorldSource**, then the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
 
 The key architectural requirement is simple:
 
