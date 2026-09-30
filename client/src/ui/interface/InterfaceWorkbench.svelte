@@ -10,6 +10,7 @@
     import ComponentTreePanel from "./panels/ComponentTreePanel.svelte";
     import ComingSoonPanel from "./panels/ComingSoonPanel.svelte";
     import ComponentEditorPanel from "./panels/ComponentEditorPanel.svelte";
+    import ClientScriptPanel from "./panels/ClientScriptPanel.svelte";
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
     import PreviewPanel from "./panels/PreviewPanel.svelte";
 
@@ -27,8 +28,8 @@
             sveltePanel({
                 id: "ifaceClientScript",
                 title: "Client script",
-                component: ComingSoonPanel,
-                props: { title: "Client script", note: "CS1 and CS2 tooling is the next interface migration slice." },
+                component: ClientScriptPanel,
+                props: { state },
                 isolateInput: true,
             }),
             sveltePanel({
