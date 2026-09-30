@@ -228,10 +228,10 @@ Do not reintroduce systems replaced by these PRs.
 The complete client gate remains the merge requirement:
 
 - clean `npm ci`
-- Svelte-only client architecture boundary: **531 files scanned**
-- Svelte check: **0 errors**
+- Svelte-only client architecture boundary: pass
+- Svelte check: pass
 - TypeScript: pass
-- Vitest: **11 files / 42 tests**
+- Vitest: pass, including cache-source, project, editor, and UI coverage
 - Vite production build: pass
 
 Run from `client/`:
