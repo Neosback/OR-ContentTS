@@ -4,12 +4,12 @@ A browser-based content studio for Old School RuneScape private servers, startin
 
 This repository started as a fork of the [xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript client. The active Studio application is now **Vite 8 + Svelte 5**. Framework-neutral RuneScape/cache/rendering code remains in TypeScript, and the legacy React/TSX application surface has been removed.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary and [ROADMAP.md](ROADMAP.md) for where the project is going.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary, [ROADMAP.md](ROADMAP.md) for where the project is going, and [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) for the current implementation handoff.
 
 ## Packages
 
 - [`client/`](client/): the Studio frontend (Vite, Svelte 5, dockview-core, TypeScript, WebGL2 rendering).
-- [`server/`](server/): the legacy TypeScript game server. The Studio only uses it to download the OSRS cache (`server/scripts/ensure-cache.ts`) and, optionally, for `/api/world` spawn and zone data. It is kept for reference and will be replaced by the OpenRune Studio backend described in the roadmap.
+- [`server/`](server/): **legacy/reference infrastructure, not the target Studio backend**. The Studio currently uses it only for cache bootstrap (`server/scripts/ensure-cache.ts`) and optional legacy `/api/world` data. Do not add new Studio architecture to this server. New backend integration targets the OpenRune server and its FileStore/domain layer.
 
 ## Quick start
 
@@ -54,7 +54,7 @@ Run these from `client/`:
 
 Client settings live in `client/.env` (see [`client/.env.example`](client/.env.example)). Vite inlines `VITE_*` variables at build time, so never put secrets in them. The most useful one is `VITE_CACHE_BASE_URL`, which points the client at a cache served from somewhere other than `/caches/`.
 
-The dev server sends COOP/COEP headers and serves `server/caches` at `/caches` with HTTP Range support. The client streams only the parts of the cache it needs and keeps them in browser storage.
+The dev server sends COOP/COEP headers and temporarily serves `server/caches` at `/caches` with HTTP Range support. This is a local-development compatibility path, not the long-term server architecture. The client streams only the cache ranges it needs and keeps them in browser storage.
 
 ## Credits
 
