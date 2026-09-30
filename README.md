@@ -2,14 +2,14 @@
 
 A browser-based content studio for Old School RuneScape private servers, starting with a map editor. It renders the world with the game client's own TypeScript decoders and WebGL2 scene code, so what you edit is what the client draws.
 
-This repository started as a fork of the [xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript client. The client is no longer used to play a live game, but its game-side systems (player updating, widgets, CS2) are kept for later Studio tools.
+This repository started as a fork of the [xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript client. The active Studio application is now **Vite 8 + Svelte 5**. Framework-neutral RuneScape/cache/rendering code remains in TypeScript, while a quarantined set of legacy TSX sources is retained temporarily for reference and staged cleanup. Those TSX sources are not the Studio entrypoint.
 
-See [ROADMAP.md](ROADMAP.md) for where the project is going.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary and [ROADMAP.md](ROADMAP.md) for where the project is going.
 
 ## Packages
 
-- [`client/`](client/): the Studio frontend (Vite, TypeScript, Svelte 5 with dockview for the Studio UI, WebGL2 rendering). The legacy game client inside it is React.
-- [`server/`](server/): the legacy TypeScript game server. The Studio only uses it to download the OSRS cache (`server/scripts/ensure-cache.ts`) and, optionally, for `/api/world` spawn and zone data. It is kept for reference and will be replaced by the OpenRune Studio backend (see the roadmap).
+- [`client/`](client/): the Studio frontend (Vite, Svelte 5, dockview-core, TypeScript, WebGL2 rendering).
+- [`server/`](server/): the legacy TypeScript game server. The Studio only uses it to download the OSRS cache (`server/scripts/ensure-cache.ts`) and, optionally, for `/api/world` spawn and zone data. It is kept for reference and will be replaced by the OpenRune Studio backend described in the roadmap.
 
 ## Quick start
 
@@ -25,10 +25,14 @@ Open <http://localhost:3000>. The first start downloads the OSRS cache (about 20
 | Route | What it opens |
 | --- | --- |
 | `/` | Studio home |
-| `/map-editor` | Map editor workspace: dockable Scene, Inspector, Search, Paint and Layers panels, no login |
-| `/play` | Legacy game client (login screen), kept for later tooling |
+| `/cache-test` | Cache Repository |
+| `/map` | Map workspace launcher |
+| `/map/viewer` | World/map viewer |
+| `/map/editor` | Map editor workspace |
+| `/interface` | Interface workbench |
+| `/__dock` | Dock layout lab in development builds only |
 
-`yarn start` from the root still starts the legacy game server and the client together, if you need `/api/world` data.
+The old React `/play` application is no longer part of the active Studio routing surface.
 
 ## Client scripts
 
@@ -36,11 +40,15 @@ Run these from `client/`:
 
 | Command | Purpose |
 | --- | --- |
-| `npm run start` | Ensure the cache is downloaded, then start the Vite dev server on port 3000 |
-| `npm run build` | Production build into `client/build` |
-| `npm run preview` | Serve the production build locally (also serves `/caches`) |
-| `npm run typecheck` | `svelte-check` (TypeScript and Svelte) |
-| `npm test` | Node tests (tsx) |
+| `npm run dev` | Start the Vite dev server on port 3000 |
+| `npm run build` | Production build into `client/dist` |
+| `npm run preview` | Serve the production build locally |
+| `npm run check` | Svelte validation |
+| `npm run typecheck` | TypeScript validation |
+| `npm run check:ui-boundaries` | Prevent React/TSX from re-entering the active Svelte UI |
+| `npm test` | Vitest suite |
+| `npm run validate` | Run the blocking UI-boundary, test and production-build gates |
+| `npm run validate:types` | Run full-tree Svelte and TypeScript diagnostics |
 
 ## Configuration
 
@@ -50,7 +58,7 @@ The dev server sends COOP/COEP headers and serves `server/caches` at `/caches` w
 
 ## Credits
 
-Thanks to Astrul, Detuks and all the contributors of the xRSPS TypeScript client, the legacy Java project, and the TypeScript continuation this fork is based on.
+Thanks to Astrul, Detuks and all contributors to xRSPS, the legacy Java project, the TypeScript continuation, RuneLite, OpenRS2, and the other projects credited throughout the repository.
 
 ## Legal
 
