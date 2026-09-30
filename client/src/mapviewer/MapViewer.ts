@@ -1,7 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { URLSearchParamsInit } from "react-router-dom";
-
-import { OsrsMenuEntry } from "../components/rs/menu/OsrsMenu";
+import type { OsrsMenuEntry } from "../ui/components/rs/osrs-menu";
 import { MenuTargetType } from "../rs/MenuEntry";
 import { CacheSystem } from "../rs/cache/CacheSystem";
 import { CacheLoaderFactory, getCacheLoaderFactory } from "../rs/cache/loader/CacheLoaderFactory";
@@ -102,7 +100,7 @@ export class MapViewer {
         this.initCache(cache);
     }
 
-    getSearchParams(): URLSearchParamsInit {
+    getSearchParams(): Record<string, string> {
         const cx = this.camera.getPosX().toFixed(2).toString();
         const cy = -this.camera.getPosY().toFixed(2).toString();
         const cz = this.camera.getPosZ().toFixed(2).toString();
@@ -112,7 +110,7 @@ export class MapViewer {
         const p = (this.camera.pitch | 0).toString();
         const y = yaw.toString();
 
-        const params: any = {
+        const params: Record<string, string> = {
             cx,
             cy,
             cz,
@@ -129,7 +127,7 @@ export class MapViewer {
             params["cache"] = this.loadedCache.info.name;
         }
 
-        params["v"] = 1;
+        params["v"] = "1";
 
         return params;
     }
