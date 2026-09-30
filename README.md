@@ -58,7 +58,7 @@ The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` w
 
 ## OpenRune backend
 
-The legacy TypeScript game server has been removed from this repository. OpenRune Server is now the only intended server-side target. The Studio remains fully usable offline/local-first while `ProjectStore`, project lifecycle, `CacheSource`, and `WorldSource` seams are completed. Backend work should be implemented in the OpenRune Server repository rather than recreating server code here.
+The legacy TypeScript game server has been removed from this repository. OpenRune Server is now the only intended server-side target. `ProjectStore`, project lifecycle/replay, and `CacheSource` are now established local-first seams; `WorldSource` is the next frontend boundary before deeper OpenRune integration. Backend work should be implemented in the OpenRune Server repository rather than recreating server code here.
 
 ## Credits
 
