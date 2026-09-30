@@ -1,15 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "yarn --cwd client install --frozen-lockfile",
-  "buildCommand": "CI=false yarn --cwd client build",
-  "outputDirectory": "client/build",
+  "installCommand": "npm --prefix client ci --no-audit --no-fund",
+  "buildCommand": "npm --prefix client run build",
+  "outputDirectory": "client/dist",
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" }
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        }
       ]
     },
     {
@@ -29,9 +35,17 @@
         }
       ],
       "headers": [
-        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        }
       ]
     }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
