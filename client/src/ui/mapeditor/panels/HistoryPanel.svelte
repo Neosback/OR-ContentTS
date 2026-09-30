@@ -4,6 +4,7 @@
     import Undo2 from "@lucide/svelte/icons/undo-2";
 
     import { formatMapSquareLabel } from "../../../mapeditor/map-editor-history-apply";
+    import { executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
     import { Button } from "../../components/ui/button";
     import { useEditorState } from "../editor-state.svelte";
     import PanelFrame from "./PanelFrame.svelte";
@@ -25,11 +26,11 @@
         </div>
 
         <div class="flex gap-1">
-            <Button variant="outline" size="sm" class="h-7 flex-1 gap-1 text-xs" disabled={!history.canUndo} onclick={() => host.undoHistory()} title="Undo (Ctrl+Z)">
+            <Button variant="outline" size="sm" class="h-7 flex-1 gap-1 text-xs" disabled={!history.canUndo} onclick={() => executeEditorCommand("workbench.undo", { host })} title="Undo (Ctrl+Z)">
                 <Undo2 class="size-3" />
                 Undo
             </Button>
-            <Button variant="outline" size="sm" class="h-7 flex-1 gap-1 text-xs" disabled={!history.canRedo} onclick={() => host.redoHistory()} title="Redo (Ctrl+Y)">
+            <Button variant="outline" size="sm" class="h-7 flex-1 gap-1 text-xs" disabled={!history.canRedo} onclick={() => executeEditorCommand("workbench.redo", { host })} title="Redo (Ctrl+Y)">
                 <Redo2 class="size-3" />
                 Redo
             </Button>
