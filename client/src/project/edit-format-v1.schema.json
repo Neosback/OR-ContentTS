@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openrune:edit-batch:v1",
+  "title": "OpenRune Edit Batch v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "id",
+    "createdAt",
+    "transactions"
+  ],
+  "properties": {
+    "format": {
+      "const": "openrune.edit-batch"
+    },
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transaction"
+      }
+    }
+  },
+  "$defs": {
+    "mapRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      }
+    },
+    "tileSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "type": "integer"
+        },
+        "hl": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "u": {
+          "type": "integer"
+        },
+        "o": {
+          "type": "integer"
+        },
+        "s": {
+          "type": "integer"
+        },
+        "r": {
+          "type": "integer"
+        },
+        "f": {
+          "type": "integer"
+        }
+      }
+    },
+    "loc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "flags",
+        "worldX",
+        "worldY"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "flags": {
+          "type": "integer"
+        },
+        "worldX": {
+          "type": "integer"
+        },
+        "worldY": {
+          "type": "integer"
+        }
+      }
+    },
+    "tileMutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mapX",
+        "mapY",
+        "level",
+        "localX",
+        "localY",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "kind": {
+          "const": "map.tile"
+        },
+        "mapX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "mapY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "localX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63
+        },
+        "localY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63
+        },
+        "before": {
+          "$ref": "#/$defs/tileSnapshot"
+        },
+        "after": {
+          "$ref": "#/$defs/tileSnapshot"
+        }
+      }
+    },
+    "objectMutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mapX",
+        "mapY",
+        "level",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "kind": {
+          "const": "map.objects"
+        },
+        "mapX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "mapY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "before": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/loc"
+          }
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/loc"
+          }
+        }
+      }
+    },
+    "mutation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/tileMutation"
+        },
+        {
+          "$ref": "#/$defs/objectMutation"
+        }
+      ]
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "source",
+        "timestamp",
+        "mutations",
+        "affectedMaps",
+        "tileCount"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "enum": [
+            "underlay",
+            "overlay",
+            "height",
+            "smooth",
+            "object-selector",
+            "object-delete",
+            "region-stamp",
+            "tile-flags",
+            "sandbox",
+            "bulk"
+          ]
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mutations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/mutation"
+          }
+        },
+        "affectedMaps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/mapRef"
+          }
+        },
+        "tileCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
