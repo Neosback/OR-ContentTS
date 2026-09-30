@@ -7,7 +7,7 @@
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
     import { cn } from "../../lib/utils";
-    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
     import InventorySimulator from "./InventorySimulator.svelte";
 
     const CS1_GENERAL_SPRITE_COMBAT = 881;
@@ -41,25 +41,25 @@
         "Sailing",
     ];
 
-    let { state }: { state: InterfaceEditorState } = $props();
+    let { state: editor }: { state: InterfaceEditorState } = $props();
     let skillsOpen = $state(false);
 
-    const hasAnyCs1Scripts = $derived(Cs1Interpreter.interfaceUsesCs1(state.interfaceData));
+    const hasAnyCs1Scripts = $derived(Cs1Interpreter.interfaceUsesCs1(editor.interfaceData));
     const generalUsed = $derived(
-        Cs1Interpreter.interfaceScriptsUseOpcodes(state.interfaceData, Cs1Interpreter.SIM_GENERAL_OPCODES),
+        Cs1Interpreter.interfaceScriptsUseOpcodes(editor.interfaceData, Cs1Interpreter.SIM_GENERAL_OPCODES),
     );
     const skillsUsed = $derived(
-        Cs1Interpreter.interfaceScriptsUseOpcodes(state.interfaceData, Cs1Interpreter.SIM_SKILL_OPCODES),
+        Cs1Interpreter.interfaceScriptsUseOpcodes(editor.interfaceData, Cs1Interpreter.SIM_SKILL_OPCODES),
     );
     const variablesUsed = $derived(
-        Cs1Interpreter.interfaceScriptsUseOpcodes(state.interfaceData, Cs1Interpreter.SIM_VARIABLE_OPCODES),
+        Cs1Interpreter.interfaceScriptsUseOpcodes(editor.interfaceData, Cs1Interpreter.SIM_VARIABLE_OPCODES),
     );
     const inventoryScriptsUsed = $derived(
-        Cs1Interpreter.interfaceScriptsUseOpcodes(state.interfaceData, Cs1Interpreter.SIM_INVENTORY_OPCODES),
+        Cs1Interpreter.interfaceScriptsUseOpcodes(editor.interfaceData, Cs1Interpreter.SIM_INVENTORY_OPCODES),
     );
-    const combatSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_COMBAT)));
-    const runSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_RUN)));
-    const weightSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_WEIGHT)));
+    const combatSpriteSrc = $derived(spriteToPngDataUrl(editor.viewer.spritesById.get(CS1_GENERAL_SPRITE_COMBAT)));
+    const runSpriteSrc = $derived(spriteToPngDataUrl(editor.viewer.spritesById.get(CS1_GENERAL_SPRITE_RUN)));
+    const weightSpriteSrc = $derived(spriteToPngDataUrl(editor.viewer.spritesById.get(CS1_GENERAL_SPRITE_WEIGHT)));
 
     $effect(() => {
         if (!skillsUsed) skillsOpen = false;
@@ -81,7 +81,7 @@
     }
 
     function patchGeneral(field: "combatLevel" | "runEnergy" | "weight", value: number): void {
-        state.setCs1SimState((previous) => ({ ...previous, [field]: value }));
+        editor.setCs1SimState((previous) => ({ ...previous, [field]: value }));
     }
 
     function patchSkill(
@@ -89,7 +89,7 @@
         field: "currentLevels" | "maximumLevels" | "currentExp",
         value: number,
     ): void {
-        state.setCs1SimState((previous) => {
+        editor.setCs1SimState((previous) => {
             const next = { ...previous, [field]: [...previous[field]] };
             next[field][index] = value;
             return next;
@@ -97,7 +97,7 @@
     }
 
     function maxAll(): void {
-        state.setCs1SimState((previous) => {
+        editor.setCs1SimState((previous) => {
             const maximumLevels = [...previous.maximumLevels];
             const currentLevels = [...previous.currentLevels];
             const currentExp = [...previous.currentExp];
@@ -111,7 +111,7 @@
     }
 
     function resetAll(): void {
-        state.cs1SimState = Cs1Interpreter.defaultState();
+        editor.cs1SimState = Cs1Interpreter.defaultState();
     }
 
     function generalSprite(id: number): string {
@@ -169,7 +169,7 @@
                             type="number"
                             class="h-8 min-w-0 flex-1 font-mono text-xs"
                             placeholder={String(item.placeholder)}
-                            value={String(state.cs1SimState[item.field as "combatLevel" | "runEnergy" | "weight"])}
+                            value={String(editor.cs1SimState[item.field as "combatLevel" | "runEnergy" | "weight"])}
                             disabled={!generalUsed}
                             oninput={(event) =>
                                 patchGeneral(
@@ -240,9 +240,9 @@
 
                             <div class="grid grid-cols-3 gap-1">
                                 {#each [
-                                    { field: "maximumLevels", label: "Max", value: state.cs1SimState.maximumLevels[index] ?? 0 },
-                                    { field: "currentLevels", label: "Cur", value: state.cs1SimState.currentLevels[index] ?? 0 },
-                                    { field: "currentExp", label: "XP", value: state.cs1SimState.currentExp[index] ?? 0 },
+                                    { field: "maximumLevels", label: "Max", value: editor.cs1SimState.maximumLevels[index] ?? 0 },
+                                    { field: "currentLevels", label: "Cur", value: editor.cs1SimState.currentLevels[index] ?? 0 },
+                                    { field: "currentExp", label: "XP", value: editor.cs1SimState.currentExp[index] ?? 0 },
                                 ] as field (field.field)}
                                     <div class="min-w-0 space-y-0.5">
                                         <div class="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{field.label}</div>
@@ -267,7 +267,7 @@
         {/if}
     </details>
 
-    <InventorySimulator {state} {inventoryScriptsUsed} />
+    <InventorySimulator state={editor} {inventoryScriptsUsed} />
 
     <div class={cn("rounded-md border border-dashed border-border p-2 text-[11px] text-muted-foreground", !variablesUsed && "bg-muted/15")}>
         <div class="flex flex-wrap items-center gap-2">
