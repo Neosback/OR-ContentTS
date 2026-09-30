@@ -1,12 +1,9 @@
-import type { ReactNode } from "react";
-
 export interface CacheType {
   id: string;
   name: string;
   ip: string;
   port: number;
   image?: string;
-  icon?: ReactNode;
   description: string;
 }
 
