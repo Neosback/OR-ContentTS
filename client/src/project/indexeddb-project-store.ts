@@ -128,6 +128,7 @@ export class IndexedDbProjectStore implements ProjectStore {
                 await requestResult(request);
                 await done;
             } catch (error) {
+                await done.catch(() => undefined);
                 if (hasErrorName(error, "ConstraintError") || hasErrorName(request.error, "ConstraintError")) {
                     throw new ProjectStoreError(
                         "CONFLICT",
