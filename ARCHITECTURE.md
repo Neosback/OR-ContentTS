@@ -77,9 +77,9 @@ The frontend is designed to work offline today. Server-backed behavior must sit 
 
 ### Target backend
 
-The target backend is the **OpenRune server**, using the OpenRune FileStore/domain layer for cache and project operations.
+The target backend is **OpenRune Server** (`Neosback/OpenRune-Server`), using its FileStore/domain and map/content layers for cache and project operations.
 
-The repository's current `server/` directory is legacy/reference infrastructure. It may continue to support temporary local cache bootstrap and legacy world-data compatibility while replacements are built, but new Studio APIs, persistence, encoding, validation, publishing, and build workflows must not be designed around that server.
+The legacy TypeScript game server has been removed from this repository. Local cache bootstrap is owned by the Studio itself, and bundled spawn data keeps the current viewer/editor independent of a game server. Do not recreate a second backend in this repository.
 
 The OpenRune backend will eventually own:
 
