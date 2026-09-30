@@ -1,8 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** `main` after PR #23  
-**Baseline commit:** `80dc0078088f6cbd05b392e0ad36c403989cb04f`
+**Current baseline:** project persistence slice following PR #24
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -220,12 +219,14 @@ These PRs establish the current baseline:
 | #21 | Expanded commands into tools, keybindings, menus, and layout actions |
 | #22 | Added universal named edit transactions |
 | #23 | Added Edit Format v1, strict codec/schema, and golden parity fixture |
+| #24 | Made OpenRune the explicit backend target and added this developer handoff |
+| #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
 
 Do not reintroduce systems replaced by these PRs.
 
 ## 6. Current validation baseline
 
-At PR #23 the complete client gate was green:
+The complete client gate remains the merge requirement:
 
 - clean `npm ci`
 - Svelte-only client architecture boundary: **524 files scanned**
@@ -255,9 +256,9 @@ A PR is not ready to merge if any blocking gate is red.
 
 ## 7. Recommended next work
 
-### Next PR: local project persistence
+### Completed: local project persistence
 
-The highest-leverage next step is a **ProjectStore abstraction plus local IndexedDB implementation**, built on Edit Format v1.
+A **ProjectStore abstraction plus local IndexedDB implementation** now sits on top of Edit Format v1.
 
 Do not wire the UI directly to IndexedDB.
 
@@ -447,7 +448,7 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-Then implement the **ProjectStore + IndexedDB persistence** slice.
+Then implement the **project lifecycle service** on top of `ProjectStore`: current project state, open/save/close, dirty-state tracking, authoritative applied-edit snapshots, and import/export orchestration. Keep publish/build unavailable until the OpenRune implementation exists.
 
 The key architectural requirement is simple:
 
