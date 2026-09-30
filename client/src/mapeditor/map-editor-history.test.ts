@@ -19,6 +19,7 @@ describe("MapEditHistory transactions", () => {
             kind: "map.objects",
             mapId: 0x3333,
             level: 1,
+            sceneBorderSize: 6,
             before: [{ level: 1, tileX: 4, tileY: 5 }],
             after: [{ level: 1, tileX: 6, tileY: 7 }],
         });
