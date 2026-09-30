@@ -4,6 +4,12 @@ import { getPaintToolsStripModel } from "../plugins/builtins/paint-tools-strip-m
 import { getHeightToolModel, type HeightPaintMode } from "../plugins/builtins/height-tool-model";
 import { isCopyableObjectKind } from "../plugins/builtins/object-copy-placement";
 import type { IEditorPluginHost } from "../plugins/editor-plugin-host";
+import type {
+    EditorToolInputContext,
+    EditorToolKeyBinding,
+    EditorToolKeyChord,
+    EditorToolKeybindTrigger,
+} from "../plugins/builtins/builtin-plugin-types";
 
 export type EditorCommandId =
     | "workbench.brush-size-up"
@@ -394,4 +400,30 @@ export function executeEditorCommand(
     const command = getEditorCommand(id);
     if (command.isEnabled && !command.isEnabled(context, payload)) return false;
     return command.execute(context, payload) !== false;
+}
+
+
+export type EditorCommandKeyBindingOptions = {
+    id: string;
+    defaultChords: readonly EditorToolKeyChord[];
+    trigger?: EditorToolKeybindTrigger;
+    shouldProcess?: (context: EditorToolInputContext) => boolean;
+};
+
+/** Builds a keybinding whose metadata, enabled state, and action all come from a shared command. */
+export function editorCommandKeyBinding(
+    commandId: EditorCommandId,
+    options: EditorCommandKeyBindingOptions,
+): EditorToolKeyBinding {
+    const command = getEditorCommand(commandId);
+    return {
+        id: options.id,
+        name: command.name,
+        description: command.description,
+        defaultChords: options.defaultChords,
+        trigger: options.trigger,
+        shouldProcess: (context) =>
+            canExecuteEditorCommand(commandId, context) && (options.shouldProcess?.(context) ?? true),
+        action: (context) => executeEditorCommand(commandId, context),
+    };
 }
