@@ -2,16 +2,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 
 const root = process.cwd();
-const uiRoot = resolve(root, "src/ui");
-const entry = resolve(root, "src/main.ts");
+const srcRoot = resolve(root, "src");
 
 const forbiddenPackages = [
     /^react(?:\/|$)/,
     /^react-dom(?:\/|$)/,
     /^dockview-react(?:\/|$)/,
+    /^lucide-react(?:\/|$)/,
+    /^leva(?:\/|$)/,
+    /^@base-ui\/react(?:\/|$)/,
+    /^@radix-ui\/react-/,
+    /^usehooks-ts(?:\/|$)/,
 ];
 
-const sourceExtensions = new Set([".svelte", ".ts", ".js", ".mts", ".mjs"]);
+const sourceExtensions = new Set([".svelte", ".ts", ".js", ".mts", ".mjs", ".tsx", ".jsx"]);
 const importPattern =
     /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|\bimport\s*)["']([^"']+)["']/g;
 
@@ -31,10 +35,16 @@ function resolvesToTsx(fromFile, specifier) {
     return existsSync(target + ".tsx") || existsSync(join(target, "index.tsx")) || target.endsWith(".tsx");
 }
 
-const files = [...walk(uiRoot), entry];
+const files = walk(srcRoot);
 const violations = [];
 
 for (const file of files) {
+    const extension = extname(file);
+    if (extension === ".tsx" || extension === ".jsx") {
+        violations.push(`${file}: JSX/TSX is not allowed in the Svelte-only client`);
+        continue;
+    }
+
     const source = readFileSync(file, "utf8");
     let match;
 
@@ -56,9 +66,9 @@ for (const file of files) {
 }
 
 if (violations.length > 0) {
-    console.error("Svelte UI architecture boundary failed:\n");
+    console.error("Svelte-only client architecture boundary failed:\n");
     for (const violation of violations) console.error(`- ${violation}`);
     process.exit(1);
 }
 
-console.log(`Svelte UI architecture boundary passed (${files.length} files scanned).`);
+console.log(`Svelte-only client architecture boundary passed (${files.length} files scanned).`);
