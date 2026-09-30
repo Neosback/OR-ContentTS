@@ -1,7 +1,7 @@
 import { Pool, spawn } from "threads";
 import type { ModuleThread, QueuedTask } from "threads";
 
-import type { LiveMinimapWorkerRequest, LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
+import type { LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
 import { transferLiveMinimapWorkerRequest } from "../../mapeditor/liveMinimapWorkerPayload";
 import { EditorMapData } from "../../mapeditor/webgl/loader/EditorMapData";
 import { EditorMapTerrainData } from "../../mapeditor/webgl/loader/EditorMapTerrainData";
@@ -127,7 +127,7 @@ export class RenderDataWorkerPool {
     queueEditorLiveMinimap(
         payload: ReturnType<typeof transferLiveMinimapWorkerRequest>,
     ): QueuedTask<RenderDataWorkerThread, LiveMinimapWorkerResult> {
-        return this.pool.queue((w) => w.renderLiveEditorMinimap(payload as unknown as LiveMinimapWorkerRequest));
+        return this.pool.queue((w) => w.renderLiveEditorMinimap(payload));
     }
 
     setVars(vars: Int32Array): Promise<void> {
