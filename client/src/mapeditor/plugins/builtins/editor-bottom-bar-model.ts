@@ -180,6 +180,7 @@ export function getEditorBottomBarModel(host: IEditorPluginHost): EditorBottomBa
     return {
         floatingPanelVisible: state.floatingPanelVisible,
         placement: state.placement,
+        placementBeforeExternal: state.placementBeforeExternal,
         position: state.position,
         minimized: state.minimized,
         size: state.size,
