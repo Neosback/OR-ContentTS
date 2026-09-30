@@ -55,7 +55,7 @@ Done:
 
 Next:
 - [ ] Shops and world map as first-class dock panels.
-- [ ] Shared command and keyboard-shortcut registry.
+- [x] Shared command and keyboard-shortcut registry.
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
 - [ ] Extra 3D views such as model preview and minimap through shared/scissored rendering where appropriate.
 
@@ -65,15 +65,15 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 
 - [ ] Formalize `CacheSource`: static/range-backed local cache today, backend-served later.
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
-- [ ] **Edit format v1**: versioned JSON schema for terrain, locs, NPC spawns, zones and future content edits.
+- [ ] **Edit format v1**: versioned JSON schema built from the transaction mutation model for terrain, locs, NPC spawns, zones and future content edits.
 - [ ] Local project persistence with IndexedDB plus import/export.
 - [ ] Move cache download ownership fully out of the legacy server path.
 - [ ] Define project/open/save/publish APIs against a local implementation first.
 
 ## Phase 3: editor depth
 
-- [ ] Shared command registry used by menus, buttons, context menus, plugins and shortcuts.
-- [ ] Universal named transactions for undo/redo across all editing tools.
+- [x] Shared command registry used by workbench actions, tool buttons, menus, plugins and shortcuts.
+- [x] Universal named edit transactions for undo/redo across paint, object, and region-stamp editing.
 - [ ] Multi-region selection and editing without seams.
 - [ ] Brush-based terrain tools for height, overlay, underlay and smoothing.
 - [ ] Better object placement: snapping, rotation preview and copy/paste between regions.

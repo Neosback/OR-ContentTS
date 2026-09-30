@@ -29,7 +29,7 @@ import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync
 import { ObjectPickIndex, type EditorObjectKind, type EditorObjectRef } from "../../webgl/sceneLocPicker";
 import type { WebGLMapEditorRenderer } from "../../webgl/WebGLMapEditorRenderer";
 import {
-    recordHistoryObjectMutation,
+    recordEditObjectMutation,
     snapshotObjectEntriesForRef,
 } from "../../map-editor-object-history";
 
@@ -561,7 +561,7 @@ export function rotateSelectedObject(host: IEditorPluginHost, renderer: WebGLMap
         return false;
     }
 
-    return recordHistoryObjectMutation(
+    return recordEditObjectMutation(
         host,
         map,
         ref.level,

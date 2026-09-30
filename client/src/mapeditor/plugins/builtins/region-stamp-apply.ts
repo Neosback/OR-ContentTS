@@ -3,7 +3,8 @@ import { Scene } from "../../../rs/scene/Scene";
 import { calculateEntityTag, EntityType, getIdFromTag } from "../../../rs/scene/entity/EntityTag";
 import type { LocType } from "../../../rs/config/loctype/LocType";
 import type { IEditorPluginHost } from "../editor-plugin-host";
-import { recordHistoryTileMutation } from "../../map-editor-history-record";
+import { runEditTransaction } from "../../editor-transaction";
+import { recordEditTileMutation } from "../../map-editor-history-record";
 import {
     cloneSceneTileLocEntry,
     snapshotObjectEntriesForBounds,
@@ -300,7 +301,7 @@ function applyRegionTiles(
                     mutateTile(worldX, worldY, level, map, sceneX, sceneY);
                 };
                 if (recordHistory) {
-                    recordHistoryTileMutation(host, map, level, sceneX, sceneY, apply);
+                    recordEditTileMutation(host, map, level, sceneX, sceneY, apply);
                 } else {
                     apply();
                 }
@@ -357,7 +358,13 @@ function applyRegionObjects(
                 }
                 const after = snapshotObjectEntriesForBounds(map, level, sceneBounds).map(cloneSceneTileLocEntry);
                 if (recordHistory && JSON.stringify(before) !== JSON.stringify(after)) {
-                    host.recordHistoryObjectChange(mapId, level, before, after);
+                    host.recordEditMutation({
+                        kind: "map.objects",
+                        mapId,
+                        level,
+                        before,
+                        after,
+                    });
                 }
                 markMapObjectChunks(map, mapId, renderer, sceneBounds);
                 syncMapObjectPickIndex(map, mapId);
@@ -429,15 +436,15 @@ export function pasteRegionStampAt(
         return false;
     }
 
-    host.beginHistoryStroke("region-stamp", "Paste region");
-    applyRegionStampToScene(host, renderer, stamp, originWorldX, originWorldY, rotation, {
-        recordHistory: true,
-        applyObjects: true,
+    return runEditTransaction(host, { source: "region-stamp", label: "Paste region" }, () => {
+        applyRegionStampToScene(host, renderer, stamp, originWorldX, originWorldY, rotation, {
+            recordHistory: true,
+            applyObjects: true,
+        });
+        renderer.updateAffectedTiles();
+        renderer.host.scheduleMinimapRefreshAfterEdit();
+        return true;
     });
-    host.commitHistoryStroke();
-    renderer.updateAffectedTiles();
-    renderer.host.scheduleMinimapRefreshAfterEdit();
-    return true;
 }
 
 export function deleteRegionBounds(
@@ -449,16 +456,16 @@ export function deleteRegionBounds(
         return false;
     }
 
-    host.beginHistoryStroke("region-stamp", "Delete region");
-    const empty = emptyTileFields();
-    applyRegionTiles(host, renderer, bounds, true, (_wx, _wy, level, map, sceneX, sceneY) => {
-        applyTileFields(map.scene, level, sceneX, sceneY, empty);
+    return runEditTransaction(host, { source: "region-stamp", label: "Delete region" }, () => {
+        const empty = emptyTileFields();
+        applyRegionTiles(host, renderer, bounds, true, (_wx, _wy, level, map, sceneX, sceneY) => {
+            applyTileFields(map.scene, level, sceneX, sceneY, empty);
+        });
+        applyRegionObjects(host, renderer, bounds, true, () => []);
+        renderer.updateAffectedTiles();
+        renderer.host.scheduleMinimapRefreshAfterEdit();
+        return true;
     });
-    applyRegionObjects(host, renderer, bounds, true, () => []);
-    host.commitHistoryStroke();
-    renderer.updateAffectedTiles();
-    renderer.host.scheduleMinimapRefreshAfterEdit();
-    return true;
 }
 
 export { captureRegionStamp as captureRegionStampFromBounds };

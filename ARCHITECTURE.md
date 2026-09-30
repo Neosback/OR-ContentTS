@@ -43,6 +43,22 @@ The active client source tree is now Svelte/TypeScript only. The retained React/
 
 WebGL2 remains the reference renderer. Svelte owns UI orchestration, while rendering and cache-heavy work stay in framework-neutral TypeScript. Future Rust/WASM work should sit behind the same TypeScript-facing runtime boundaries rather than coupling directly to Svelte components.
 
+## Editor mutation boundary
+
+Editor behavior now follows a common flow:
+
+```text
+command / tool interaction
+  -> named edit transaction
+     -> typed mutations
+        -> undo/redo history
+        -> future Edit Format v1 / project persistence
+```
+
+Transactions are framework-neutral TypeScript. Current mutation kinds cover map tiles and map objects; future content types such as NPC spawns, zones, shops, interfaces, and definitions should extend the mutation union rather than introducing separate save/undo systems.
+
+History entries retain compatibility projections for existing map replay/UI code, but the transaction mutation list is the forward-facing representation for persistence and backend integration.
+
 ## Backend boundary
 
 The frontend is designed to work offline today. Server-backed behavior should sit behind explicit interfaces so the future RSPSi/OpenRune Studio backend can replace local/static implementations without rewriting the UI.

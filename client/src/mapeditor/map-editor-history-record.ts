@@ -3,7 +3,7 @@ import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import { readTileFieldSnapshot } from "./map-editor-history-snapshot";
 import type { EditorMapSquare } from "./webgl/EditorMapSquare";
 
-export function recordHistoryTileMutation(
+export function recordEditTileMutation(
     host: IEditorPluginHost,
     map: EditorMapSquare,
     level: number,
@@ -34,5 +34,16 @@ export function recordHistoryTileMutation(
     const before = readTileFieldSnapshot(scene, level, sceneX, sceneY);
     mutate();
     const after = readTileFieldSnapshot(scene, level, sceneX, sceneY);
-    host.recordHistoryTileChange(getMapSquareId(map.mapX, map.mapY), level, (localX << 8) | localY, before, after);
+    host.recordEditMutation({
+        kind: "map.tile",
+        mapId: getMapSquareId(map.mapX, map.mapY),
+        level,
+        localTileId: (localX << 8) | localY,
+        before,
+        after,
+    });
 }
+
+
+/** @deprecated Use recordEditTileMutation. */
+export const recordHistoryTileMutation = recordEditTileMutation;

@@ -77,6 +77,7 @@ import {
     saveViewerControlSettingsToStorage,
 } from "./map-editor-viewer-control-settings";
 import type { MapEditorWorkbenchUiPluginId } from "./map-editor-workbench-layout";
+import type { EditorMutation, EditorTransactionSource } from "./editor-transaction";
 import type { EditorMapSquare } from "./webgl/EditorMapSquare";
 import { WebGLMapEditorRenderer } from "./webgl/WebGLMapEditorRenderer";
 import type { MapEditorBrushType, MapEditorTool } from "./map-editor-kinds";
@@ -768,17 +769,34 @@ export class MapEditor {
         return this.mapEditHistory.getSnapshot();
     };
 
-    beginHistoryStroke = (tool: MapEditorHistoryTool, label?: string): void => {
-        this.mapEditHistory.beginStroke(tool, label);
+    beginEditTransaction = (source: EditorTransactionSource, label?: string): void => {
+        this.mapEditHistory.beginTransaction(source, label);
     };
 
-    commitHistoryStroke = (): void => {
-        this.mapEditHistory.commitStroke();
+    commitEditTransaction = (): void => {
+        this.mapEditHistory.commitTransaction();
         this.notifyHistoryChanged();
     };
 
+    cancelEditTransaction = (): void => {
+        this.mapEditHistory.cancelTransaction();
+    };
+
+    recordEditMutation = (mutation: EditorMutation): void => {
+        this.mapEditHistory.recordMutation(mutation);
+    };
+
+    /** Compatibility wrappers while paint-stroke call sites migrate to transactions. */
+    beginHistoryStroke = (tool: MapEditorHistoryTool, label?: string): void => {
+        this.beginEditTransaction(tool, label);
+    };
+
+    commitHistoryStroke = (): void => {
+        this.commitEditTransaction();
+    };
+
     cancelHistoryStroke = (): void => {
-        this.mapEditHistory.cancelStroke();
+        this.cancelEditTransaction();
     };
 
     recordHistoryTileChange = (
