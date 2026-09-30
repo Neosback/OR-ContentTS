@@ -143,7 +143,7 @@ function mergePendingTile(
     if (delta.after.hl) {
         existing.after.hl = [...delta.after.hl];
     }
-    const keys: (keyof TileFieldSnapshot)[] = ["h", "u", "o", "s", "r", "f"];
+    const keys: ScalarTileFieldKey[] = ["h", "u", "o", "s", "r", "f"];
     for (const key of keys) {
         if (existing.before[key] === undefined && delta.before[key] !== undefined) {
             existing.before[key] = delta.before[key];
