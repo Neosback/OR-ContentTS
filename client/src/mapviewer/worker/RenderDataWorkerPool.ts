@@ -61,7 +61,7 @@ export class RenderDataWorkerPool {
         loader: Loader,
         input: I,
     ): QueuedTask<RenderDataWorkerThread, D> {
-        return this.pool.queue((w) => w.load(loader, input));
+        return this.pool.queue<D>((w) => w.load(loader, input) as unknown as Promise<D>);
     }
 
     queueLoadEditorMapData(
