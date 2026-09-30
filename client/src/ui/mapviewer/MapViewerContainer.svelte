@@ -7,6 +7,7 @@
     import WorldMapModal from "../components/rs/WorldMapModal.svelte";
     import { rendererCanvas } from "../lib/actions";
     import MapViewerToolsDock from "./MapViewerToolsDock.svelte";
+    import TouchJoysticks from "./TouchJoysticks.svelte";
     import type { MapViewerUiState } from "./map-viewer-state.svelte";
 
     let { state }: { state: MapViewerUiState } = $props();
@@ -42,8 +43,7 @@
         {/if}
 
         {#if !state.hideUi && isTouchDevice}
-            <div class="joystick-container left" aria-label="Movement joystick"></div>
-            <div class="joystick-container right" aria-label="Camera joystick"></div>
+            <TouchJoysticks {state} />
         {/if}
 
         {#if state.renderer}
