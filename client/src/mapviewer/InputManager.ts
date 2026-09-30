@@ -1,6 +1,4 @@
 import { vec2 } from "gl-matrix";
-import { IJoystickUpdateEvent } from "react-joystick-component/build/lib/Joystick";
-
 /** Wheel delta in pixels, whatever unit the device reports (Firefox mouse wheels use lines). */
 export function wheelDeltaPixels(event: { deltaY: number; deltaMode: number }): number {
     if (event.deltaMode === 1) {
@@ -87,8 +85,8 @@ export class InputManager {
     pickX: number = -1;
     pickY: number = -1;
 
-    positionJoystickEvent?: IJoystickUpdateEvent;
-    cameraJoystickEvent?: IJoystickUpdateEvent;
+    positionJoystickEvent?: object;
+    cameraJoystickEvent?: object;
 
     gamepadIndex?: number;
 
@@ -429,19 +427,19 @@ export class InputManager {
         this.pickY = y;
     };
 
-    onPositionJoystickMove = (event: IJoystickUpdateEvent) => {
+    onPositionJoystickMove = (event: object) => {
         this.positionJoystickEvent = event;
     };
 
-    onPositionJoystickStop = (event: IJoystickUpdateEvent) => {
+    onPositionJoystickStop = (event: object) => {
         this.positionJoystickEvent = undefined;
     };
 
-    onCameraJoystickMove = (event: IJoystickUpdateEvent) => {
+    onCameraJoystickMove = (event: object) => {
         this.cameraJoystickEvent = event;
     };
 
-    onCameraJoystickStop = (event: IJoystickUpdateEvent) => {
+    onCameraJoystickStop = (event: object) => {
         this.cameraJoystickEvent = undefined;
     };
 
