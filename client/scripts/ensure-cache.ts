@@ -157,16 +157,39 @@ async function writeCache(entry: OpenRS2CacheEntry, cacheDir: string): Promise<v
     fs.writeFileSync(path.join(cacheDir, "info.json"), JSON.stringify(entry), "utf8");
 }
 
-function writeCacheList(entry: OpenRS2CacheEntry): void {
-    const item = {
-        name: cacheName(entry),
-        game: entry.game,
-        environment: entry.environment,
-        revision: entry.builds[0].major,
-        timestamp: entry.timestamp,
-        size: entry.size ?? 0,
-    };
-    fs.writeFileSync(path.join(CACHES_DIR, "caches.json"), JSON.stringify([item]), "utf8");
+function writeCacheList(): void {
+    fs.mkdirSync(CACHES_DIR, { recursive: true });
+    const items: Array<{
+        name: string;
+        game: string;
+        environment: string;
+        revision: number;
+        timestamp: string;
+        size: number;
+    }> = [];
+
+    for (const name of fs.readdirSync(CACHES_DIR)) {
+        const cacheDir = path.join(CACHES_DIR, name);
+        if (!fs.existsSync(cacheDir) || !fs.statSync(cacheDir).isDirectory() || !isCacheValid(cacheDir)) continue;
+        try {
+            const entry = JSON.parse(fs.readFileSync(path.join(cacheDir, "info.json"), "utf8")) as OpenRS2CacheEntry;
+            const revision = entry.builds[0]?.major;
+            if (!Number.isSafeInteger(revision) || !entry.timestamp) continue;
+            items.push({
+                name,
+                game: entry.game,
+                environment: entry.environment,
+                revision,
+                timestamp: entry.timestamp,
+                size: entry.size ?? 0,
+            });
+        } catch {
+            // Ignore unrelated or corrupt local cache directories. They can be repaired manually.
+        }
+    }
+
+    items.sort((a, b) => b.revision - a.revision || Date.parse(b.timestamp) - Date.parse(a.timestamp));
+    fs.writeFileSync(path.join(CACHES_DIR, "caches.json"), JSON.stringify(items), "utf8");
 }
 
 async function main(): Promise<void> {
@@ -176,7 +199,7 @@ async function main(): Promise<void> {
     const cacheDir = path.join(CACHES_DIR, name);
 
     if (isCacheValid(cacheDir)) {
-        writeCacheList(entry);
+        writeCacheList();
         console.log(`[CacheBootstrap] ${name} is already present.`);
         return;
     }
@@ -184,20 +207,17 @@ async function main(): Promise<void> {
     if (!acquireLock()) {
         await waitForLock();
         if (isCacheValid(cacheDir)) {
-            writeCacheList(entry);
+            writeCacheList();
             return;
         }
         if (!acquireLock()) throw new Error("Could not acquire the cache bootstrap lock.");
     }
 
     try {
-        for (const item of fs.existsSync(CACHES_DIR) ? fs.readdirSync(CACHES_DIR) : []) {
-            if (item === path.basename(LOCK_FILE)) continue;
-            fs.rmSync(path.join(CACHES_DIR, item), { recursive: true, force: true });
-        }
+        fs.rmSync(cacheDir, { recursive: true, force: true });
         await writeCache(entry, cacheDir);
         if (!isCacheValid(cacheDir)) throw new Error("Cache download completed but validation failed.");
-        writeCacheList(entry);
+        writeCacheList();
         console.log(`[CacheBootstrap] ${name} is ready.`);
     } finally {
         releaseLock();
