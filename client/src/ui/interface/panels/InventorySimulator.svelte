@@ -92,6 +92,16 @@
         if (!inventoryScriptsUsed) invOpen = false;
     });
 
+    $effect(() => {
+        state.selectedId;
+        selectedComponentId = null;
+        targetIdText = "";
+        targetPanelOpen = false;
+        fillSuggestOpen = false;
+        rowSuggestOpen = false;
+        rowSuggestRow = null;
+    });
+
     function getComponent(id: number): ComponentType | null {
         const data = state.interfaceData;
         if (!data?.components) return null;
