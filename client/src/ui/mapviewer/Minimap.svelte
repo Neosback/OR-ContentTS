@@ -62,21 +62,25 @@
     onDestroy(() => cancelAnimationFrame(raf));
 </script>
 
-<div class="minimap-container">
-    <img src={frameSrc} alt="" />
-    <div class="minimap" style:transform="rotate({yawDegrees}deg)">
-        <div bind:this={imageHost} class="minimap-images"></div>
+<div class="flex h-full min-h-0 flex-col gap-2 overflow-auto bg-card/95 p-2 text-card-foreground">
+    <div class="minimap-container">
+        <img src={frameSrc} alt="" />
+        <div class="minimap" style:transform="rotate({yawDegrees}deg)">
+            <div bind:this={imageHost} class="minimap-images"></div>
+        </div>
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <img
+            class="compass"
+            style:transform="rotate({yawDegrees}deg)"
+            alt=""
+            src={compassSrc}
+            onclick={() => state.mapViewer.camera.setYaw(0)}
+        />
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="worldmap-icon" onclick={() => state.openWorldMap()}></div>
     </div>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <img
-        class="compass"
-        style:transform="rotate({yawDegrees}deg)"
-        alt=""
-        src={compassSrc}
-        onclick={() => state.mapViewer.camera.setYaw(0)}
-    />
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="worldmap-icon" onclick={() => state.openWorldMap()}></div>
+    <div class="fps-counter content-text text-[11px]">{state.fps}</div>
+    <div class="fps-counter content-text text-[11px]">{state.debugText ?? ""}</div>
 </div>
