@@ -93,6 +93,23 @@ The OpenRune backend will eventually own:
 
 The frontend should continue to implement local/offline versions of these interfaces first so the UI remains usable without a running OpenRune server.
 
+### Project persistence
+
+Project persistence is framework-neutral:
+
+```text
+project lifecycle service
+    -> ProjectStore
+       -> IndexedDbProjectStore (local/offline)
+       -> OpenRuneProjectStore (future)
+```
+
+The portable project envelope is `openrune.project` v1. It contains stable project metadata, portable base-cache/source identity, and Edit Format v1 edit data. Renderer state, dock layout, and internal Undo/Redo history are not authoritative project content.
+
+The local cache profile id is only a binding hint. Portable identity must not depend on a browser-specific profile id because project exports need to remain meaningful on another installation.
+
+IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. The next application layer is the project lifecycle service that will own open/save/close/dirty-state behavior.
+
 ## Validation
 
 Every pull request that changes the client must pass the clean, reproducible blocking gate:
