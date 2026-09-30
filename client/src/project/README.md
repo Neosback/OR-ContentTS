@@ -51,3 +51,8 @@ Imports are strictly validated before persistence. Importing a project whose sta
 - typed errors for missing, conflicting, invalid, or unavailable storage
 
 Svelte components must not access this IndexedDB database directly. The next layer is the project lifecycle service, which will own open/save/close/dirty-state behavior and feed authoritative project content through `ProjectStore`.
+
+
+### Validation baseline
+
+The ProjectStore slice is covered by the normal client gate. The current green baseline includes 11 Vitest files / 42 tests, including real IndexedDB API behavior through `fake-indexeddb`. Run `npm run validate` from `client/` before merging project-contract changes.
