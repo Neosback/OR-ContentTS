@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import goldenFixture from "./fixtures/edit-format-v1.golden.json";
+
 import type { EditorTransaction } from "../mapeditor/editor-transaction";
 import {
     EDIT_FORMAT_V1_SCHEMA,
@@ -190,6 +192,13 @@ describe("Edit Format v1", () => {
         };
 
         expect(() => transactionToEditFormatV1(transaction)).toThrow(EditFormatV1Error);
+    });
+
+    it("decodes the canonical backend parity fixture", () => {
+        const decoded = decodeEditBatchV1(goldenFixture);
+
+        expect(decoded.id).toBe("golden-map-edit-v1");
+        expect(decoded.transactions[0]).toEqual(transactionToEditFormatV1(sampleTransaction()));
     });
 
     it("exports a machine-readable JSON Schema for backend parity tests", () => {
