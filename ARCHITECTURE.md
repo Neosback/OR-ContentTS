@@ -57,16 +57,21 @@ The frontend is designed to work offline today. Server-backed behavior should si
 
 The backend will eventually own encoding, validation, project persistence, publishing, and OpenRune build actions.
 
-## Required validation
+## Validation
 
-Every pull request that changes the client must pass:
+Every pull request that changes the client must pass the clean, reproducible blocking gate:
 
 ```bash
+npm ci
 npm run check:ui-boundaries
-npm run check
-npm run typecheck
 npm test
 npm run build
 ```
 
-The GitHub Actions client validation workflow treats all five as blocking checks.
+Full-tree Svelte and TypeScript diagnostics also run in CI, but remain advisory while retained migration code and existing engine typing debt are being removed:
+
+```bash
+npm run validate:types
+```
+
+The goal is to make those diagnostics blocking once the existing debt is cleared, without allowing new React/TSX coupling back into the active Svelte UI.
