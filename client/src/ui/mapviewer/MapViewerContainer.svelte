@@ -17,8 +17,8 @@
         const onKeyDown = (event: KeyboardEvent): void => {
             if (!event.repeat && event.key === "F1") state.toggleUi();
         };
-        document.addEventListener("keydown", onKeyDown);
-        return () => document.removeEventListener("keydown", onKeyDown);
+        window.addEventListener("keydown", onKeyDown, true);
+        return () => window.removeEventListener("keydown", onKeyDown, true);
     });
 
     onDestroy(() => state.stop());
