@@ -8,7 +8,6 @@
     import InterfaceDialogs from "./InterfaceDialogs.svelte";
     import type { InterfaceEditorState } from "./interface-editor-state.svelte";
     import ComponentTreePanel from "./panels/ComponentTreePanel.svelte";
-    import ComingSoonPanel from "./panels/ComingSoonPanel.svelte";
     import ComponentEditorPanel from "./panels/ComponentEditorPanel.svelte";
     import ClientScriptPanel from "./panels/ClientScriptPanel.svelte";
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
@@ -50,10 +49,7 @@
         });
     });
 
-    onDestroy(() => {
-        dock?.dispose();
-        state.dispose();
-    });
+    onDestroy(() => dock?.dispose());
 </script>
 
 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
