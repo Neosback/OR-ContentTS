@@ -87,7 +87,8 @@ export function getRootWidgetV3(entry: InterfaceEntry, interfaceId: number): boo
   }
   for (const row of byLayer.values()) row.sort((a, b) => a.id - b.id);
   const rootLayer = byLayer.has(-1) ? -1 : interfaceId;
-  return byLayer.get(rootLayer)?.[0]?.v3 ?? null;
+  const first = byLayer.get(rootLayer)?.[0];
+  return first ? first.v3 : null;
 }
 
 export function unhideComponentSubtree(component: ComponentType): void {
