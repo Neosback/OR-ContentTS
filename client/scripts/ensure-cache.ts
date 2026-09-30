@@ -174,7 +174,7 @@ function writeCacheList(): void {
         try {
             const entry = JSON.parse(fs.readFileSync(path.join(cacheDir, "info.json"), "utf8")) as OpenRS2CacheEntry;
             const revision = entry.builds[0]?.major;
-            if (!Number.isSafeInteger(revision) || !entry.timestamp) continue;
+            if (typeof revision !== "number" || !Number.isSafeInteger(revision) || !entry.timestamp) continue;
             items.push({
                 name,
                 game: entry.game,
