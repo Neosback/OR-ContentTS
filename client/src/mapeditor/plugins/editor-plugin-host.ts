@@ -123,6 +123,13 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
 
     subscribeHistory(listener: () => void): () => void;
     getHistorySnapshot(): import("../map-editor-history").MapEditorHistorySnapshot;
+
+    beginEditTransaction(source: import("../editor-transaction").EditorTransactionSource, label?: string): void;
+    commitEditTransaction(): void;
+    cancelEditTransaction(): void;
+    recordEditMutation(mutation: import("../editor-transaction").EditorMutation): void;
+
+    /** Compatibility wrappers for existing paint-stroke code. */
     beginHistoryStroke(tool: import("../map-editor-history").MapEditorHistoryTool, label?: string): void;
     commitHistoryStroke(): void;
     cancelHistoryStroke(): void;
@@ -469,6 +476,21 @@ export class EditorPluginHost implements IEditorPluginHost {
     };
     getHistorySnapshot = (): import("../map-editor-history").MapEditorHistorySnapshot => {
         return this._e.getHistorySnapshot();
+    };
+    beginEditTransaction = (
+        source: import("../editor-transaction").EditorTransactionSource,
+        label?: string,
+    ): void => {
+        this._e.beginEditTransaction(source, label);
+    };
+    commitEditTransaction = (): void => {
+        this._e.commitEditTransaction();
+    };
+    cancelEditTransaction = (): void => {
+        this._e.cancelEditTransaction();
+    };
+    recordEditMutation = (mutation: import("../editor-transaction").EditorMutation): void => {
+        this._e.recordEditMutation(mutation);
     };
     beginHistoryStroke = (tool: import("../map-editor-history").MapEditorHistoryTool, label?: string): void => {
         this._e.beginHistoryStroke(tool, label);
