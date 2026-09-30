@@ -493,6 +493,11 @@ export class EditorPluginHost implements IEditorPluginHost {
     recordEditMutation = (mutation: import("../editor-transaction").EditorMutation): void => {
         this._e.recordEditMutation(mutation);
     };
+    appendAppliedHistoryTransaction = (
+        transaction: import("../editor-transaction").EditorTransaction,
+    ): void => {
+        this._e.appendAppliedHistoryTransaction(transaction);
+    };
     beginHistoryStroke = (tool: import("../map-editor-history").MapEditorHistoryTool, label?: string): void => {
         this._e.beginHistoryStroke(tool, label);
     };
