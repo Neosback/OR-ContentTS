@@ -110,7 +110,25 @@ The local cache profile id is only a binding hint. Portable identity must not de
 
 IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. `ProjectLifecycle` now owns current-project state, create/open/save/Save As/close, dirty-state tracking, import/export, and conversion of the applied editor-history cursor into authoritative Edit Format v1 data.
 
-Undo/Redo history beyond the current applied cursor is never project content. UI integration should subscribe to `ProjectLifecycle` rather than reimplementing those rules in Svelte.
+Undo/Redo history beyond the current applied cursor is never project content. The Svelte map-editor workflow uses a thin `ProjectSessionController` adapter that subscribes to `ProjectLifecycle` and editor history; project rules remain outside the components.
+
+### Project replay
+
+Opening a saved project follows a strict replay path:
+
+```text
+Project v1
+  -> Edit Format v1 validation
+  -> required map-square load
+  -> base-state preflight
+  -> live terrain / semantic loc application
+  -> runtime transaction reconstruction
+  -> normal Undo/Redo history
+```
+
+`client/src/project/edit-format-v1-replay.ts` owns this framework-neutral application boundary. It rejects unsupported renderers, non-empty history, missing required maps, terrain base mismatches, and semantic object mismatches. Replayed transactions preserve their persisted ids, labels, sources, and timestamps. If replay fails, applied work is rolled back before control returns to the UI.
+
+The Svelte launch workflow only orchestrates project selection, required-map loading, progress, and user-facing errors. It does not implement terrain/object mutation rules.
 
 ## Validation
 
