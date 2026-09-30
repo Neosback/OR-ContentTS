@@ -6,7 +6,6 @@ import { useCacheType } from "@/context/cache-type-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cacheProxyHeaders } from "@/lib/cache-proxy-client";
-import type { RsInterfaceMode } from "@/components/ui/rs-interface";
 import { adaptInterfaceEntryFromApi, type ComponentType, type InterfaceEntry } from "@/lib/interface-renderer/component-types";
 import { openInterface, setCs1InterfaceEntry } from "@/lib/interface-renderer/interface-manager";
 import { applyCs2RuntimeFromSim } from "@/lib/interface-renderer/cs2/runtime-context";
@@ -29,10 +28,10 @@ import {
   type InterfaceEditorWorkbench,
   type InterfaceLegacyFilter,
   type InterfaceListEntry,
-  type TreeNode,
   type TreeRow,
 } from "./interface-editor-workbench-context";
 import { InterfaceEditorDock } from "./interface-editor-dock";
+import type { RsInterfaceMode } from "./interface-editor-workbench-model";
 import {
   buildComponentTree,
   flattenTree,
