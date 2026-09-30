@@ -9,6 +9,7 @@
     import { cn } from "./lib/utils";
     import CacheRepositoryScreen from "./screens/cache/CacheRepositoryScreen.svelte";
     import MapEditorScreen from "./mapeditor/MapEditorScreen.svelte";
+    import MapViewerScreen from "./mapviewer/MapViewerScreen.svelte";
     import HomeScreen from "./screens/HomeScreen.svelte";
     import MapHubScreen from "./screens/MapHubScreen.svelte";
     import NotPortedScreen from "./screens/NotPortedScreen.svelte";
@@ -63,7 +64,7 @@
                 {:else if path === "/cache-test"}
                     <CacheRepositoryScreen />
                 {:else if path.startsWith("/map/viewer")}
-                    <NotPortedScreen name="Map viewer" />
+                    <MapViewerScreen />
                 {:else if path.startsWith("/map/editor")}
                     <MapEditorScreen />
                 {:else if isInterfaceRoute}
