@@ -8,7 +8,7 @@ import { cacheProxy } from "./vite/cache-proxy.mts";
 import { glslAsString, serveCaches, wasmBz2Url } from "./vite/plugins.mts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
-/** `client/caches` is a symlink to `server/caches` (downloaded by scripts/download-caches.js). */
+/** Local development caches are bootstrapped directly into `client/caches`. */
 const cachesDir = path.resolve(appRoot, "caches");
 
 // SharedArrayBuffer needs cross-origin isolation, in dev and in `vite preview`.
