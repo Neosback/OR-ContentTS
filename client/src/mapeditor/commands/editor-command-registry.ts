@@ -42,6 +42,7 @@ export type EditorCommandId =
     | "height.blend-strength.increase"
     | "height.blend-strength.decrease"
     | "object-selector.cancel"
+    | "object-selector.clear-selection"
     | "object-selector.rotate-selected"
     | "object-selector.copy-object"
     | "region-stamp.copy"
@@ -260,6 +261,19 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         execute: ({ host }) => {
             if (host.isObjectCopyPlacementActive()) host.cancelObjectCopyPlacement();
             else host.clearSelectedObject();
+            host.notifyWorkbenchStateChanged();
+        },
+    },
+    {
+        id: "object-selector.clear-selection",
+        name: "Clear object selection",
+        description: "Cancel copy placement and clear the current object selection.",
+        isEnabled: ({ host }) =>
+            host.isObjectSelectorToolActive() &&
+            (host.isObjectCopyPlacementActive() || host.selectedObject != null),
+        execute: ({ host }) => {
+            host.cancelObjectCopyPlacement();
+            host.clearSelectedObject();
             host.notifyWorkbenchStateChanged();
         },
     },
