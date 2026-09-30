@@ -73,8 +73,7 @@
         bind:this={host}
         class="context-menu-container"
         class:tooltip
-        style:left="{realX}px"
-        style:top="{realY}px"
+        style={`left: ${realX}px; top: ${realY}px;`}
         oncontextmenu={(event) => event.preventDefault()}
         onfocus={(event) => {
             if (tooltip) event.preventDefault();
