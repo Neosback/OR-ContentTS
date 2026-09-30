@@ -1,5 +1,6 @@
 <script lang="ts">
     import { keybindChordToLabel } from "../../../mapeditor/editor-tool-input";
+    import { executeEditorCommand, heightModeCommandId } from "../../../mapeditor/commands/editor-command-registry";
     import { getBuiltinEditorToolPlugin } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
     import { HEIGHT_MODES } from "../../../mapeditor/plugins/builtins/height-brush-settings.shared";
     import { getHeightToolModel } from "../../../mapeditor/plugins/builtins/height-tool-model";
@@ -82,10 +83,7 @@
                                 size="sm"
                                 variant={selected ? "secondary" : "outline"}
                                 class={cn("h-8 justify-start gap-1.5 px-2 text-[11px]", selected && "ring-1 ring-primary/35")}
-                                onclick={() => {
-                                    model.setMode(m.id);
-                                    host.setEditorTool("height");
-                                }}
+                                onclick={() => executeEditorCommand(heightModeCommandId(m.id), { host })}
                             >
                                 <Icon class="size-3.5" />
                                 {m.name}
