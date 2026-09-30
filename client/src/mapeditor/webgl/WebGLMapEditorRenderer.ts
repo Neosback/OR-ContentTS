@@ -105,7 +105,7 @@ import {
     tileRenderFlagValueLabelForView,
 } from "../../rs/map/TileRenderFlags";
 import { syncSceneLocHeightsForHeightEdit, markObjectChunksForHeightEdit } from "./scene-loc-height-sync";
-import { recordHistoryTileMutation } from "../map-editor-history-record";
+import { recordEditTileMutation } from "../map-editor-history-record";
 
 const MAX_TEXTURES = 2048;
 const TEXTURE_SIZE = 128;
@@ -230,7 +230,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
     private tileFlagsPaintedKeys = new Set<string>();
     private tileFlagsPaintStrokeActive = false;
-    private paintHistoryStrokeActive = false;
+    private paintTransactionActive = false;
 
     lastTimeTerrainUpdated: number = 0;
     updatedTerrainMapIds: Set<number> = new Set();
@@ -1019,17 +1019,17 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         }
     }
 
-    private syncPaintHistoryStroke(isPainting: boolean): void {
+    private syncPaintTransaction(isPainting: boolean): void {
         if (!isPainting) {
-            if (this.paintHistoryStrokeActive) {
-                this.host.commitHistoryStroke();
-                this.paintHistoryStrokeActive = false;
+            if (this.paintTransactionActive) {
+                this.host.commitEditTransaction();
+                this.paintTransactionActive = false;
             }
             return;
         }
-        if (!this.paintHistoryStrokeActive && this.host.editorTool !== "object-selector" && this.host.editorTool !== "object-delete" && this.host.editorTool !== "region-stamp") {
-            this.host.beginHistoryStroke(this.host.editorTool);
-            this.paintHistoryStrokeActive = true;
+        if (!this.paintTransactionActive && this.host.editorTool !== "object-selector" && this.host.editorTool !== "object-delete" && this.host.editorTool !== "region-stamp") {
+            this.host.beginEditTransaction(this.host.editorTool);
+            this.paintTransactionActive = true;
         }
     }
 
@@ -2956,7 +2956,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             : // Alt+right-click opens the viewport context menu instead of painting.
               inputManager.isHolding() && !inputManager.isAltDown();
 
-        this.syncPaintHistoryStroke(isPainting);
+        this.syncPaintTransaction(isPainting);
 
         if (this.hoverWorldX === -1 || this.hoverWorldY === -1 || !isPainting) {
             return;
@@ -3135,7 +3135,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 const worldX = map.mapX * 64 + tileX;
                 const worldY = map.mapY * 64 + tileY;
                 const paintId = this.host.getUnderlayPaintTypeId(worldX, worldY);
-                recordHistoryTileMutation(this.host, map, level, sceneX, sceneY, () => {
+                recordEditTileMutation(this.host, map, level, sceneX, sceneY, () => {
                     scene.tileUnderlays[level][sceneX][sceneY] = paintId + 1;
                 });
 
@@ -3206,7 +3206,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                     continue;
                 }
 
-                recordHistoryTileMutation(this.host, map, level, sceneX, sceneY, () => {
+                recordEditTileMutation(this.host, map, level, sceneX, sceneY, () => {
                     scene.tileOverlays[level][sceneX][sceneY] = overlayValue;
                     if (overlayValue === 0) {
                         scene.tileShapes[level][sceneX][sceneY] = 0;
@@ -3252,7 +3252,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             return;
         }
 
-        recordHistoryTileMutation(this.host, map, level, sceneX, sceneY, () => {
+        recordEditTileMutation(this.host, map, level, sceneX, sceneY, () => {
             scene.tileOverlays[level][sceneX][sceneY] = overlayValue;
             if (overlayValue === 0) {
                 scene.tileShapes[level][sceneX][sceneY] = 0;
