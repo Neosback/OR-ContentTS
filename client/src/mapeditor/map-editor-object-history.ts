@@ -336,6 +336,7 @@ export function recordEditObjectMutation(
                 kind: "map.objects",
                 mapId: getMapSquareId(map.mapX, map.mapY),
                 level,
+                sceneBorderSize: map.borderSize,
                 before: cloneSceneTileLocEntries(before),
                 after: cloneSceneTileLocEntries(after),
             });
