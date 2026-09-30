@@ -8,7 +8,7 @@ import {
 } from "../../webgl/sceneLocData";
 import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync";
 import {
-    recordHistoryObjectMutation,
+    recordEditObjectMutation,
     snapshotObjectEntriesForRef,
 } from "../../map-editor-object-history";
 import type { EditorObjectRef } from "../../webgl/sceneLocPicker";
@@ -120,7 +120,7 @@ export function deleteObjectRef(
         return false;
     }
 
-    return recordHistoryObjectMutation(
+    return recordEditObjectMutation(
         host,
         map,
         ref.level,
