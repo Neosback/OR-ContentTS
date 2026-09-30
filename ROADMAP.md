@@ -29,7 +29,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the enforced frontend boundary.
 - [x] Cut the map viewer, map editor and interface routes over to the Svelte shell.
 - [x] Removed the obsolete React map-editor UI/plugin island.
 - [x] Kept rendering/cache/game-side TypeScript systems available beneath the UI.
-- [x] Established green Svelte, TypeScript, Vitest and Vite production-build validation.
+- [x] Established reproducible clean-install, Vitest and Vite production-build validation; full-tree Svelte/TypeScript debt remains visible as advisory diagnostics.
 
 A quarantined set of legacy TSX files is still present for staged cleanup. It is not the active Studio runtime.
 
@@ -50,10 +50,11 @@ Done:
 - [x] Inventory/gameval simulator.
 - [x] Svelte-only runtime entrypoint.
 - [x] CI architecture guard preventing React/TSX imports into `src/ui`.
-- [x] Blocking Svelte, TypeScript, Vitest and Vite build gates.
+- [x] Blocking UI-boundary, Vitest and Vite build gates, with full-tree Svelte/TypeScript diagnostics kept visible as migration debt.
 
 Next:
 
+- [ ] Clear the remaining full-tree Svelte/TypeScript diagnostics, including retained legacy TSX references and active engine typing debt.
 - [ ] Classify and remove retained legacy TSX and then prune React-only dependencies/tooling.
 - [ ] Shops and world map as first-class dock panels.
 - [ ] Shared command and keyboard-shortcut registry.
