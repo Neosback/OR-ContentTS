@@ -9,6 +9,7 @@
     import type { InterfaceEditorState } from "./interface-editor-state.svelte";
     import ComponentTreePanel from "./panels/ComponentTreePanel.svelte";
     import ComingSoonPanel from "./panels/ComingSoonPanel.svelte";
+    import ComponentEditorPanel from "./panels/ComponentEditorPanel.svelte";
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
     import PreviewPanel from "./panels/PreviewPanel.svelte";
 
@@ -33,8 +34,8 @@
             sveltePanel({
                 id: "ifaceComponentEditor",
                 title: "Component editor",
-                component: ComingSoonPanel,
-                props: { title: "Component editor", note: "Component property editing is the next interface migration slice." },
+                component: ComponentEditorPanel,
+                props: { state },
                 isolateInput: true,
             }),
         ];
