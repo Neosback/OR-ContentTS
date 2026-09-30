@@ -8,7 +8,7 @@ This is the plan for turning this repository into the OpenRune Content Studio fr
 | --- | --- |
 | Svelte 5 Studio UI | shell, routing, dock layout, panels, workflows, user interaction |
 | Framework-neutral TypeScript | cache decoding, scene/rendering, map editor runtime, plugin/editor services, data models |
-| RSPSi / OpenRune Studio backend | project files, validation, saving, encoding, publishing, OpenRune builds |
+| OpenRune Studio backend | OpenRune FileStore/domain integration, project files, validation, saving, encoding, publishing, OpenRune builds |
 
 Rules that follow from that split:
 
@@ -61,7 +61,7 @@ Next:
 
 ## Phase 2: backend-ready seams
 
-Goal: the frontend works fully offline, with every server dependency behind an interface the RSPSi backend can implement later.
+Goal: the frontend works fully offline, with every server dependency behind an interface the OpenRune server can implement later.
 
 - [ ] Formalize `CacheSource`: static/range-backed local cache today, backend-served later.
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
@@ -80,9 +80,9 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 - [ ] Validation overlays for clipping, blocked tiles and missing definitions.
 - [ ] Consistent selection/inspection model across maps, interfaces and future definition editors.
 
-## Phase 4: RSPSi / OpenRune backend integration
+## Phase 4: OpenRune backend integration
 
-- [ ] Server module on top of the OpenRune FileStore/domain layer.
+- [ ] OpenRune Studio server module on top of the OpenRune FileStore/domain layer.
 - [ ] Serve caches with Range support and versioned names.
 - [ ] Implement `WorldSource` and project APIs.
 - [ ] Accept edit batches, validate and save projects.
@@ -121,5 +121,6 @@ Next:
 
 ## Current caveats
 
-- Without the legacy server, optional `/api/world` data can be unavailable; the editor itself still opens from local cache data.
+- The repository's `server/` directory is legacy/reference infrastructure, not the target Studio backend. Do not add new Studio architecture to it.
+- Without the legacy server, optional `/api/world` data can currently be unavailable; the editor itself still opens from local cache data. This compatibility path should disappear behind `WorldSource`.
 - The app builds for the site root with Vite. Any old deployment scripts that assume `/play` need to be treated as legacy.
