@@ -11,14 +11,9 @@ This document is the current engineering handoff for developers continuing OpenR
 
 New Studio backend work must target the **OpenRune server** and its FileStore/domain model.
 
-The repository's current `server/` directory is **legacy/reference infrastructure**. It is not the architecture to extend.
+The legacy TypeScript `server/` has been removed from this repository.
 
-Today it is still useful for two temporary compatibility paths:
-
-- bootstrapping/downloading the cache through `server/scripts/ensure-cache.ts`
-- optional legacy `/api/world` spawn/zone data
-
-Do not add new project APIs, Studio persistence, cache encoding, publishing, validation, or build workflows to that legacy server.
+The only intended backend target is `Neosback/OpenRune-Server`. Local Studio cache bootstrap lives under `client/scripts/ensure-cache.ts`, and current spawn snapshots are bundled in the client, so no compatibility server is required to run the editor.
 
 The intended direction is:
 
@@ -394,25 +389,13 @@ command -> transaction -> typed mutation -> Edit Format
 
 Do not create isolated per-panel save systems.
 
-## 10. Legacy server rules
+## 10. Backend rules
 
-The current `server/` directory is not the long-term Studio backend.
+There is no game server in this repository anymore.
 
-Allowed temporary uses:
+Do not recreate one here. New server-side work belongs in `Neosback/OpenRune-Server` and should be reached through stable Studio interfaces such as `ProjectStore`, `CacheSource`, `WorldSource`, and the future OpenRune Studio service client.
 
-- cache bootstrap
-- existing compatibility paths while replacements are implemented
-- reference when understanding old behavior
-
-Do not:
-
-- add new Studio project persistence there
-- add new authoritative validation there
-- define the new project protocol around its current endpoints
-- send pre-encoded map/cache bytes from the frontend to match it
-- couple new panels directly to its socket/API model
-
-If a new feature appears to require the legacy server, first ask whether it should instead be a `ProjectStore`, `CacheSource`, `WorldSource`, or OpenRune service interface.
+The Studio must continue to start and support local editing without OpenRune Server running.
 
 ## 11. Development conventions
 
