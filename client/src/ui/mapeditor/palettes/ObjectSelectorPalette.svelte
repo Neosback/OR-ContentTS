@@ -1,5 +1,6 @@
 <script lang="ts">
     import { isCopyableObjectKind } from "../../../mapeditor/plugins/builtins/object-copy-placement";
+    import { executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
     import { Label } from "../../components/ui/label";
     import { useEditorState } from "../editor-state.svelte";
 
@@ -37,11 +38,7 @@
             <button
                 type="button"
                 class="mt-2 text-xs text-primary underline-offset-2 hover:underline"
-                onclick={() => {
-                    host.cancelObjectCopyPlacement();
-                    host.clearSelectedObject();
-                    host.notifyWorkbenchStateChanged();
-                }}
+                onclick={() => executeEditorCommand("object-selector.clear-selection", { host })}
             >
                 Clear selection
             </button>
