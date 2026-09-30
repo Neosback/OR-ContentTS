@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IEditorPluginHost } from "../plugins/editor-plugin-host";
 import {
     canExecuteEditorCommand,
+    editorCommandKeyBinding,
     executeEditorCommand,
     getEditorCommand,
     getRegisteredEditorCommands,
@@ -15,6 +16,8 @@ function hostStub(overrides: Partial<IEditorPluginHost> = {}): IEditorPluginHost
         toggleTerrainSmoothingEnabled: vi.fn(),
         undoHistory: vi.fn(),
         redoHistory: vi.fn(),
+        setEditorTool: vi.fn(),
+        notifyWorkbenchStateChanged: vi.fn(),
         getHistorySnapshot: () => ({
             entries: [],
             currentIndex: -1,
@@ -48,6 +51,53 @@ describe("editor command registry", () => {
         expect(canExecuteEditorCommand("workbench.undo", { host })).toBe(false);
         expect(executeEditorCommand("workbench.undo", { host })).toBe(false);
         expect(undoHistory).not.toHaveBeenCalled();
+    });
+
+    it("executes tool selection through the same command used by keybindings", () => {
+        const setEditorTool = vi.fn();
+        const host = hostStub({ setEditorTool });
+        const binding = editorCommandKeyBinding("tool.select-region-stamp", {
+            id: "select-tool",
+            defaultChords: [{ code: "Digit6" }],
+        });
+
+        expect(binding.name).toBe("Select Region Stamp tool");
+        expect(binding.action({ host, input: {} as never })).not.toBe(false);
+        expect(setEditorTool).toHaveBeenCalledWith("region-stamp");
+    });
+
+    it("executes parameterized workbench layout commands", () => {
+        const openPanel = vi.fn();
+        const success = vi.fn();
+        const host = hostStub();
+        const layout = {
+            openPanel,
+            restoreAllPanels: vi.fn(),
+            resetLayout: vi.fn(),
+        };
+
+        expect(
+            executeEditorCommand(
+                "workbench.open-panel",
+                { host, layout, notify: { success } },
+                { panelId: "editor-history", panelTitle: "History" },
+            ),
+        ).toBe(true);
+        expect(openPanel).toHaveBeenCalledWith("editor-history");
+        expect(success).toHaveBeenCalledWith("History opened");
+    });
+
+    it("does not execute parameterized panel commands without a panel id", () => {
+        const openPanel = vi.fn();
+        const host = hostStub();
+        const layout = {
+            openPanel,
+            restoreAllPanels: vi.fn(),
+            resetLayout: vi.fn(),
+        };
+
+        expect(executeEditorCommand("workbench.open-panel", { host, layout })).toBe(false);
+        expect(openPanel).not.toHaveBeenCalled();
     });
 
     it("executes enabled history commands", () => {
