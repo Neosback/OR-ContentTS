@@ -73,9 +73,25 @@ Derived metadata such as affected maps and tile counts is validated against the 
 
 ## Backend boundary
 
-The frontend is designed to work offline today. Server-backed behavior should sit behind explicit interfaces so the future RSPSi/OpenRune Studio backend can replace local/static implementations without rewriting the UI.
+The frontend is designed to work offline today. Server-backed behavior must sit behind explicit interfaces so local implementations can be replaced without rewriting the UI.
 
-The backend will eventually own encoding, validation, project persistence, publishing, and OpenRune build actions.
+### Target backend
+
+The target backend is the **OpenRune server**, using the OpenRune FileStore/domain layer for cache and project operations.
+
+The repository's current `server/` directory is legacy/reference infrastructure. It may continue to support temporary local cache bootstrap and legacy world-data compatibility while replacements are built, but new Studio APIs, persistence, encoding, validation, publishing, and build workflows must not be designed around that server.
+
+The OpenRune backend will eventually own:
+
+- project persistence and project lifecycle operations
+- authoritative validation
+- cache encoding and publishing
+- world/content sources
+- OpenRune project/build integration
+- serving versioned cache data with Range support
+- accepting versioned Studio edit batches such as Edit Format v1
+
+The frontend should continue to implement local/offline versions of these interfaces first so the UI remains usable without a running OpenRune server.
 
 ## Validation
 
