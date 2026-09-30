@@ -21,7 +21,8 @@
             size: 75,
             color: "#007BFF",
         });
-        manager.on("move", (_event, data) => {
+        manager.on("move", (event) => {
+            const data = event.data;
             const radians = ((data.angle?.degree ?? 0) * Math.PI) / 180;
             const force = data.force ?? 0;
             move({
