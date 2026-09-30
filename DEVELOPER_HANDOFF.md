@@ -217,6 +217,7 @@ These PRs establish the current baseline:
 | #24 | Made OpenRune the explicit backend target and added this developer handoff |
 | #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
 | #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
+| #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -318,21 +319,20 @@ Use an IndexedDB test implementation or a focused test dependency if browser Ind
 
 After local project persistence, continue in roughly this order:
 
-### A. Project lifecycle API
+### A. Project lifecycle API — completed
 
-Formalize application-level operations such as:
+`client/src/project/project-lifecycle.ts` now owns:
 
-- open project
-- save project
-- close project
-- import/export
-- validate
-- publish
-- build OpenRune project
+- create/open/save/Save As/close
+- current project + working edits
+- dirty-state tracking
+- import/export orchestration
+- explicit dirty-project discard guards
+- applied-history cursor -> Edit Format v1 conversion
 
-Local implementations should handle operations that can work offline. Publish/build can remain unavailable until the OpenRune backend implementation exists.
+Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content.
 
-The UI should consume this project service rather than IndexedDB directly.
+The next project-facing slice should wire this service into the Svelte project/launch workflow and add edit-batch replay/application when opening an existing project. Publish/build remain unavailable until the OpenRune backend implementation exists.
 
 ### B. CacheSource
 
@@ -437,7 +437,7 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-Then implement the **project lifecycle service** on top of `ProjectStore`: current project state, open/save/close, dirty-state tracking, authoritative applied-edit snapshots, and import/export orchestration. Keep publish/build unavailable until the OpenRune implementation exists.
+Then wire **ProjectLifecycle into the Svelte project/launch workflow** and implement safe replay/application of a project's Edit Format v1 data into the editor. Keep Svelte as orchestration only; lifecycle and edit application rules stay framework-neutral.
 
 The key architectural requirement is simple:
 
