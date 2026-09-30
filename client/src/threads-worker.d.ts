@@ -1,6 +1,54 @@
-/** Minimal typings: `threads` package default export points at .mjs without types under some TS setups. */
+/** Compatibility typings for threads.js under TypeScript bundler resolution. */
 declare module "threads" {
-    export function registerSerializer(...args: unknown[]): void;
+    export interface TransferDescriptor<T = unknown> {
+        payload: T;
+        transferables?: Transferable[];
+    }
+
+    export interface SerializerImplementation {
+        serialize(value: unknown, defaultHandler: (value: unknown) => unknown): unknown;
+        deserialize(value: unknown, defaultHandler: (value: unknown) => unknown): unknown;
+    }
+
+    export type ModuleThread<T> = T;
+
+    export interface QueuedTask<ThreadType, Return> extends PromiseLike<Return> {
+        id: number;
+        run(thread: ThreadType): Return | PromiseLike<Return>;
+        cancel(): void;
+    }
+
+    export interface Pool<ThreadType> {
+        queue<Return>(task: (thread: ThreadType) => Return): QueuedTask<ThreadType, Return>;
+        terminate(force?: boolean): Promise<void>;
+    }
+
+    export function Pool<ThreadType>(
+        spawnWorker: () => Promise<ThreadType>,
+        optionsOrSize?: number | { size?: number; concurrency?: number; maxQueuedJobs?: number; name?: string },
+    ): Pool<ThreadType>;
+
+    export function spawn<T>(worker: Worker): Promise<ModuleThread<T>>;
+    export function registerSerializer(serializer: SerializerImplementation): void;
+}
+
+declare module "threads/dist/master/pool" {
+    export interface QueuedTask<ThreadType, Return> extends PromiseLike<Return> {
+        id: number;
+        run(thread: ThreadType): Return | PromiseLike<Return>;
+        cancel(): void;
+    }
+}
+
+declare module "threads/dist/master/pool-types" {
+    export interface WorkerDescriptor<ThreadType> {
+        init: Promise<ThreadType>;
+        runningTasks: Promise<void>[];
+    }
+}
+
+declare module "threads/dist/observable-promise" {
+    export type ObservablePromise<T> = PromiseLike<T>;
 }
 
 declare module "threads/worker" {
