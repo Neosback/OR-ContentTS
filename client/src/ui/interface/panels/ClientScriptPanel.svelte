@@ -2,6 +2,7 @@
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
     import ComingSoonPanel from "./ComingSoonPanel.svelte";
     import Cs2ManualRunner from "./Cs2ManualRunner.svelte";
+    import Cs1Simulator from "./Cs1Simulator.svelte";
 
     let { state }: { state: InterfaceEditorState } = $props();
 </script>
@@ -16,7 +17,7 @@
         {:else if state.rootWidgetV3 === true}
             <Cs2ManualRunner {state} />
         {:else if state.rootWidgetV3 === false}
-            <ComingSoonPanel title="CS1 simulator" note="The legacy CS1 + inventory simulator is the next stacked migration slice." />
+            <Cs1Simulator {state} />
         {:else}
             <div class="px-3 py-2 text-xs text-muted-foreground">
                 Could not determine legacy vs IF3 for this interface. You can still run CS2 manually below.
