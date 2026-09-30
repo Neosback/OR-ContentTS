@@ -10,12 +10,12 @@
     import { Label } from "../../components/ui/label";
     import { clickOutside } from "../../lib/actions";
     import { cn } from "../../lib/utils";
-    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
 
     type ItemRowDraft = { itemIdText: string; qtyText: string };
     type GamevalEntry = { id: number; name: string; lowerName: string };
 
-    let { state, inventoryScriptsUsed }: { state: InterfaceEditorState; inventoryScriptsUsed: boolean } = $props();
+    let { state: editor, inventoryScriptsUsed }: { state: InterfaceEditorState; inventoryScriptsUsed: boolean } = $props();
 
     let invOpen = $state(false);
     let targetIdText = $state("");
@@ -36,13 +36,13 @@
     const invLocked = $derived(!inventoryScriptsUsed);
 
     const components = $derived.by(() => {
-        const data = state.interfaceData;
+        const data = editor.interfaceData;
         if (!data?.components) return [] as ComponentType[];
         return Object.values(data.components).sort((a, b) => a.id - b.id);
     });
 
     const itemEntries = $derived.by((): GamevalEntry[] => {
-        const gameVals = state.viewer.gamevals;
+        const gameVals = editor.viewer.gamevals;
         if (!gameVals) return [];
         try {
             return gameVals.get(GameValGroupType.OBJTYPES).map((entry) => ({
@@ -75,7 +75,7 @@
     );
 
     const selectedInventory = $derived(
-        selectedComponentId == null ? undefined : state.cs1SimState.simulatedInventories[selectedComponentId],
+        selectedComponentId == null ? undefined : editor.cs1SimState.simulatedInventories[selectedComponentId],
     );
 
     const slots = $derived(slotCountFor(selectedComponent, selectedInventory));
@@ -93,7 +93,7 @@
     });
 
     $effect(() => {
-        state.selectedId;
+        editor.selectedId;
         selectedComponentId = null;
         targetIdText = "";
         targetPanelOpen = false;
@@ -103,7 +103,7 @@
     });
 
     function getComponent(id: number): ComponentType | null {
-        const data = state.interfaceData;
+        const data = editor.interfaceData;
         if (!data?.components) return null;
         const direct = data.components[String(id)];
         return direct ?? Object.values(data.components).find((component) => component.id === id) ?? null;
@@ -137,7 +137,7 @@
     }
 
     function commitInventory(componentId: number, inventory: Cs1SimInventory): void {
-        state.setCs1SimState((previous) => ({
+        editor.setCs1SimState((previous) => ({
             ...previous,
             simulatedInventories: {
                 ...previous.simulatedInventories,
@@ -149,7 +149,7 @@
     function clearSelected(): void {
         if (selectedComponentId == null) return;
         const component = getComponent(selectedComponentId);
-        const count = slotCountFor(component, state.cs1SimState.simulatedInventories[selectedComponentId]);
+        const count = slotCountFor(component, editor.cs1SimState.simulatedInventories[selectedComponentId]);
         commitInventory(selectedComponentId, emptyInventory(count));
     }
 
@@ -160,7 +160,7 @@
         if (!Number.isFinite(defId) || defId < 0 || !Number.isFinite(quantity) || quantity < 0) return;
 
         const component = getComponent(selectedComponentId);
-        const count = slotCountFor(component, state.cs1SimState.simulatedInventories[selectedComponentId]);
+        const count = slotCountFor(component, editor.cs1SimState.simulatedInventories[selectedComponentId]);
         const wire = Cs1Interpreter.itemSlotEncoding(defId);
         commitInventory(selectedComponentId, {
             itemIds: Array.from({ length: count }, () => wire),
@@ -171,7 +171,7 @@
     function applyRows(): void {
         if (selectedComponentId == null) return;
         const component = getComponent(selectedComponentId);
-        const count = slotCountFor(component, state.cs1SimState.simulatedInventories[selectedComponentId]);
+        const count = slotCountFor(component, editor.cs1SimState.simulatedInventories[selectedComponentId]);
         const itemIds = Array.from({ length: count }, () => 0);
         const itemQuantities = Array.from({ length: count }, () => 0);
 
