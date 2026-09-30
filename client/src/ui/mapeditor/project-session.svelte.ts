@@ -6,6 +6,7 @@ import {
     type ProjectLifecycleSnapshot,
     type SaveProjectAsInput,
 } from "../../project/project-lifecycle";
+import { decodeProjectV1 } from "../../project/project-format-v1";
 import type { Project, ProjectSummary } from "../../project/project-store";
 
 export class ProjectSessionController {
@@ -91,6 +92,8 @@ export class ProjectSessionController {
     async openProject(id: string, discardChanges = false): Promise<Project> {
         return this.run(async () => {
             this.ensureCanReplaceCurrent(discardChanges);
+            const summary = this.projects.find((project) => project.id === id);
+            if (summary) this.assertCompatible(summary);
             this.pauseHistorySync();
             this.resetEditorToBase();
             const project = await this.lifecycle.openProject(id, { discardChanges });
@@ -102,10 +105,11 @@ export class ProjectSessionController {
     async importProject(serialized: string, discardChanges = false): Promise<Project> {
         return this.run(async () => {
             this.ensureCanReplaceCurrent(discardChanges);
+            const decoded = decodeProjectV1(serialized);
+            this.assertCompatible(decoded);
             this.pauseHistorySync();
             this.resetEditorToBase();
             const project = await this.lifecycle.importProject(serialized, { discardChanges });
-            this.assertCompatible(project);
             await this.refreshProjects();
             return project;
         });
@@ -149,7 +153,7 @@ export class ProjectSessionController {
         );
     }
 
-    assertCompatible(project: Pick<Project, "base">): void {
+    assertCompatible(project: Pick<Project, "base"> | Pick<ProjectSummary, "base">): void {
         const host = this.requireHost();
         const actual = host.loadedCache.info;
         if (project.base.game !== actual.game || project.base.revision !== actual.revision) {
