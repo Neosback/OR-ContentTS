@@ -371,8 +371,12 @@ export class LaunchController {
         this.lastSavedSessionKey = sessionKey;
     }
 
-    private saveOnExit = (): void => {
+    private saveOnExit = (event?: BeforeUnloadEvent): void => {
         if (this.launchMeta && !this.showLaunchPanel) this.saveLastLoadedEntry(this.launchMeta, "exit");
+        if (event && this.projects.snapshot.dirty) {
+            event.preventDefault();
+            event.returnValue = "";
+        }
     };
 
     // ── launching ────────────────────────────────────────────
