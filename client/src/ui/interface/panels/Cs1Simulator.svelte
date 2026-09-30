@@ -8,6 +8,7 @@
     import { Input } from "../../components/ui/input";
     import { cn } from "../../lib/utils";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
+    import InventorySimulator from "./InventorySimulator.svelte";
 
     const CS1_GENERAL_SPRITE_COMBAT = 881;
     const CS1_GENERAL_SPRITE_RUN = 1070;
@@ -266,20 +267,7 @@
         {/if}
     </details>
 
-    <div
-        class="rounded-lg border border-border bg-background p-2"
-        class:opacity-70={!inventoryScriptsUsed}
-    >
-        <div class="flex items-center gap-2 text-xs font-semibold">
-            <span>Inventory</span>
-            {#if !inventoryScriptsUsed}
-                <span class="rounded bg-secondary px-1.5 py-0 text-[9px] font-normal text-secondary-foreground">Not used</span>
-            {/if}
-        </div>
-        <p class="mt-1 text-[10px] leading-snug text-muted-foreground">
-            Inventory slot editing and item gameval suggestions are isolated into the next migration PR.
-        </p>
-    </div>
+    <InventorySimulator {state} {inventoryScriptsUsed} />
 
     <div class={cn("rounded-md border border-dashed border-border p-2 text-[11px] text-muted-foreground", !variablesUsed && "bg-muted/15")}>
         <div class="flex flex-wrap items-center gap-2">
