@@ -35,7 +35,8 @@ type OpenRS2CacheEntry = {
 
 function readTarget(): CacheTarget {
     const raw = JSON.parse(fs.readFileSync(TARGET_FILE, "utf8")) as Partial<CacheTarget>;
-    if (raw.game !== "oldschool" || !Number.isSafeInteger(raw.revision) || (raw.revision ?? 0) <= 0) {
+    const revision = raw.revision;
+    if (raw.game !== "oldschool" || typeof revision !== "number" || !Number.isSafeInteger(revision) || revision <= 0) {
         throw new Error("cache-target.json must define an oldschool cache with a positive integer revision.");
     }
     if (raw.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(raw.date)) {
@@ -43,7 +44,7 @@ function readTarget(): CacheTarget {
     }
     return {
         game: raw.game,
-        revision: raw.revision,
+        revision,
         environment: raw.environment ?? "live",
         date: raw.date,
     };
