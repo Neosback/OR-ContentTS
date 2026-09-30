@@ -38,12 +38,10 @@ jobs:
       - name: Svelte UI boundary
         run: npm run check:ui-boundaries
 
-      - name: Svelte check (legacy debt report)
-        continue-on-error: true
+      - name: Svelte check
         run: npm run check
 
-      - name: TypeScript (legacy debt report)
-        continue-on-error: true
+      - name: TypeScript
         run: npm run typecheck
 
       - name: Unit tests
