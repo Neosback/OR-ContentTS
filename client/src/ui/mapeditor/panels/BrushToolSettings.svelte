@@ -1,5 +1,6 @@
 <script lang="ts">
     import { HEIGHT_MODES } from "../../../mapeditor/plugins/builtins/height-brush-settings.shared";
+    import { executeEditorCommand, heightModeCommandId } from "../../../mapeditor/commands/editor-command-registry";
     import { getBuiltinEditorToolPlugin } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
     import { getHeightToolModel } from "../../../mapeditor/plugins/builtins/height-tool-model";
     import { Button } from "../../components/ui/button";
@@ -32,10 +33,7 @@
                                 size="sm"
                                 variant={selected ? "secondary" : "outline"}
                                 class={cn("h-7 justify-start gap-1 px-1.5 text-[10px]", selected && "ring-1 ring-primary/35")}
-                                onclick={() => {
-                                    getHeightToolModel(host).setMode(mode.id);
-                                    host.setEditorTool("height");
-                                }}
+                                onclick={() => executeEditorCommand(heightModeCommandId(mode.id), { host })}
                             >
                                 <Icon class="size-3 shrink-0" />
                                 <span class="truncate">{mode.name}</span>
