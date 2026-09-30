@@ -4,7 +4,7 @@
 
     import { Button } from "../components/ui/button";
     import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
-    import type { InterfaceEditorState } from "./interface-editor-editor.svelte";
+    import type { InterfaceEditorState } from "./interface-editor-state.svelte";
 
     let { state: editor }: { state: InterfaceEditorState } = $props();
     let componentCopied = $state(false);
