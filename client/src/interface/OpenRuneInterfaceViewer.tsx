@@ -25,6 +25,7 @@ import {
 } from "@/lib/interface-renderer/cs2/cs2-console-sink";
 import {
   InterfaceEditorWorkbenchProvider,
+  type InterfaceContextMenuEvent,
   type InterfaceEditorWorkbench,
   type InterfaceLegacyFilter,
   type InterfaceListEntry,
@@ -545,7 +546,7 @@ export function OpenRuneInterfaceViewer({ viewer }: OpenRuneInterfaceViewerProps
   const selectedComponentId = selectedTreeNode?.id ?? null;
 
   const handleComponentRightClick = React.useCallback(
-    (e: React.MouseEvent, nodeKey: string) => {
+    (e: InterfaceContextMenuEvent, nodeKey: string) => {
       e.preventDefault();
       setJsonDialogComponentNodeKey(nodeKey);
       setJsonDialogOpen(true);
