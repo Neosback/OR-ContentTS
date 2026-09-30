@@ -1,5 +1,3 @@
-import { Schema } from "leva/dist/declarations/src/types";
-
 import { Renderer } from "../components/renderer/Renderer";
 import { SceneBuilder } from "../rs/scene/SceneBuilder";
 import { clamp } from "../util/MathUtil";
@@ -43,9 +41,6 @@ export abstract class MapViewerRenderer<T extends MapSquare = MapSquare> extends
         );
     }
 
-    getControls(): Schema {
-        return {};
-    }
 
     queueLoadMap(mapX: number, mapY: number): void {}
 
