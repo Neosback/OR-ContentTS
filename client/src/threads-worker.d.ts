@@ -6,8 +6,8 @@ declare module "threads" {
     }
 
     export interface SerializerImplementation {
-        serialize(value: unknown, defaultHandler: (value: unknown) => unknown): unknown;
-        deserialize(value: unknown, defaultHandler: (value: unknown) => unknown): unknown;
+        serialize(value: any, defaultHandler: (value: any) => any): any;
+        deserialize(value: any, defaultHandler: (value: any) => any): any;
     }
 
     export type ModuleThread<T> = T;
@@ -19,7 +19,7 @@ declare module "threads" {
     }
 
     export interface Pool<ThreadType> {
-        queue<Return>(task: (thread: ThreadType) => Return): QueuedTask<ThreadType, Return>;
+        queue<Return>(task: (thread: ThreadType) => Return | PromiseLike<Return>): QueuedTask<ThreadType, Return>;
         terminate(force?: boolean): Promise<void>;
     }
 
