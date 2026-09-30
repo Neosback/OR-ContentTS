@@ -12,7 +12,7 @@
     let loadingLabel = $state("Loading selected cache...");
     let loadingProgress = $state(0);
     let errorMessage = $state<string>();
-    let state = $state<InterfaceEditorState>();
+    let editorState = $state<InterfaceEditorState>();
     let abortController: AbortController | undefined;
 
     async function load(): Promise<void> {
@@ -62,7 +62,7 @@
 
         loadingLabel = "Starting interface viewer...";
         loadingProgress = 100;
-        state = new InterfaceEditorState(viewer);
+        editorState = new InterfaceEditorState(viewer);
     }
 
     onMount(() => {
@@ -75,7 +75,7 @@
 
     onDestroy(() => {
         abortController?.abort("component-unmount");
-        state?.dispose();
+        editorState?.dispose();
     });
 
     const progress = $derived(Math.max(0, Math.min(100, loadingProgress)));
