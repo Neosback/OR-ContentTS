@@ -1,7 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** project persistence slice following PR #24
+**Current baseline:** ProjectStore + Studio-owned cache bootstrap; legacy TypeScript server removed
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -216,6 +216,7 @@ These PRs establish the current baseline:
 | #23 | Added Edit Format v1, strict codec/schema, and golden parity fixture |
 | #24 | Made OpenRune the explicit backend target and added this developer handoff |
 | #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
+| #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
 
 Do not reintroduce systems replaced by these PRs.
 
