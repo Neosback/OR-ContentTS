@@ -69,6 +69,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
 - [x] Move cache download ownership into the Studio; local bootstrap now writes directly to `client/caches`.
 - [x] Define the framework-neutral project lifecycle API for create/open/save/Save As/close, dirty state, import/export, and applied-history persistence against `ProjectStore`; publish/build remain unavailable until OpenRune integration.
+- [x] Wire project lifecycle into the Svelte map-editor workflow, including local project create/open/import, save/Save As/export/close, dirty-state guards, required-map loading, and safe Edit Format v1 replay into live Undo/Redo history.
 
 ## Phase 3: editor depth
 
