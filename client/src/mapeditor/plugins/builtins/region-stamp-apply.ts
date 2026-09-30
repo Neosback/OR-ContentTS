@@ -362,6 +362,7 @@ function applyRegionObjects(
                         kind: "map.objects",
                         mapId,
                         level,
+                        sceneBorderSize: map.borderSize,
                         before,
                         after,
                     });
