@@ -1,7 +1,4 @@
 import type { LocalCacheProfile } from "../lib/local-cache-profiles";
-import {
-    serverCacheName,
-} from "../lib/profile-cache-store";
 import type {
     CacheLoadOptions,
     CacheSource,
@@ -9,6 +6,18 @@ import type {
 } from "./cache-source";
 import { IndexedDbProfileCacheSource } from "./indexeddb-profile-cache-source";
 import { staticRangeCacheSource } from "./static-range-cache-source";
+
+export const SERVER_PROFILE_PREFIX = "server:";
+
+export function serverProfileId(cacheName: string): string {
+    return SERVER_PROFILE_PREFIX + cacheName;
+}
+
+export function serverCacheName(profileId: string): string | undefined {
+    return profileId.startsWith(SERVER_PROFILE_PREFIX)
+        ? profileId.slice(SERVER_PROFILE_PREFIX.length)
+        : undefined;
+}
 
 export type ProfileCacheBinding = {
     source: CacheSource;
