@@ -123,9 +123,22 @@ export class IndexedDbProjectStore implements ProjectStore {
         try {
             const transaction = db.transaction(PROJECT_STORE_OBJECT_STORE, "readwrite");
             const done = transactionDone(transaction);
-            transaction.objectStore(PROJECT_STORE_OBJECT_STORE).add(cloneProject(project));
-            await done;
+            const request = transaction.objectStore(PROJECT_STORE_OBJECT_STORE).add(cloneProject(project));
+            try {
+                await requestResult(request);
+                await done;
+            } catch (error) {
+                if (hasErrorName(error, "ConstraintError") || hasErrorName(request.error, "ConstraintError")) {
+                    throw new ProjectStoreError(
+                        "CONFLICT",
+                        'A project with id "' + project.id + '" already exists.',
+                        { cause: request.error ?? error },
+                    );
+                }
+                throw error;
+            }
         } catch (error) {
+            if (error instanceof ProjectStoreError) throw error;
             if (hasErrorName(error, "ConstraintError")) {
                 throw new ProjectStoreError(
                     "CONFLICT",
