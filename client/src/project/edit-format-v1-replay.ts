@@ -172,6 +172,30 @@ function semanticLocEqual(a: EditLocV1 | undefined, b: EditLocV1): boolean {
     );
 }
 
+function matchRuntimeEntries(
+    map: EditorMapSquare,
+    level: number,
+    locs: readonly EditLocV1[],
+): { matches: SceneTileLocData[]; missing: EditLocV1[] } {
+    const available = serializeSceneLocData(map.scene, map.borderSize).tiles
+        .filter((entry) => entry.level === level)
+        .map((entry) => structuredClone(entry));
+    const matches: SceneTileLocData[] = [];
+    const missing: EditLocV1[] = [];
+
+    for (const loc of locs) {
+        const index = available.findIndex((entry) => semanticLocEqual(semanticLocForEntry(map, entry), loc));
+        if (index === -1) {
+            missing.push(loc);
+            continue;
+        }
+        matches.push(available[index]!);
+        available.splice(index, 1);
+    }
+
+    return { matches, missing };
+}
+
 function findRuntimeEntries(
     map: EditorMapSquare,
     level: number,
@@ -179,25 +203,18 @@ function findRuntimeEntries(
     errorCode: "BASE_MISMATCH" | "OBJECT_APPLY_FAILED",
     side: "before" | "after",
 ): SceneTileLocData[] {
-    const available = serializeSceneLocData(map.scene, map.borderSize).tiles
-        .filter((entry) => entry.level === level)
-        .map((entry) => structuredClone(entry));
-    const matches: SceneTileLocData[] = [];
-
-    for (const loc of locs) {
-        const index = available.findIndex((entry) => semanticLocEqual(semanticLocForEntry(map, entry), loc));
-        if (index === -1) {
-            throw new EditReplayError(
-                errorCode,
-                `Could not match ${side} object ${loc.id} at ${loc.worldX},${loc.worldY} on level ${level}.`,
-                [`${map.mapX},${map.mapY},${level},${loc.id},${loc.worldX},${loc.worldY}`],
-            );
-        }
-        matches.push(available[index]!);
-        available.splice(index, 1);
+    const result = matchRuntimeEntries(map, level, locs);
+    if (result.missing.length > 0) {
+        const loc = result.missing[0]!;
+        throw new EditReplayError(
+            errorCode,
+            `Could not match ${side} object ${loc.id} at ${loc.worldX},${loc.worldY} on level ${level}.`,
+            result.missing.map(
+                (item) => `${map.mapX},${map.mapY},${level},${item.id},${item.worldX},${item.worldY}`,
+            ),
+        );
     }
-
-    return matches;
+    return result.matches;
 }
 
 function entryBounds(entries: readonly SceneTileLocData[]): {
@@ -324,20 +341,6 @@ function preflightObjectMutation(
     }
 }
 
-function preflightTransaction(
-    host: IEditorPluginHost,
-    renderer: WebGLMapEditorRenderer,
-    transaction: EditTransactionV1,
-): void {
-    for (const mutation of transaction.mutations) {
-        if (mutation.kind === "map.tile") {
-            preflightTileMutation(renderer, mutation);
-        } else {
-            preflightObjectMutation(host, renderer, mutation);
-        }
-    }
-}
-
 function applyObjectMutation(
     host: IEditorPluginHost,
     renderer: WebGLMapEditorRenderer,
@@ -395,15 +398,11 @@ function applyObjectMutation(
             after: afterEntries,
         };
     } catch (error) {
-        const currentlyApplied = mutation.after.length
-            ? findRuntimeEntries(
-                  map,
-                  mutation.level,
-                  mutation.after,
-                  "OBJECT_APPLY_FAILED",
-                  "after",
-              )
-            : [];
+        const currentlyApplied = matchRuntimeEntries(
+            map,
+            mutation.level,
+            mutation.after,
+        ).matches;
         applyObjectSnapshotEntries(map, mapId, renderer, currentlyApplied, beforeEntries);
         throw error;
     }
@@ -444,17 +443,18 @@ function applyTransaction(
     renderer: WebGLMapEditorRenderer,
     transaction: EditTransactionV1,
 ): void {
-    preflightTransaction(host, renderer, transaction);
     const runtimeMutations: EditorMutation[] = [];
 
     try {
         for (const mutation of transaction.mutations) {
             if (mutation.kind === "map.tile") {
+                preflightTileMutation(renderer, mutation);
                 const map = requireMap(renderer, mutation.mapX, mutation.mapY);
                 applyTileSnapshot(map, mutation);
                 markTileMutation(renderer, map, mutation);
                 runtimeMutations.push(runtimeTileMutation(mutation));
             } else {
+                preflightObjectMutation(host, renderer, mutation);
                 runtimeMutations.push(applyObjectMutation(host, renderer, mutation));
             }
         }
