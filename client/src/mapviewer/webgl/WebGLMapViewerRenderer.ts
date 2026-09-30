@@ -16,7 +16,7 @@ import {
     VertexBuffer,
 } from "picogl";
 
-import { OsrsMenuEntry } from "../../components/rs/menu/OsrsMenu";
+import type { OsrsMenuEntry } from "../../ui/components/rs/osrs-menu";
 import { createTextureArray } from "../../picogl/PicoTexture";
 import { MenuTargetType } from "../../rs/MenuEntry";
 import { Scene } from "../../rs/scene/Scene";
