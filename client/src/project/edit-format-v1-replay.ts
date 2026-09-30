@@ -15,7 +15,6 @@ import {
     decodeEditBatchV1,
     type EditBatchV1,
     type EditLocV1,
-    type EditMutationV1,
     type EditObjectMutationV1,
     type EditTileMutationV1,
     type EditTransactionV1,
