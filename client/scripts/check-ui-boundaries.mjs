@@ -5,7 +5,7 @@ const root = process.cwd();
 const srcRoot = resolve(root, "src");
 
 const forbiddenPackages = [
-    /^react(?:\/|$)/,
+    /^react(?:\/|$|-)/,
     /^react-dom(?:\/|$)/,
     /^dockview-react(?:\/|$)/,
     /^lucide-react(?:\/|$)/,
@@ -13,6 +13,10 @@ const forbiddenPackages = [
     /^@base-ui\/react(?:\/|$)/,
     /^@radix-ui\/react-/,
     /^usehooks-ts(?:\/|$)/,
+    /^@types\/react(?:-dom)?$/,
+    /^@vitejs\/plugin-react$/,
+    /^@testing-library\/react$/,
+    /^sonner$/,
 ];
 
 const sourceExtensions = new Set([".svelte", ".ts", ".js", ".mts", ".mjs", ".tsx", ".jsx"]);
@@ -38,6 +42,17 @@ function resolvesToTsx(fromFile, specifier) {
 const files = walk(srcRoot);
 const violations = [];
 
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const declaredPackages = {
+    ...(packageJson.dependencies ?? {}),
+    ...(packageJson.devDependencies ?? {}),
+};
+for (const packageName of Object.keys(declaredPackages)) {
+    if (forbiddenPackages.some((pattern) => pattern.test(packageName))) {
+        violations.push(`package.json: forbidden React-era dependency "${packageName}"`);
+    }
+}
+
 for (const file of files) {
     const extension = extname(file);
     if (extension === ".tsx" || extension === ".jsx") {
@@ -52,16 +67,16 @@ for (const file of files) {
         const specifier = match[1];
 
         if (forbiddenPackages.some((pattern) => pattern.test(specifier))) {
-            violations.push(`${file}: forbidden UI dependency "${specifier}"`);
+            violations.push(`${file}: forbidden React-era dependency "${specifier}"`);
         }
 
         if (resolvesToTsx(file, specifier)) {
-            violations.push(`${file}: active Svelte UI resolves "${specifier}" to TSX`);
+            violations.push(`${file}: active client resolves "${specifier}" to TSX`);
         }
     }
 
     if (/\bReact\./.test(source)) {
-        violations.push(`${file}: active Svelte UI references the React namespace`);
+        violations.push(`${file}: active client references the React namespace`);
     }
 }
 
