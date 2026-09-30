@@ -66,9 +66,9 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 - [ ] Formalize `CacheSource`: static/range-backed local cache today, backend-served later.
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
-- [ ] Local project persistence with IndexedDB plus import/export.
+- [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
 - [ ] Move cache download ownership fully out of the legacy server path.
-- [ ] Define project/open/save/publish APIs against a local implementation first.
+- [ ] Define the project lifecycle API for open/save/close/dirty state against `ProjectStore` first; publish/build remain unavailable until OpenRune integration.
 
 ## Phase 3: editor depth
 

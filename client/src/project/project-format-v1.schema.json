@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openrune:project:v1",
+  "title": "OpenRune Project v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "id",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "base",
+    "edits"
+  ],
+  "properties": {
+    "format": {
+      "const": "openrune.project"
+    },
+    "version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "updatedAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "base": {
+      "$ref": "#/$defs/cacheIdentity"
+    },
+    "edits": {
+      "$ref": "urn:openrune:edit-batch:v1"
+    }
+  },
+  "$defs": {
+    "cacheIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "game",
+        "revision"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cache"
+        },
+        "game": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profileId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fingerprint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

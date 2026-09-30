@@ -8,7 +8,7 @@ import { hasProfileCache, loadProfileCache } from "./profile-cache-store";
  * (full page reload clears in-memory runtime only).
  */
 /**
- * In-flight loads by profile id. React StrictMode (dev) mounts effects twice, and each call used to
+ * In-flight loads by profile id. Repeated lifecycle/effect calls can overlap during development, and each call used to
  * start its own full ~190 MB load; concurrent callers now share one.
  */
 const inFlight = new Map<string, Promise<LoadedCache | null>>();
