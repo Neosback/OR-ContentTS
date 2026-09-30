@@ -1,5 +1,4 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +24,6 @@ export default defineConfig(({ command, mode }) => ({
     root: appRoot,
     base: "/",
     plugins: [
-        react(),
         svelte(),
         tailwindcss(),
         glslAsString(),

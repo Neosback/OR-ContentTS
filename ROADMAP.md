@@ -31,7 +31,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the enforced frontend boundary.
 - [x] Kept rendering/cache/game-side TypeScript systems available beneath the UI.
 - [x] Established reproducible clean-install, Svelte, TypeScript, Vitest and Vite production-build validation.
 
-A quarantined set of legacy TSX files is still present for staged cleanup. It is not the active Studio runtime.
+The legacy React/TSX migration surface and direct React-only dependency/tooling stack have been removed.
 
 ## Phase 1: Studio UI foundation (hardening)
 
@@ -49,12 +49,11 @@ Done:
 - [x] CS2 manual runner.
 - [x] Inventory/gameval simulator.
 - [x] Svelte-only runtime entrypoint.
-- [x] CI architecture guard preventing React/TSX imports into `src/ui`.
+- [x] Client-wide CI architecture guard preventing React/TSX and React-era dependencies from re-entering the active source tree.
 - [x] Blocking UI-boundary, Svelte, TypeScript, Vitest and Vite build gates.
+- [x] Removed retained legacy TSX and pruned direct React-only dependencies/tooling.
 
 Next:
-
-- [ ] Classify and remove retained legacy TSX and then prune React-only dependencies/tooling.
 - [ ] Shops and world map as first-class dock panels.
 - [ ] Shared command and keyboard-shortcut registry.
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
@@ -122,7 +121,5 @@ Next:
 
 ## Current caveats
 
-- Legacy TSX files remain outside the active Svelte UI and are intentionally quarantined until a dedicated cleanup can safely remove them.
-- React-related build/type dependencies therefore remain temporarily even though React is no longer the application entrypoint.
 - Without the legacy server, optional `/api/world` data can be unavailable; the editor itself still opens from local cache data.
 - The app builds for the site root with Vite. Any old deployment scripts that assume `/play` need to be treated as legacy.

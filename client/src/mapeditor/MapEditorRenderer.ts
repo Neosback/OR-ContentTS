@@ -1,5 +1,3 @@
-import { Schema } from "leva/dist/declarations/src/types";
-
 import { Renderer } from "../components/renderer/Renderer";
 import { ProjectionType } from "../mapviewer/Camera";
 import { MapManager, MapSquare } from "../mapviewer/MapManager";
@@ -42,9 +40,6 @@ export abstract class MapEditorRenderer<T extends MapSquare = MapSquare> extends
         );
     }
 
-    getControls(): Schema {
-        return {};
-    }
 
     queueLoadMap(mapX: number, mapY: number): void {}
 

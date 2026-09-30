@@ -25,7 +25,6 @@
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "jsx": "react-jsx",
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsconfig.tsbuildinfo",
     "baseUrl": ".",
@@ -44,8 +43,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src/**/*.tsx",
-    "src/**/*.jsx"
+    "dist"
   ]
 }

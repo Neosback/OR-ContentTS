@@ -1,7 +1,5 @@
 import Denque from "denque";
 import { vec2, vec4 } from "gl-matrix";
-import { folder } from "leva";
-import { Schema } from "leva/dist/declarations/src/types";
 import {
     DrawCall,
     Framebuffer,
@@ -16,7 +14,7 @@ import {
     VertexBuffer,
 } from "picogl";
 
-import { OsrsMenuEntry } from "../../components/rs/menu/OsrsMenu";
+import type { OsrsMenuEntry } from "../../ui/components/rs/osrs-menu";
 import { createTextureArray } from "../../picogl/PicoTexture";
 import { MenuTargetType } from "../../rs/MenuEntry";
 import { Scene } from "../../rs/scene/Scene";
@@ -524,120 +522,6 @@ export class WebGLMapViewerRenderer extends MapViewerRenderer<WebGLMapSquare> {
             magFilter: PicoGL.NEAREST,
             internalFormat: PicoGL.RGBA8I,
         });
-    }
-
-    getControls(): Schema {
-        return {
-            "Max Level": {
-                value: this.maxLevel,
-                min: 0,
-                max: 3,
-                step: 1,
-                onChange: (v: number) => {
-                    this.setMaxLevel(v);
-                },
-            },
-            Sky: {
-                r: this.skyColor[0] * 255,
-                g: this.skyColor[1] * 255,
-                b: this.skyColor[2] * 255,
-                onChange: (v: ColorRgb) => {
-                    this.setSkyColor(v.r, v.g, v.b);
-                },
-            },
-            "Fog Depth": {
-                value: this.fogDepth,
-                min: 0,
-                max: 256,
-                step: 8,
-                onChange: (v: number) => {
-                    this.fogDepth = v;
-                },
-            },
-            Brightness: {
-                value: 1,
-                min: 0,
-                max: 4,
-                step: 1,
-                onChange: (v: number) => {
-                    this.brightness = 1.0 - v * 0.1;
-                },
-            },
-            "Color Banding": {
-                value: 50,
-                min: 0,
-                max: 100,
-                step: 1,
-                onChange: (v: number) => {
-                    this.colorBanding = 255 - v * 2;
-                },
-            },
-            "Texture Filtering": {
-                value: this.textureFilterMode,
-                options: {
-                    Disabled: TextureFilterMode.DISABLED,
-                    Bilinear: TextureFilterMode.BILINEAR,
-                    Trilinear: TextureFilterMode.TRILINEAR,
-                    "Anisotropic 2x": TextureFilterMode.ANISOTROPIC_2X,
-                    "Anisotropic 4x": TextureFilterMode.ANISOTROPIC_4X,
-                    "Anisotropic 8x": TextureFilterMode.ANISOTROPIC_8X,
-                    "Anisotropic 16x": TextureFilterMode.ANISOTROPIC_16X,
-                },
-                onChange: (v: TextureFilterMode) => {
-                    if (v === this.textureFilterMode) {
-                        return;
-                    }
-                    this.textureFilterMode = v;
-                    this.updateTextureFiltering();
-                },
-            },
-            "Smooth Terrain": {
-                value: this.smoothTerrain,
-                onChange: (v: boolean) => {
-                    this.setSmoothTerrain(v);
-                },
-            },
-            "Cull Back-faces": {
-                value: this.cullBackFace,
-                onChange: (v: boolean) => {
-                    this.cullBackFace = v;
-                },
-            },
-            "Anti-Aliasing": folder(
-                {
-                    MSAA: {
-                        value: this.msaaEnabled,
-                        onChange: (v: boolean) => {
-                            this.setMsaa(v);
-                        },
-                    },
-                    FXAA: {
-                        value: this.fxaaEnabled,
-                        onChange: (v: boolean) => {
-                            this.setFxaa(v);
-                        },
-                    },
-                },
-                { collapsed: true },
-            ),
-            Entity: folder(
-                {
-                    Items: {
-                        value: this.loadObjs,
-                        onChange: (v: boolean) => {
-                            this.setLoadObjs(v);
-                        },
-                    },
-                    Npcs: {
-                        value: this.loadNpcs,
-                        onChange: (v: boolean) => {
-                            this.setLoadNpcs(v);
-                        },
-                    },
-                },
-                { collapsed: true },
-            ),
-        };
     }
 
     override async queueLoadMap(mapX: number, mapY: number): Promise<void> {

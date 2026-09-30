@@ -2,7 +2,7 @@
 
 A browser-based content studio for Old School RuneScape private servers, starting with a map editor. It renders the world with the game client's own TypeScript decoders and WebGL2 scene code, so what you edit is what the client draws.
 
-This repository started as a fork of the [xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript client. The active Studio application is now **Vite 8 + Svelte 5**. Framework-neutral RuneScape/cache/rendering code remains in TypeScript, while a quarantined set of legacy TSX sources is retained temporarily for reference and staged cleanup. Those TSX sources are not the Studio entrypoint.
+This repository started as a fork of the [xRSPS](https://github.com/xrsps/xrsps-typescript) TypeScript client. The active Studio application is now **Vite 8 + Svelte 5**. Framework-neutral RuneScape/cache/rendering code remains in TypeScript, and the legacy React/TSX application surface has been removed.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary and [ROADMAP.md](ROADMAP.md) for where the project is going.
 
@@ -45,7 +45,7 @@ Run these from `client/`:
 | `npm run preview` | Serve the production build locally |
 | `npm run check` | Svelte validation |
 | `npm run typecheck` | TypeScript validation |
-| `npm run check:ui-boundaries` | Prevent React/TSX from re-entering the active Svelte UI |
+| `npm run check:ui-boundaries` | Enforce a React-free, JSX/TSX-free active client source/dependency boundary |
 | `npm test` | Vitest suite |
 | `npm run validate` | Run all blocking client gates: UI boundary, Svelte, TypeScript, tests and production build |
 | `npm run validate:types` | Run full-tree Svelte and TypeScript diagnostics |
