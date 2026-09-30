@@ -47,7 +47,8 @@ Run these from `client/`:
 | `npm run typecheck` | TypeScript validation |
 | `npm run check:ui-boundaries` | Prevent React/TSX from re-entering the active Svelte UI |
 | `npm test` | Vitest suite |
-| `npm run validate` | Run all required client validation gates |
+| `npm run validate` | Run the blocking UI-boundary, test and production-build gates |
+| `npm run validate:types` | Run full-tree Svelte and TypeScript diagnostics |
 
 ## Configuration
 
