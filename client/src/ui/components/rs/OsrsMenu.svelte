@@ -2,20 +2,8 @@
     import { tick } from "svelte";
 
     import "../../../components/rs/menu/OsrsMenu.css";
-    import type { MenuEntry } from "../../../rs/MenuEntry";
     import { MenuTargetType } from "../../../rs/MenuEntry";
-
-    export interface OsrsMenuEntry extends MenuEntry {
-        onClick?: (entry: MenuEntry) => void;
-    }
-
-    export interface OsrsMenuProps {
-        x: number;
-        y: number;
-        entries: OsrsMenuEntry[];
-        tooltip: boolean;
-        debugId: boolean;
-    }
+    import type { OsrsMenuProps } from "./osrs-menu";
 
     const BORDER_SIZE = 10;
 
