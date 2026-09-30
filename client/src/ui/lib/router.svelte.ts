@@ -39,7 +39,7 @@ class Router {
     }
 
     /** Replace the query string in place (camera sync etc.); never adds a history entry by default. */
-    setSearchParams(params: URLSearchParams | Record<string, string>, options: NavigateOptions = { replace: true }): void {
+    setSearchParams(params: ConstructorParameters<typeof URLSearchParams>[0], options: NavigateOptions = { replace: true }): void {
         const query = new URLSearchParams(params).toString();
         this.navigate(this.path + (query ? `?${query}` : ""), options);
     }
