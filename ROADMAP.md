@@ -68,7 +68,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
 - [x] Move cache download ownership into the Studio; local bootstrap now writes directly to `client/caches`.
-- [ ] Define the project lifecycle API for open/save/close/dirty state against `ProjectStore` first; publish/build remain unavailable until OpenRune integration.
+- [x] Define the framework-neutral project lifecycle API for create/open/save/Save As/close, dirty state, import/export, and applied-history persistence against `ProjectStore`; publish/build remain unavailable until OpenRune integration.
 
 ## Phase 3: editor depth
 
