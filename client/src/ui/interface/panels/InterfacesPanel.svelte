@@ -16,7 +16,8 @@
         <div class="flex shrink-0 items-center gap-1">
             <Button
                 type="button"
-                size="icon"\n                class="size-6"
+                size="icon"
+                class="size-6"
                 variant="outline"
                 disabled={state.selectedId == null}
                 title={state.selectedId == null ? "Select an interface first" : "JSON for selected interface from local decode"}
