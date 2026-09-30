@@ -27,6 +27,8 @@ export type EditorObjectMutation = {
     kind: "map.objects";
     mapId: number;
     level: number;
+    /** Renderer scene border used to normalize snapshot coordinates at persistence boundaries. */
+    sceneBorderSize: number;
     before: SceneTileLocData[];
     after: SceneTileLocData[];
 };
