@@ -10,6 +10,7 @@ export class MapViewerUiState {
     renderer = $state<MapViewerRenderer>();
     hideUi = $state(false);
     fps = $state(0);
+    debugText = $state<string>();
     cameraYaw = $state(0);
     worldMapOpen = $state(false);
     menu = $state<OsrsMenuProps>();
@@ -41,6 +42,7 @@ export class MapViewerUiState {
             if (renderer && time - this.lastHudUpdate >= HUD_UPDATE_MS) {
                 this.lastHudUpdate = time;
                 this.fps = Math.round(renderer.stats.frameTimeFps);
+                this.debugText = viewer.debugText;
             }
 
             const nextMenu =
