@@ -1,3 +1,4 @@
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import { isCopyableObjectKind } from "./object-copy-placement";
 import type { EditorToolPlugin } from "./builtin-plugin-types";
 
@@ -10,50 +11,18 @@ export const objectSelectorEditorTool: EditorToolPlugin = {
     actions: [{ kind: "select-tool", tool: "object-selector" }],
     usesBrushControls: false,
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-object-selector", {
             id: "select-tool",
-            name: "Select Object Selector tool",
-            description: "Switch active tool to Object Selector.",
             defaultChords: [{ code: "Digit4" }],
-            action: ({ host }) => {
-                host.setEditorTool("object-selector");
-            },
-        },
-        {
+        }),
+        editorCommandKeyBinding("object-selector.cancel", {
             id: "deselect-or-cancel-copy",
-            name: "Deselect / cancel copy",
-            description: "Cancel copy placement, or clear the current object selection.",
             defaultChords: [{ code: "Escape" }],
-            shouldProcess: ({ host }) =>
-                host.isObjectSelectorToolActive() &&
-                (host.isObjectCopyPlacementActive() || host.selectedObject != null),
-            action: ({ host }) => {
-                if (host.isObjectCopyPlacementActive()) {
-                    host.cancelObjectCopyPlacement();
-                } else {
-                    host.clearSelectedObject();
-                }
-                host.notifyWorkbenchStateChanged();
-            },
-        },
-        {
+        }),
+        editorCommandKeyBinding("object-selector.rotate-selected", {
             id: "rotate-selected",
-            name: "Rotate selected object",
-            description: "Rotate the selected object 90° on its tile.",
             defaultChords: [{ code: "KeyR" }],
-            shouldProcess: ({ host }) => {
-                const ref = host.selectedObject;
-                return (
-                    host.isObjectSelectorToolActive() &&
-                    !host.isObjectCopyPlacementActive() &&
-                    ref != null &&
-                    isCopyableObjectKind(ref.kind)
-                );
-            },
-            action: ({ host }) => {
-                host.rotateSelectedObject();
-            },
-        },
+        }),
         {
             id: "rotate-selected-suppress",
             name: "Rotate selected object (camera suppress)",
@@ -71,24 +40,10 @@ export const objectSelectorEditorTool: EditorToolPlugin = {
             },
             action: () => true,
         },
-        {
+        editorCommandKeyBinding("object-selector.copy-object", {
             id: "copy-object",
-            name: "Copy object placement",
-            description: "Stamp copies of the selected object — click tiles to place, Esc to cancel.",
             defaultChords: [{ code: "KeyC" }],
-            shouldProcess: ({ host }) => {
-                const ref = host.selectedObject;
-                return (
-                    host.isObjectSelectorToolActive() &&
-                    ref != null &&
-                    isCopyableObjectKind(ref.kind)
-                );
-            },
-            action: ({ host }) => {
-                host.startObjectCopyPlacement();
-                host.notifyWorkbenchStateChanged();
-            },
-        },
+        }),
         {
             id: "copy-object-suppress",
             name: "Copy object (camera suppress)",
