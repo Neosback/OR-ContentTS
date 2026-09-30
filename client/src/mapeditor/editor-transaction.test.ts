@@ -2,17 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { runEditTransaction, type EditorTransactionHost } from "./editor-transaction";
 
-function transactionHost(): EditorTransactionHost & {
-    beginEditTransaction: ReturnType<typeof vi.fn>;
-    commitEditTransaction: ReturnType<typeof vi.fn>;
-    cancelEditTransaction: ReturnType<typeof vi.fn>;
-} {
+function transactionHost() {
     return {
         isHistoryApplying: () => false,
-        beginEditTransaction: vi.fn(),
-        commitEditTransaction: vi.fn(),
-        cancelEditTransaction: vi.fn(),
-    };
+        beginEditTransaction: vi.fn((_source, _label?: string) => {}),
+        commitEditTransaction: vi.fn(() => {}),
+        cancelEditTransaction: vi.fn(() => {}),
+    } satisfies EditorTransactionHost;
 }
 
 describe("runEditTransaction", () => {
