@@ -1,6 +1,5 @@
 
 import * as React from "react";
-import { Globe } from "lucide-react";
 import {
   BASE_CACHE_TYPES,
   LOCALHOST_CACHE_TYPE,
@@ -78,18 +77,12 @@ function isLocalEnvironment(): boolean {
 
 export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
   const useLocalhostType = React.useMemo(() => isLocalEnvironment(), []);
-  const localhostWithIcon = React.useMemo(
-    () => ({
-      ...LOCALHOST_CACHE_TYPE,
-      icon: <Globe size={24} />,
-    }),
-    [],
-  );
+  const localhostType = LOCALHOST_CACHE_TYPE;
   const cacheTypes = React.useMemo(() => {
     return useLocalhostType
-      ? [localhostWithIcon, ...BASE_CACHE_TYPES]
+      ? [localhostType, ...BASE_CACHE_TYPES]
       : BASE_CACHE_TYPES;
-  }, [localhostWithIcon, useLocalhostType]);
+  }, [localhostType, useLocalhostType]);
 
   const [selectedId, setSelectedId] = React.useState<string>(BASE_CACHE_TYPES[0].id);
   const [manuallySelected, setManuallySelected] = React.useState(false);
@@ -131,8 +124,8 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
       setManuallySelected(manual);
 
       if (useLocalhostType && !manual) {
-        setSelectedId(localhostWithIcon.id);
-        localStorage.setItem(STORAGE_KEY, localhostWithIcon.id);
+        setSelectedId(localhostType.id);
+        localStorage.setItem(STORAGE_KEY, localhostType.id);
         return;
       }
 
@@ -146,7 +139,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore storage failures.
     }
-  }, [cacheTypes, localhostWithIcon.id, useLocalhostType]);
+  }, [cacheTypes, localhostType.id, useLocalhostType]);
 
   const refreshCacheStatuses = React.useCallback(
     async (options?: { silent?: boolean }) => {
