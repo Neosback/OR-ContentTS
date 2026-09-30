@@ -56,7 +56,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json --threshold error",
     "check:ui-boundaries": "node scripts/check-ui-boundaries.mjs",
     "validate": "npm run check:ui-boundaries && npm run check && npm run typecheck && npm test && npm run build",
-    "validate:types": "npm run check && npm run typecheck"
+    "validate:types": "npm run check && npm run typecheck",
+    "ensure-cache": "tsx scripts/ensure-cache.ts"
   },
   "browserslist": {
     "production": [
