@@ -1,5 +1,5 @@
 import { memo, useRef, type ReactNode } from "react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import { MapEditorWorkbenchFloatingLayerContext } from "./map-editor-workbench-floating-layer-context";

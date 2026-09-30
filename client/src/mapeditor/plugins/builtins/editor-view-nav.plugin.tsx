@@ -13,7 +13,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../components/ui/tooltip";
 import { keybindChordToLabel } from "../../editor-tool-input";
 import type { IEditorPluginHost } from "../editor-plugin-host";
-import type { EditorViewNavPlugin } from "./builtin-plugin-types";
+import type { EditorViewNavPlugin } from "../../react-plugin-types";
 import { workbenchBindingKey, workbenchDefaultChords } from "./workbench-keybinds.builtin";
 
 export function TerrainSmoothingNavButton({ pluginHost }: { pluginHost: IEditorPluginHost }): JSX.Element {

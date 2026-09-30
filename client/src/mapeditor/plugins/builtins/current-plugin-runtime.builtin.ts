@@ -1,12 +1,11 @@
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-core";
 
+import type { EditorToolWorkspaceBinding, MapEditorDockPanelId } from "./builtin-plugin-types";
 import type {
     EditorHeaderPlugin,
-    EditorToolWorkspaceBinding,
     EditorViewFloatingNavPlugin,
     EditorViewStickyNavPlugin,
-    MapEditorDockPanelId,
-} from "./builtin-plugin-types";
+} from "../../react-plugin-types";
 import { EditorLayoutRegion } from "./builtin-plugin-types";
 import { quickControlsNavPlugin } from "./editor-view-nav.plugin";
 import { heightEditorTool } from "./height.plugin";

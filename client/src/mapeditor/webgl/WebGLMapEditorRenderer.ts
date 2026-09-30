@@ -135,6 +135,12 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
     hasMultiDraw: boolean = false;
 
+    /** Resolves once `init()` has created the shaders, textures and uniform buffers map builds need. */
+    private markInitialized!: () => void;
+    private readonly initialized = new Promise<void>((resolve) => {
+        this.markInitialized = resolve;
+    });
+
     // Shaders
     shadersPromise?: Promise<Program[]>;
     terrainProgram?: Program;
@@ -331,6 +337,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             ...(stored ?? {}),
         });
         this.applyBrushHighlightUniforms();
+        this.markInitialized();
     }
 
     async initShaders(): Promise<Program[]> {
@@ -575,6 +582,8 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     }
 
     override async queueLoadMap(mapX: number, mapY: number): Promise<void> {
+        // Map builds need the shaders/textures created by init(); a worker can finish before that.
+        await this.initialized;
         const generation = this.mapManager.generation;
         const mapData = await this.host.workerPool.queueLoadEditorMapData(
             mapX,

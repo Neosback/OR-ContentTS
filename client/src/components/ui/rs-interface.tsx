@@ -1,7 +1,5 @@
-"use client";
 
 import * as React from "react";
-import Image from "next/image";
 import {
   InterfaceManager,
   Interpreter,
@@ -498,40 +496,35 @@ export function RsInterface({
       />
 
       {showOverlays && mode === "fixed" ? (
-        <Image
+        <img
           src="/ui/fixed_ui.png"
           alt="Fixed UI overlay"
           width={FIXED_CANVAS_WIDTH}
           height={FIXED_CANVAS_HEIGHT}
           className="pointer-events-none absolute left-0 top-0 z-20"
-          priority
-          unoptimized
         />
       ) : showOverlays ? (
         <>
-          <Image
+          <img
             src="/ui/resized_chat.png"
             alt="Chat overlay"
             className="pointer-events-none absolute bottom-0 left-0 z-20 object-contain"
             width={519}
             height={142}
-            unoptimized
           />
-          <Image
+          <img
             src="/ui/resized_map.png"
             alt="Map overlay"
             className="pointer-events-none absolute right-0 top-0 z-20 object-contain"
             width={211}
             height={194}
-            unoptimized
           />
-          <Image
+          <img
             src="/ui/resized_tab.png"
             alt="Tab overlay"
             className="pointer-events-none absolute bottom-0 right-0 z-20 object-contain"
             width={249}
             height={336}
-            unoptimized
           />
         </>
       ) : null}

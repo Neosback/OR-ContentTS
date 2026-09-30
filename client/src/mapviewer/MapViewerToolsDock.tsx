@@ -4,8 +4,8 @@ import {
     DockviewReadyEvent,
     IDockviewPanelProps,
     themeDark,
-} from "dockview";
-import "dockview/dist/styles/dockview.css";
+} from "dockview-react";
+import "dockview-react/dist/styles/dockview.css";
 
 import { MinimapContainer } from "../components/rs/minimap/MinimapContainer";
 import { RS_TO_DEGREES } from "../rs/MathConstants";

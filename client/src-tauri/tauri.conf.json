@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "dev.openrune.web-editor",
   "build": {
-    "frontendDist": "../.tauri-frontend",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run tauri:build:web"
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [

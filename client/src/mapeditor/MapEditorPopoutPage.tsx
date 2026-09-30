@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { TOOL_PALETTES } from "./react-tool-ui";
 import { useSearchParams } from "react-router-dom";
 
 import { TooltipProvider } from "../components/ui/tooltip";
@@ -79,13 +80,13 @@ function PopoutPanelBody({ panelId }: { panelId: MapEditorExternalPanelId }): JS
         );
     }
 
-    const UnderlayPanel = underlayEditorTool.palettePanel;
-    const OverlayPanel = overlayEditorTool.palettePanel;
-    const HeightPanel = heightEditorTool.palettePanel;
-    const ObjectPanel = objectSelectorEditorTool.palettePanel;
-    const ObjectDeletePanel = objectDeleteEditorTool.palettePanel;
-    const RegionStampPanel = regionStampEditorTool.palettePanel;
-    const TileFlagsPanel = tileFlagsEditorTool.palettePanel;
+    const UnderlayPanel = TOOL_PALETTES["underlay"];
+    const OverlayPanel = TOOL_PALETTES["overlay"];
+    const HeightPanel = TOOL_PALETTES["height"];
+    const ObjectPanel = TOOL_PALETTES["object-selector"];
+    const ObjectDeletePanel = TOOL_PALETTES["object-delete"];
+    const RegionStampPanel = TOOL_PALETTES["region-stamp"];
+    const TileFlagsPanel = TOOL_PALETTES["tile-flags"];
 
     if (panelId === "editor-brush-workspace") {
         return (

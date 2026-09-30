@@ -1,5 +1,6 @@
 import { memo, useCallback, useSyncExternalStore } from "react";
-import type { DockviewApi } from "dockview";
+import { TOOL_PALETTES } from "./react-tool-ui";
+import type { DockviewApi } from "dockview-react";
 
 import { MapEditorFloatingWindow } from "./MapEditorFloatingWindow";
 import { MapEditorHistoryWorkspacePanel } from "./MapEditorHistoryWorkspacePanel";
@@ -49,13 +50,13 @@ function FloatingPanelContent({
     panelId: MapEditorDockPanelId;
     pluginHost: IEditorPluginHost;
 }): JSX.Element {
-    const UnderlayPanel = underlayEditorTool.palettePanel;
-    const OverlayPanel = overlayEditorTool.palettePanel;
-    const HeightPanel = heightEditorTool.palettePanel;
-    const ObjectPanel = objectSelectorEditorTool.palettePanel;
-    const ObjectDeletePanel = objectDeleteEditorTool.palettePanel;
-    const RegionStampPanel = regionStampEditorTool.palettePanel;
-    const TileFlagsPanel = tileFlagsEditorTool.palettePanel;
+    const UnderlayPanel = TOOL_PALETTES["underlay"];
+    const OverlayPanel = TOOL_PALETTES["overlay"];
+    const HeightPanel = TOOL_PALETTES["height"];
+    const ObjectPanel = TOOL_PALETTES["object-selector"];
+    const ObjectDeletePanel = TOOL_PALETTES["object-delete"];
+    const RegionStampPanel = TOOL_PALETTES["region-stamp"];
+    const TileFlagsPanel = TOOL_PALETTES["tile-flags"];
 
     let body: JSX.Element;
     switch (panelId) {

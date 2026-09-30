@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { Suspense, lazy, useMemo, useState } from "react";
 import { Archive, Check, Coffee, Home, LayoutGrid, Map, Moon, PanelLeft, Settings, Sun } from "lucide-react";
-import dynamic from "next/dynamic";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { Logo } from "./components/ui/svg/Logo";
@@ -12,44 +11,21 @@ import { ThemePreset } from "./context/settings-context";
 import { useSettings } from "./context/settings-context";
 import { useShellPreferences } from "./context/shell-preferences-context";
 import { cn } from "./util/cn";
-import InterfaceEditorApp from "./app/interface/InterfaceEditorApp";
+import InterfaceEditorApp from "./interface/InterfaceEditorApp";
 
-const LazyMapViewerApp = dynamic(
-    () => import("./mapviewer/MapViewerApp").then((m) => m.default),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                Loading map viewer...
-            </div>
-        ),
-    },
+function RouteFallback({ label }: { label: string }): JSX.Element {
+    return (
+        <div className="flex h-full w-full items-center justify-center text-muted-foreground">{label}</div>
+    );
+}
+
+const LazyMapViewerApp = lazy(() => import("./mapviewer/MapViewerApp"));
+const LazyMapEditorPopoutPage = lazy(() =>
+    import("./mapeditor/MapEditorPopoutPage").then((m) => ({ default: m.MapEditorPopoutPage })),
 );
-
-const LazyMapEditorPopoutPage = dynamic(
-    () => import("./mapeditor/MapEditorPopoutPage").then((m) => m.MapEditorPopoutPage),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                Loading panel...
-            </div>
-        ),
-    },
+const LazyMapEditorApp = lazy(() =>
+    import("./mapeditor/MapEditorApp").then((m) => ({ default: m.MapEditorApp })),
 );
-
-const LazyMapEditorApp = dynamic(
-    () => import("./mapeditor/MapEditorApp").then((m) => m.MapEditorApp),
-    {
-        ssr: false,
-        loading: () => (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                Loading map editor...
-            </div>
-        ),
-    },
-);
-
 
 function HomePage(): JSX.Element {
     return (
@@ -292,7 +268,11 @@ export default function App(): JSX.Element {
     const { sidebarCollapsed, toggleSidebarCollapsed } = useShellPreferences();
 
     if (isMapEditorPopoutRoute) {
-        return <LazyMapEditorPopoutPage />;
+        return (
+            <Suspense fallback={<RouteFallback label="Loading panel..." />}>
+                <LazyMapEditorPopoutPage />
+            </Suspense>
+        );
     }
 
     return (
@@ -354,6 +334,7 @@ export default function App(): JSX.Element {
                                 : "mx-auto w-full max-w-7xl"
                         }
                     >
+                        <Suspense fallback={<RouteFallback label="Loading..." />}>
                         <Routes>
                             <Route path="/" element={<HomePage />} />
                             <Route path="/cache-test" element={<CacheRepositoryPage />} />
@@ -373,6 +354,7 @@ export default function App(): JSX.Element {
                             />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
+                        </Suspense>
                     </div>
                 </main>
             </div>

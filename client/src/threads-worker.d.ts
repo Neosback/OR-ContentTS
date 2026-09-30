@@ -12,3 +12,12 @@ declare module "threads/worker" {
     export function registerSerializer(...args: unknown[]): void;
     export function expose(exposed: unknown): void;
 }
+
+declare module "bzip2" {
+    const bzip2: any;
+    export default bzip2;
+}
+
+declare module "picogl/build/module/texture.js" {
+    export const Texture: any;
+}

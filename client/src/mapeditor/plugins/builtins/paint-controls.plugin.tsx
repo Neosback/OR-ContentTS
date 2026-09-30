@@ -6,6 +6,7 @@ import { cn } from "../../../util/cn";
 import { BUILTIN_EDITOR_TOOL_PLUGINS } from "./current-plugin-layout.builtin";
 import type { PaintToolsStripOrientation } from "./paint-tools-strip-model";
 import type { IEditorPluginHost } from "../editor-plugin-host";
+import { TOOL_ICONS } from "../../react-tool-ui";
 
 export interface EditorPaintControlsPluginPanelProps {
     pluginHost: IEditorPluginHost;
@@ -59,7 +60,9 @@ export function EditorPaintControlsPluginPanel({
                 )}
                 aria-label="Map paint tools"
             >
-                {visibleTools.map(({ id, name, description, icon: Icon }) => (
+                {visibleTools.map(({ id, name, description, icon }) => {
+                    const Icon = TOOL_ICONS[icon];
+                    return (
                     <Tooltip key={id}>
                         <TooltipTrigger asChild>
                             <Button
@@ -79,7 +82,8 @@ export function EditorPaintControlsPluginPanel({
                             <span className="mt-1 block text-muted-foreground">{description}</span>
                         </TooltipContent>
                     </Tooltip>
-                ))}
+                    );
+                })}
             </nav>
         </TooltipProvider>
     );

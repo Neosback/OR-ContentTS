@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 import { toast } from "sonner";
 
 import { Button } from "../components/ui/button";

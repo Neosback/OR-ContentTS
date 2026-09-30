@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-core";
 import type { EditorToolKeyChord } from "./builtins/builtin-plugin-types";
 import type { IEditorPluginHost } from "./editor-plugin-host";
 

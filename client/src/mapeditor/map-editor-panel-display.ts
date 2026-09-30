@@ -1,4 +1,4 @@
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-core";
 
 import type { MapEditorDockPanelId } from "./plugins/builtins/builtin-plugin-types";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
@@ -13,25 +13,8 @@ import type { MapEditorFloatingLayerPosition } from "./map-editor-workbench-floa
 
 export type MapEditorPanelPlacement = "docked" | "floating" | "external";
 
-export type MapEditorFloatablePanelConfig = {
-    panelId: MapEditorDockPanelId;
-    title: string;
-    canExternal?: boolean;
-    defaultWidth?: number;
-    defaultHeight?: number;
-};
-
-export const MAP_EDITOR_FLOATABLE_DOCK_PANELS: readonly MapEditorFloatablePanelConfig[] = [
-    { panelId: "editor-underlays", title: "Underlays", canExternal: true, defaultWidth: 380, defaultHeight: 520 },
-    { panelId: "editor-overlays", title: "Overlays", canExternal: true, defaultWidth: 380, defaultHeight: 520 },
-    { panelId: "editor-height", title: "Height", canExternal: true, defaultWidth: 380, defaultHeight: 520 },
-    { panelId: "editor-object-selector", title: "Objects", canExternal: true, defaultWidth: 380, defaultHeight: 420 },
-    { panelId: "editor-object-delete", title: "Delete objects", canExternal: true, defaultWidth: 380, defaultHeight: 420 },
-    { panelId: "editor-region-stamp", title: "Region stamp", canExternal: true, defaultWidth: 380, defaultHeight: 420 },
-    { panelId: "editor-tile-flags", title: "Tile flags", canExternal: true, defaultWidth: 380, defaultHeight: 520 },
-    { panelId: "editor-history", title: "History", canExternal: true, defaultWidth: 420, defaultHeight: 380 },
-    { panelId: "editor-minimap", title: "Minimap", canExternal: true, defaultWidth: 360, defaultHeight: 360 },
-];
+export { MAP_EDITOR_FLOATABLE_DOCK_PANELS, type MapEditorFloatablePanelConfig } from "./map-editor-panel-config";
+import { MAP_EDITOR_FLOATABLE_DOCK_PANELS } from "./map-editor-panel-config";
 
 type PanelDisplayState = {
     placement: MapEditorPanelPlacement;

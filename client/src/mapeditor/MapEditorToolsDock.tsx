@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
     DockviewReact,
@@ -5,8 +6,8 @@ import {
     type DockviewApi,
     IDockviewPanelProps,
     themeDark,
-} from "dockview";
-import "dockview/dist/styles/dockview.css";
+} from "dockview-react";
+import "dockview-react/dist/styles/dockview.css";
 
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -54,8 +55,8 @@ import { buildPaintToolsContextMenuItems } from "./map-editor-panel-placement-me
 import { getPaintToolsStripModel } from "./plugins/builtins/paint-tools-strip-model";
 import { syncEditorBottomBarExternalWindow, getEditorBottomBarModel } from "./plugins/builtins/editor-bottom-bar-model";
 import { EditorPaintControlsPluginPanel } from "./plugins/builtins/paint-controls.plugin";
-import { SandboxTerrainWorkspacePanel } from "./SandboxTerrainWorkspacePanel";
-import type { EditorToolPlugin, MapEditorDockPanelId } from "./plugins/builtins/builtin-plugin-types";
+import type { MapEditorDockPanelId, MapEditorPalettePanelProps } from "./plugins/builtins/builtin-plugin-types";
+import { TOOL_PALETTES } from "./react-tool-ui";
 import { cn } from "../util/cn";
 import {
     mapEditorDockPanelFrameClassName,
@@ -233,7 +234,7 @@ const PlaceholderScenePanel = memo(function PlaceholderScenePanel(
 function createToolPaletteDockPanel(
     panelId: MapEditorDockPanelId,
     title: string,
-    Panel: NonNullable<EditorToolPlugin["palettePanel"]>,
+    Panel: ComponentType<MapEditorPalettePanelProps>,
 ) {
     return memo(function ToolPaletteDockPanel(_props: IDockviewPanelProps): JSX.Element {
         const pluginHost = useContext(MapEditorWorkbenchContext);
@@ -248,28 +249,28 @@ function createToolPaletteDockPanel(
     });
 }
 
-const EditorPalettePanel = createToolPaletteDockPanel("editor-underlays", "Underlays", underlayEditorTool.palettePanel!);
-const EditorOverlayPalettePanel = createToolPaletteDockPanel("editor-overlays", "Overlays", overlayEditorTool.palettePanel!);
-const EditorHeightPalettePanel = createToolPaletteDockPanel("editor-height", "Height", heightEditorTool.palettePanel!);
+const EditorPalettePanel = createToolPaletteDockPanel("editor-underlays", "Underlays", TOOL_PALETTES["underlay"]!);
+const EditorOverlayPalettePanel = createToolPaletteDockPanel("editor-overlays", "Overlays", TOOL_PALETTES["overlay"]!);
+const EditorHeightPalettePanel = createToolPaletteDockPanel("editor-height", "Height", TOOL_PALETTES["height"]!);
 const EditorObjectSelectorPalettePanel = createToolPaletteDockPanel(
     "editor-object-selector",
     "Objects",
-    objectSelectorEditorTool.palettePanel!,
+    TOOL_PALETTES["object-selector"]!,
 );
 const EditorObjectDeletePalettePanel = createToolPaletteDockPanel(
     "editor-object-delete",
     "Delete objects",
-    objectDeleteEditorTool.palettePanel!,
+    TOOL_PALETTES["object-delete"]!,
 );
 const EditorRegionStampPalettePanel = createToolPaletteDockPanel(
     "editor-region-stamp",
     "Region stamp",
-    regionStampEditorTool.palettePanel!,
+    TOOL_PALETTES["region-stamp"]!,
 );
 const EditorTileFlagsPalettePanel = createToolPaletteDockPanel(
     "editor-tile-flags",
     "Tile flags",
-    tileFlagsEditorTool.palettePanel!,
+    TOOL_PALETTES["tile-flags"]!,
 );
 const EditorSmoothPalettePanel = EditorHeightPalettePanel;
 
@@ -428,15 +429,6 @@ const EditorMinimapWorkspacePanel = memo(function EditorMinimapWorkspacePanel(_p
     );
 });
 
-const EditorSandboxTerrainWorkspacePanel = memo(function EditorSandboxTerrainWorkspacePanel(
-    _props: IDockviewPanelProps,
-): JSX.Element {
-    const pluginHost = useContext(MapEditorWorkbenchContext);
-    if (!pluginHost) {
-        return <></>;
-    }
-    return <SandboxTerrainWorkspacePanel pluginHost={pluginHost} />;
-});
 
 export interface MapEditorToolsDockProps {
     pluginHost: IEditorPluginHost;
@@ -480,7 +472,6 @@ export function MapEditorToolsDock({ pluginHost, onDockReady }: MapEditorToolsDo
             brushWorkspace: EditorBrushWorkspacePanel,
             historyWorkspace: EditorHistoryWorkspacePanel,
             minimapWorkspace: EditorMinimapWorkspacePanel,
-            sandboxTerrainWorkspace: EditorSandboxTerrainWorkspacePanel,
         }),
         [],
     );

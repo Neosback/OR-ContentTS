@@ -1,4 +1,4 @@
-import type { IDockviewPanelProps } from "dockview";
+import type { IDockviewPanelProps } from "dockview-react";
 import { History, Redo2, Undo2 } from "lucide-react";
 import { useCallback, useContext, useSyncExternalStore } from "react";
 

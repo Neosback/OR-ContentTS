@@ -1,4 +1,4 @@
-import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview";
+import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-react";
 import { memo, useCallback, useContext } from "react";
 
 import { useMapEditorPanelContextMenu } from "./MapEditorPanelContextMenu";

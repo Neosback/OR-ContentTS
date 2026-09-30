@@ -1,7 +1,8 @@
-import { ModuleThread, Pool, spawn } from "threads";
-import { QueuedTask } from "threads/dist/master/pool";
-import { WorkerDescriptor } from "threads/dist/master/pool-types";
-import { ObservablePromise } from "threads/dist/observable-promise";
+import { Pool, spawn } from "threads";
+import type { ModuleThread } from "threads";
+import type { QueuedTask } from "threads/dist/master/pool";
+import type { WorkerDescriptor } from "threads/dist/master/pool-types";
+import type { ObservablePromise } from "threads/dist/observable-promise";
 
 import type { LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
 import { transferLiveMinimapWorkerRequest } from "../../mapeditor/liveMinimapWorkerPayload";
@@ -20,7 +21,7 @@ import { RenderDataWorker } from "./RenderDataWorker";
 type RenderDataWorkerThread = ModuleThread<RenderDataWorker>;
 
 function spawnWorker(): Promise<RenderDataWorkerThread> {
-    const worker = new Worker(new URL("./RenderDataWorker", import.meta.url));
+    const worker = new Worker(new URL("./RenderDataWorker.ts", import.meta.url), { type: "module" });
     return spawn<RenderDataWorker>(worker);
 }
 

@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import type { AddPanelOptions } from "dockview";
+import type { AddPanelOptions } from "dockview-core";
 import { URLSearchParamsInit } from "react-router-dom";
 
 
@@ -1296,7 +1296,7 @@ export class MapEditor {
         cache: LoadedCache,
     ) {
         this.pluginHost = new EditorPluginHost(this);
-        if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+        if (import.meta.env.DEV && typeof window !== "undefined") {
             // Dev-only console/devtools handle for inspecting scene data.
             (window as unknown as { __mapEditor?: MapEditor }).__mapEditor = this;
         }

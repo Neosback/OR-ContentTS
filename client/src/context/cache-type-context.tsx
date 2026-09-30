@@ -1,4 +1,3 @@
-"use client";
 
 import * as React from "react";
 import { Globe } from "lucide-react";
@@ -70,8 +69,8 @@ function isLocalEnvironment(): boolean {
   }
 
   return (
-    process.env.NEXT_PUBLIC_IS_LOCAL === "true" ||
-    process.env.NODE_ENV === "development" ||
+    import.meta.env.VITE_IS_LOCAL === "true" ||
+    import.meta.env.DEV ||
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1"
   );

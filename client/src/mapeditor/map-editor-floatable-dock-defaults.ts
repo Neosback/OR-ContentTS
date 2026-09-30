@@ -1,4 +1,4 @@
-import type { AddPanelOptions, DockviewApi } from "dockview";
+import type { AddPanelOptions, DockviewApi } from "dockview-core";
 
 import { addMapEditorDockPanelRestoredOrDefault } from "./map-editor-dock-panel-restore";
 import type { MapEditorDockPanelId } from "./plugins/builtins/builtin-plugin-types";

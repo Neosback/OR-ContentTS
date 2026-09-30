@@ -1,4 +1,4 @@
-import type { AddPanelOptions, DockviewApi } from "dockview";
+import type { AddPanelOptions, DockviewApi } from "dockview-core";
 
 import { addMapEditorDockPanelRestoredOrDefault, extractDockPanelRestoreOptions } from "./map-editor-dock-panel-restore";
 import { getMapEditorFloatableDockPanelDefaults } from "./map-editor-floatable-dock-defaults";
@@ -18,16 +18,8 @@ const ALL_MAP_EDITOR_TOOLS: readonly MapEditorTool[] = [
     "region-stamp",
 ];
 
-/** Dock panel for each paint tool’s palette tab. */
-export const EDITOR_TOOL_DOCK_PANEL: Partial<Record<MapEditorTool, MapEditorDockPanelId>> = {
-    underlay: "editor-underlays",
-    overlay: "editor-overlays",
-    height: "editor-height",
-    "tile-flags": "editor-tile-flags",
-    "object-selector": "editor-object-selector",
-    "object-delete": "editor-object-delete",
-    "region-stamp": "editor-region-stamp",
-};
+export { EDITOR_TOOL_DOCK_PANEL } from "./map-editor-panel-config";
+import { EDITOR_TOOL_DOCK_PANEL } from "./map-editor-panel-config";
 
 /** Extra workbench regions (not tied to a single paint tool). */
 export const WORKBENCH_UI_PLUGINS = BUILTIN_WORKBENCH_UI_PLUGINS;

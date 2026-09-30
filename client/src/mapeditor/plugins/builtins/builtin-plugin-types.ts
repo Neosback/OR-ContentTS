@@ -1,6 +1,4 @@
-import type { ComponentType } from "react";
-import type { LucideIcon } from "lucide-react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-core";
 
 import type { InputManager } from "../../../mapviewer/InputManager";
 import type { MapEditorBrushType, MapEditorTool } from "../../map-editor-kinds";
@@ -109,15 +107,24 @@ export interface EditorToolKeyBinding {
     action: (ctx: EditorToolInputContext) => boolean | void;
 }
 
+export type EditorToolIconName =
+    | "layers-2"
+    | "layout-grid"
+    | "arrow-up-down"
+    | "flag"
+    | "mouse-pointer-2"
+    | "trash-2"
+    | "copy";
+
 export interface EditorToolPlugin {
     id: MapEditorTool;
     name: string;
     description: string;
-    icon: LucideIcon;
+    /** Lucide icon name (kebab-case). Each UI maps it to its own icon component. */
+    icon: EditorToolIconName;
     workspaces?: readonly EditorToolWorkspaceBinding[];
     actions?: readonly EditorToolAction[];
     data?: EditorToolDataFns;
-    palettePanel?: ComponentType<MapEditorPalettePanelProps>;
     /** When false, brush type and radius controls are disabled (e.g. object selector). Default true. */
     usesBrushControls?: boolean;
     brushStripHint?: string;
@@ -138,19 +145,3 @@ export interface BrushTypePlugin {
     workspaces?: readonly EditorToolWorkspaceBinding[];
 }
 
-export interface EditorViewNavPlugin {
-    id: string;
-    name: string;
-    order?: number;
-    component: ComponentType<{ pluginHost: IEditorPluginHost }>;
-}
-
-export type EditorViewFloatingNavPlugin = EditorViewNavPlugin;
-export type EditorViewStickyNavPlugin = EditorViewNavPlugin;
-
-export interface EditorHeaderPlugin {
-    id: string;
-    name: string;
-    order?: number;
-    component: ComponentType<{ pluginHost: IEditorPluginHost; dockApi: DockviewApi | null }>;
-}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 
 import { activateBuiltinEditorToolWorkspaces } from "./plugins/builtins/current-plugin-runtime.builtin";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";

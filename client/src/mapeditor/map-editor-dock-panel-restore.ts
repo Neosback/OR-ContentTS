@@ -1,4 +1,4 @@
-import { Orientation, type AddPanelOptions, type DockviewApi, type SerializedDockview, type SerializedGridObject } from "dockview";
+import { Orientation, type AddPanelOptions, type DockviewApi, type SerializedDockview, type SerializedGridObject } from "dockview-core";
 
 /** Leaf payload in `SerializedDockview.grid` (tab group with panel ids). */
 interface SerializedTabGroupState {

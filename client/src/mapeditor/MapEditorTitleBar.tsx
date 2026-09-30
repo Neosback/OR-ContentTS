@@ -1,7 +1,7 @@
 import { Download, LayoutGrid, PanelRightOpen, RotateCcw, Upload } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";

@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { HEIGHT_MODE_ICONS } from "./react-height-icons";
 
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
@@ -27,7 +28,7 @@ function HeightBrushSettings({ pluginHost }: { pluginHost: IEditorPluginHost }):
         <div className="space-y-2.5 px-2 pb-1 pt-0.5">
             <div className="grid grid-cols-2 gap-1">
                 {HEIGHT_MODES.map((mode) => {
-                    const Icon = mode.icon;
+                    const Icon = HEIGHT_MODE_ICONS[mode.icon];
                     const selected = mode.id === currentMode;
                     return (
                         <Tooltip key={mode.id}>

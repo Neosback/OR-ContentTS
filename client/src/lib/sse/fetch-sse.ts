@@ -1,4 +1,3 @@
-"use client";
 
 import type { SseEvent, SseEventDataMap, SseEventType } from "@/lib/sse/types";
 

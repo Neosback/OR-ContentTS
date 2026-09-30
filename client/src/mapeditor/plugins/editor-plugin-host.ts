@@ -2,7 +2,7 @@
  * Injectable host for map editor plugins and UI — prefer this over `MapEditor` in new code.
  * `EditorPluginHost` forwards to the concrete editor; the interface is what you type against.
  */
-import type { AddPanelOptions } from "dockview";
+import type { AddPanelOptions } from "dockview-core";
 import type { URLSearchParamsInit } from "react-router-dom";
 
 import type { CacheList, LoadedCache } from "../../mapviewer/Caches";
