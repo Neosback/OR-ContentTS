@@ -128,8 +128,8 @@
             else if (event.key === "F3") addCameraPoint();
             else if (event.key === "F4") deleteLastPoint();
         };
-        document.addEventListener("keydown", onKeyDown);
-        return () => document.removeEventListener("keydown", onKeyDown);
+        window.addEventListener("keydown", onKeyDown, true);
+        return () => window.removeEventListener("keydown", onKeyDown, true);
     });
 
     onDestroy(stopCamera);
@@ -297,6 +297,6 @@
             </div>
         </details>
 
-        <div class="content-text px-1 text-[11px]">{mapViewer.debugText ?? ""}</div>
+        <div class="content-text px-1 text-[11px]">{state.debugText ?? ""}</div>
     </div>
 </div>
