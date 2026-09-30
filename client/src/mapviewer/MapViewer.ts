@@ -102,7 +102,7 @@ export class MapViewer {
 
     getSearchParams(): Record<string, string> {
         const cx = this.camera.getPosX().toFixed(2).toString();
-        const cy = -this.camera.getPosY().toFixed(2).toString();
+        const cy = (-this.camera.getPosY()).toFixed(2);
         const cz = this.camera.getPosZ().toFixed(2).toString();
 
         const yaw = this.camera.yaw & 2047;
