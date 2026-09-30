@@ -67,7 +67,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
-- [ ] Move cache download ownership fully out of the legacy server path.
+- [x] Move cache download ownership into the Studio; local bootstrap now writes directly to `client/caches`.
 - [ ] Define the project lifecycle API for open/save/close/dirty state against `ProjectStore` first; publish/build remain unavailable until OpenRune integration.
 
 ## Phase 3: editor depth
@@ -121,6 +121,6 @@ Next:
 
 ## Current caveats
 
-- The repository's `server/` directory is legacy/reference infrastructure, not the target Studio backend. Do not add new Studio architecture to it.
-- Without the legacy server, optional `/api/world` data can currently be unavailable; the editor itself still opens from local cache data. This compatibility path should disappear behind `WorldSource`.
+- The legacy TypeScript server has been removed. `Neosback/OpenRune-Server` is the only intended backend target.
+- NPC/object spawn snapshots currently bundled with the Studio keep offline viewing functional; authoritative/project-owned world content should still move behind `WorldSource`.
 - The app builds for the site root with Vite. Any old deployment scripts that assume `/play` need to be treated as legacy.
