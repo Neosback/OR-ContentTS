@@ -33,14 +33,15 @@ jobs:
           cache-dependency-path: client/package-lock.json
 
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Svelte UI boundary
+        run: npm run check:ui-boundaries
 
       - name: Svelte check
-        continue-on-error: true
         run: npm run check
 
       - name: TypeScript
-        continue-on-error: true
         run: npm run typecheck
 
       - name: Unit tests
