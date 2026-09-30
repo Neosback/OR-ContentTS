@@ -12,7 +12,7 @@ The client is the active OpenRune Content Studio frontend.
 
 The application boots through `src/main.ts -> src/ui/main.ts -> src/ui/App.svelte`.
 
-Legacy React/TSX files still exist outside the active Svelte UI while migration cleanup is completed. They are not the application entrypoint and must not be imported into `src/ui`.
+The active client source tree is Svelte/TypeScript only. Legacy React/TSX sources and direct React-only tooling/dependencies have been removed.
 
 ## Development
 
@@ -36,8 +36,8 @@ npm run dev
 npm run validate
 ```
 
-This runs the complete blocking client gate: Svelte UI architecture boundary, Svelte check, TypeScript, Vitest and the production Vite build.
+This runs the complete blocking client gate: client architecture boundary, Svelte check, TypeScript, Vitest and the production Vite build.
 
-Retained legacy TSX is excluded from the active typecheck root unless active code imports it.
+The architecture boundary scans the active source tree and package manifest to reject JSX/TSX and React-era dependencies.
 
 See the repository [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROADMAP.md](../ROADMAP.md) for the current architecture and planned work.
