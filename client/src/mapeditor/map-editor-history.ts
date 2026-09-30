@@ -273,6 +273,28 @@ export class MapEditHistory {
         this.beginTransaction(tool, label);
     }
 
+    recordMutation(mutation: EditorMutation): void {
+        switch (mutation.kind) {
+            case "map.tile":
+                this.recordTileChange(
+                    mutation.mapId,
+                    mutation.level,
+                    mutation.localTileId,
+                    mutation.before,
+                    mutation.after,
+                );
+                return;
+            case "map.objects":
+                this.recordObjectChange(
+                    mutation.mapId,
+                    mutation.level,
+                    mutation.before,
+                    mutation.after,
+                );
+                return;
+        }
+    }
+
     recordTileChange(
         mapId: number,
         level: number,
@@ -442,6 +464,7 @@ export class MapEditHistory {
         this.pendingTiles.clear();
         this.pendingObjectChanges = [];
         this.transactionActive = false;
+        this.transactionLabel = undefined;
         this.notify();
     }
 }
