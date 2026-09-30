@@ -1,6 +1,6 @@
-import type { EditorToolPlugin } from "./builtin-plugin-types";
-import { getHeightToolModel } from "./height-tool-model";
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
+import type { EditorToolPlugin } from "./builtin-plugin-types";
 
 export const heightEditorTool: EditorToolPlugin = {
     id: "height",
@@ -29,15 +29,10 @@ export const heightEditorTool: EditorToolPlugin = {
         },
     },
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-height", {
             id: "select-tool",
-            name: "Select Height tool",
-            description: "Switch active paint tool to Height.",
             defaultChords: [{ code: "Digit3" }],
-            action: ({ host }) => {
-                host.setEditorTool("height");
-            },
-        },
+        }),
         {
             id: "hold-lower-modifier",
             name: "Hold lower modifier",
@@ -47,121 +42,27 @@ export const heightEditorTool: EditorToolPlugin = {
             shouldProcess: ({ host }) => host.getEditorTool() === "height",
             action: () => true,
         },
-        {
-            id: "mode-raise-lower",
-            name: "Height mode: Raise / Lower",
-            description: "Switch Height tool mode to Raise / Lower.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                getHeightToolModel(host).setMode("raise-lower");
-                return true;
-            },
-        },
-        {
-            id: "mode-slope",
-            name: "Height mode: Slope",
-            description: "Switch Height tool mode to Slope.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                getHeightToolModel(host).setMode("slope");
-                return true;
-            },
-        },
-        {
-            id: "mode-blend",
-            name: "Height mode: Blend",
-            description: "Switch Height tool mode to Blend.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                getHeightToolModel(host).setMode("blend");
-                return true;
-            },
-        },
-        {
-            id: "mode-smooth",
-            name: "Height mode: Smooth",
-            description: "Switch Height tool mode to Smooth.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                getHeightToolModel(host).setMode("smooth");
-                return true;
-            },
-        },
-        {
-            id: "increase-step",
-            name: "Increase height step",
-            description: "Increase Height step slider value.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                host.heightAdjustStep = Math.max(1, Math.min(256, host.heightAdjustStep + 1));
-                host.notifyWorkbenchStateChanged();
-                return true;
-            },
-        },
-        {
-            id: "decrease-step",
-            name: "Decrease height step",
-            description: "Decrease Height step slider value.",
-            defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                host.heightAdjustStep = Math.max(1, Math.min(256, host.heightAdjustStep - 1));
-                host.notifyWorkbenchStateChanged();
-                return true;
-            },
-        },
-        {
+        editorCommandKeyBinding("height.mode.raise-lower", { id: "mode-raise-lower", defaultChords: [] }),
+        editorCommandKeyBinding("height.mode.slope", { id: "mode-slope", defaultChords: [] }),
+        editorCommandKeyBinding("height.mode.blend", { id: "mode-blend", defaultChords: [] }),
+        editorCommandKeyBinding("height.mode.smooth", { id: "mode-smooth", defaultChords: [] }),
+        editorCommandKeyBinding("height.step.increase", { id: "increase-step", defaultChords: [] }),
+        editorCommandKeyBinding("height.step.decrease", { id: "decrease-step", defaultChords: [] }),
+        editorCommandKeyBinding("height.slope-strength.increase", {
             id: "increase-slope-strength",
-            name: "Increase slope strength",
-            description: "Increase Slope strength slider value.",
             defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                const model = getHeightToolModel(host);
-                model.setSlopeStrength(model.slopeStrength + 0.05);
-                return true;
-            },
-        },
-        {
+        }),
+        editorCommandKeyBinding("height.slope-strength.decrease", {
             id: "decrease-slope-strength",
-            name: "Decrease slope strength",
-            description: "Decrease Slope strength slider value.",
             defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                const model = getHeightToolModel(host);
-                model.setSlopeStrength(model.slopeStrength - 0.05);
-                return true;
-            },
-        },
-        {
+        }),
+        editorCommandKeyBinding("height.blend-strength.increase", {
             id: "increase-blend-strength",
-            name: "Increase blend strength",
-            description: "Increase Blend strength slider value.",
             defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                const model = getHeightToolModel(host);
-                model.setBlendStrength(model.blendStrength + 0.05);
-                return true;
-            },
-        },
-        {
+        }),
+        editorCommandKeyBinding("height.blend-strength.decrease", {
             id: "decrease-blend-strength",
-            name: "Decrease blend strength",
-            description: "Decrease Blend strength slider value.",
             defaultChords: [],
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
-            action: ({ host }) => {
-                const model = getHeightToolModel(host);
-                model.setBlendStrength(model.blendStrength - 0.05);
-                return true;
-            },
-        },
+        }),
     ],
 };
