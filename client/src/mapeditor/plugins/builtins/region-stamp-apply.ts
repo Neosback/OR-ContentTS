@@ -19,6 +19,8 @@ import {
     rotateWallData,
     rotateWallDecorationData,
     type SceneTileLocData,
+    type WallData,
+    type WallDecorationData,
 } from "../../webgl/sceneLocData";
 import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync";
 import { syncMapObjectPickIndex, worldTileToSceneTile } from "./object-transform-runtime";
@@ -212,7 +214,7 @@ function buildPastedObjectEntry(
     const tag = newTagForTile(newTileX, newTileY, locTypeId, locType);
 
     if (object.entry.wall) {
-        let wall = {
+        let wall: WallData = {
             ...object.entry.wall,
             tag,
             x: centerX,
@@ -245,7 +247,7 @@ function buildPastedObjectEntry(
         return { level: object.level, tileX: newTileX, tileY: newTileY, floorDecoration };
     }
     if (object.entry.wallDecoration) {
-        let wallDecoration = {
+        let wallDecoration: WallDecorationData = {
             ...object.entry.wallDecoration,
             tag,
             x: centerX,
