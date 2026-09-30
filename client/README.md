@@ -1,30 +1,41 @@
-# RuneScape Map Viewer
+# OpenRune Content Studio Client
 
-[Website](https://osrs.world) | [Discord](https://discord.gg/WfEWPE5wUd)
+The client is the active OpenRune Content Studio frontend.
 
-A webapp for exploring current and historical versions of RuneScape.
+## Runtime
 
-<img src="screenshots/lumbridge.png" alt="Lumbridge">
+- Vite 8
+- Svelte 5
+- TypeScript
+- dockview-core
+- WebGL2
 
-## Running locally
+The application boots through `src/main.ts -> src/ui/main.ts -> src/ui/App.svelte`.
 
+Legacy React/TSX files still exist outside the active Svelte UI while migration cleanup is completed. They are not the application entrypoint and must not be imported into `src/ui`.
+
+## Development
+
+From the repository root:
+
+```bash
+npm run setup
+npm run client
 ```
-$ git clone https://github.com/dennisdev/rs-map-viewer.git
-$ cd rs-map-viewer
-$ yarn install
-$ yarn run download-caches
-$ yarn start
+
+Or from this directory:
+
+```bash
+npm ci
+npm run dev
 ```
 
-## Credits
+## Validation
 
--   Jagex
--   [RuneLite](https://github.com/runelite/runelite)
--   [OpenRS2 Archive](https://archive.openrs2.org/) - Caches
--   [RuneScape Archive](https://rs-archive.github.io/) - Caches
--   [OSRS Wiki](https://oldschool.runescape.wiki/) - Item spawns
--   [2004scape](https://github.com/2004scape/Server) - Npc spawns
--   [2009scape](https://gitlab.com/2009scape/2009scape) - Npc spawns
--   [RuneStar](https://github.com/RuneStar/fonts) - Fonts
--   [Blurite](https://github.com/blurite/pathfinder) - Some pathfinding stuff
--   [RuneApps Model Viewer](https://github.com/skillbert/rsmv) - Some procedural texture stuff
+```bash
+npm run validate
+```
+
+This runs the UI architecture boundary check, Svelte validation, TypeScript, Vitest and the production Vite build.
+
+See the repository [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROADMAP.md](../ROADMAP.md) for the current architecture and planned work.
