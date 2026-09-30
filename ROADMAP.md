@@ -65,7 +65,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 
 - [ ] Formalize `CacheSource`: static/range-backed local cache today, backend-served later.
 - [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
-- [ ] **Edit format v1**: versioned JSON schema built from the transaction mutation model for terrain, locs, NPC spawns, zones and future content edits.
+- [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [ ] Local project persistence with IndexedDB plus import/export.
 - [ ] Move cache download ownership fully out of the legacy server path.
 - [ ] Define project/open/save/publish APIs against a local implementation first.

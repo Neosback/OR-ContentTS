@@ -21,6 +21,7 @@ export type MapSquareTileDelta = {
 export type MapSquareObjectDelta = {
     mapId: number;
     level: number;
+    sceneBorderSize: number;
     before: SceneTileLocData[];
     after: SceneTileLocData[];
 };
@@ -288,6 +289,7 @@ export class MapEditHistory {
                 this.recordObjectChange(
                     mutation.mapId,
                     mutation.level,
+                    mutation.sceneBorderSize,
                     mutation.before,
                     mutation.after,
                 );
@@ -314,6 +316,7 @@ export class MapEditHistory {
     recordObjectChange(
         mapId: number,
         level: number,
+        sceneBorderSize: number,
         before: SceneTileLocData[],
         after: SceneTileLocData[],
     ): void {
@@ -329,6 +332,7 @@ export class MapEditHistory {
         this.pendingObjectChanges.push({
             mapId,
             level,
+            sceneBorderSize,
             before: before.map((entry) => structuredClone(entry)),
             after: after.map((entry) => structuredClone(entry)),
         });
@@ -369,6 +373,7 @@ export class MapEditHistory {
                     kind: "map.objects",
                     mapId: delta.mapId,
                     level: delta.level,
+                    sceneBorderSize: delta.sceneBorderSize,
                     before: delta.before,
                     after: delta.after,
                 }),

@@ -815,7 +815,7 @@ export class MapEditor {
         before: import("./webgl/sceneLocData").SceneTileLocData[],
         after: import("./webgl/sceneLocData").SceneTileLocData[],
     ): void => {
-        this.mapEditHistory.recordObjectChange(mapId, level, before, after);
+        this.mapEditHistory.recordObjectChange(mapId, level, 0, before, after);
     };
 
     isHistoryApplying = (): boolean => {
