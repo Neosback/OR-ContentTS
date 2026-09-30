@@ -298,12 +298,11 @@ function validateTransaction(
         addIssue(issues, `${path}.mutations`, "Expected at least one mutation.");
     } else {
         value.mutations.forEach((mutation, index) => {
-            const before = issues.length;
-            if (validateMutation(mutation, `${path}.mutations[${index}]`, issues) && issues.length === before) {
-                mutations.push(mutation);
-            } else if (validateMutation(mutation, `${path}.mutations[${index}]`, [])) {
+            const localIssues: EditFormatV1Issue[] = [];
+            if (validateMutation(mutation, `${path}.mutations[${index}]`, localIssues) && localIssues.length === 0) {
                 mutations.push(mutation);
             }
+            issues.push(...localIssues);
         });
     }
 
