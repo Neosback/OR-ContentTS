@@ -1,8 +1,17 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "types": ["vite/client", "@webgpu/types", "node", "svelte"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "types": [
+      "vite/client",
+      "@webgpu/types",
+      "node",
+      "svelte"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -21,9 +30,22 @@
     "tsBuildInfoFile": "node_modules/.cache/tsconfig.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src", "scripts", "vite", "vite.config.mts", "svelte.config.js"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "scripts",
+    "vite",
+    "vite.config.mts",
+    "svelte.config.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.tsx",
+    "src/**/*.jsx"
+  ]
 }
