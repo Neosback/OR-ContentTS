@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { runEditTransaction, type EditorTransactionHost } from "./editor-transaction";
 
-function transactionHost() {
+function transactionHost(historyApplying = false) {
     return {
-        isHistoryApplying: () => false,
+        isHistoryApplying: () => historyApplying,
         beginEditTransaction: vi.fn((_source, _label?: string) => {}),
         commitEditTransaction: vi.fn(() => {}),
         cancelEditTransaction: vi.fn(() => {}),
@@ -45,8 +45,7 @@ describe("runEditTransaction", () => {
     });
 
     it("does not nest history transactions during replay", () => {
-        const host = transactionHost();
-        host.isHistoryApplying = () => true;
+        const host = transactionHost(true);
 
         const result = runEditTransaction(host, { source: "height", label: "Replay" }, () => "replayed");
 
