@@ -2,6 +2,7 @@
     import SquareArrowOutUpRight from "@lucide/svelte/icons/square-arrow-out-up-right";
 
     import { BUILTIN_EDITOR_TOOL_PLUGINS } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
+    import { editorToolSelectCommandId, executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
     import { getPaintToolsStripModel } from "../../../mapeditor/plugins/builtins/paint-tools-strip-model";
     import { Button } from "../../components/ui/button";
     import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
@@ -62,7 +63,7 @@
                                 class="size-8 shrink-0"
                                 aria-label={tool.name}
                                 aria-pressed={activeTool === tool.id}
-                                onclick={() => host.setEditorTool(tool.id)}
+                                onclick={() => executeEditorCommand(editorToolSelectCommandId(tool.id), { host })}
                             >
                                 <Icon class="size-4" aria-hidden="true" />
                             </Button>
