@@ -12,7 +12,7 @@ export class TextureGenerator {
 
     static INVERSE_SQUARE_ROOT: Int8Array;
 
-    static permutationCache: Map<number, Int8Array> = new Map();
+    static permutationCache: Map<number, Int8Array<ArrayBufferLike>> = new Map();
 
     spriteIndex: CacheIndex;
     textureLoader: TextureLoader;
@@ -102,7 +102,7 @@ export class TextureGenerator {
         }
     }
 
-    static initPermutations(seed: number): Int8Array {
+    static initPermutations(seed: number): Int8Array<ArrayBufferLike> {
         const cached = TextureGenerator.permutationCache.get(seed);
         if (cached) {
             return cached;
