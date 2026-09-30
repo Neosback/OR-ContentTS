@@ -229,10 +229,10 @@ Do not reintroduce systems replaced by these PRs.
 The complete client gate remains the merge requirement:
 
 - clean `npm ci`
-- Svelte-only client architecture boundary: **524 files scanned**
+- Svelte-only client architecture boundary: **531 files scanned**
 - Svelte check: **0 errors**
 - TypeScript: pass
-- Vitest: **8 files / 30 tests**
+- Vitest: **11 files / 42 tests**
 - Vite production build: pass
 
 Run from `client/`:
@@ -262,9 +262,14 @@ A **ProjectStore abstraction plus local IndexedDB implementation** now sits on t
 
 Do not wire the UI directly to IndexedDB.
 
-Define a framework-neutral interface first, then implement IndexedDB behind it.
+Current implementation:
 
-Suggested shape:
+- `client/src/project/project-store.ts` defines the framework-neutral interface.
+- `client/src/project/project-format-v1.ts` and its schema define the portable project contract.
+- `client/src/project/indexeddb-project-store.ts` provides the local browser implementation.
+- `client/src/project/fixtures/project-v1.golden.json` provides the portable golden fixture.
+
+Current interface:
 
 ```ts
 interface ProjectStore {
