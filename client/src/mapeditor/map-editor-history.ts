@@ -76,6 +76,7 @@ export function buildHistoryEntryWorldKeys(entry: MapEditorHistoryEntry): {
 }
 
 type PendingTileKey = string;
+type ScalarTileFieldKey = "h" | "u" | "o" | "s" | "r" | "f";
 
 function pendingTileKey(mapId: number, level: number, localTileId: number): PendingTileKey {
     return `${mapId}:${level}:${localTileId}`;
@@ -98,7 +99,7 @@ function diffSnapshots(
     const b: TileFieldSnapshot = {};
     const a: TileFieldSnapshot = {};
     let changed = false;
-    const keys: (keyof TileFieldSnapshot)[] = ["h", "u", "o", "s", "r", "f"];
+    const keys: ScalarTileFieldKey[] = ["h", "u", "o", "s", "r", "f"];
     for (const key of keys) {
         if (before[key] !== after[key]) {
             b[key] = before[key];
@@ -142,7 +143,7 @@ function mergePendingTile(
     if (delta.after.hl) {
         existing.after.hl = [...delta.after.hl];
     }
-    const keys: (keyof TileFieldSnapshot)[] = ["h", "u", "o", "s", "r", "f"];
+    const keys: ScalarTileFieldKey[] = ["h", "u", "o", "s", "r", "f"];
     for (const key of keys) {
         if (existing.before[key] === undefined && delta.before[key] !== undefined) {
             existing.before[key] = delta.before[key];

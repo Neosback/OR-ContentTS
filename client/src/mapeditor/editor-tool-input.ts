@@ -70,7 +70,7 @@ export function isMouseChordCode(code: string): boolean {
 }
 
 export function getChordCodes(chord: EditorToolKeyChord): readonly string[] {
-    return Array.isArray(chord.code) ? chord.code : [chord.code];
+    return typeof chord.code === "string" ? [chord.code] : chord.code;
 }
 
 /** True if any resolved chord for this binding shares a `KeyboardEvent.code` with the tool-suppressed set. */

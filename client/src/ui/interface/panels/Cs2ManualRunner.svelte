@@ -17,17 +17,17 @@
     import { cn } from "../../lib/utils";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
-    let { state }: { state: InterfaceEditorState } = $props();
+    let { state: editor }: { state: InterfaceEditorState } = $props();
     let scriptIdText = $state("");
     let argRows = $state<string[]>([]);
     let running = $state(false);
     let copied = $state(false);
     let scrollHost = $state<HTMLDivElement>();
 
-    const disabled = $derived(state.selectedId == null || !state.interfaceData || running);
+    const disabled = $derived(editor.selectedId == null || !editor.interfaceData || running);
 
     $effect(() => {
-        state.cs2LogLines.length;
+        editor.cs2LogLines.length;
         void tick().then(() => {
             if (scrollHost) scrollHost.scrollTop = scrollHost.scrollHeight;
         });
@@ -79,12 +79,12 @@
     }
 
     function log(level: Cs2LogLevel, body: string): void {
-        state.appendCs2LogLine(makeCs2LogLine(level, body));
+        editor.appendCs2LogLine(makeCs2LogLine(level, body));
     }
 
     async function send(): Promise<void> {
-        const interfaceRootId = state.selectedId;
-        const interfaceData = state.interfaceData;
+        const interfaceRootId = editor.selectedId;
+        const interfaceData = editor.interfaceData;
         if (interfaceRootId == null || !interfaceData) return;
 
         const scriptId = Number.parseInt(scriptIdText.trim(), 10);
@@ -110,7 +110,7 @@
         try {
             await runScript(event, 5_000_000, 0);
             log("success", `[send] Finished script ${scriptId}.`);
-            state.cs2RedrawNonce += 1;
+            editor.cs2RedrawNonce += 1;
         } catch (error) {
             log("error", `[send] Script ${scriptId} threw: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
@@ -119,7 +119,7 @@
     }
 
     async function copyAll(): Promise<void> {
-        const text = state.cs2LogLines.map((line) => `[${line.at}] [${line.level}] ${line.body}`).join("\n");
+        const text = editor.cs2LogLines.map((line) => `[${line.at}] [${line.level}] ${line.body}`).join("\n");
         await navigator.clipboard.writeText(text);
         copied = true;
         window.setTimeout(() => (copied = false), 1500);
@@ -208,7 +208,7 @@
                     variant="ghost"
                     size="sm"
                     class="h-7 gap-1 px-2 text-[10px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                    disabled={state.cs2LogLines.length === 0}
+                    disabled={editor.cs2LogLines.length === 0}
                     onclick={() => void copyAll()}
                 >
                     {#if copied}<Check class="size-3.5 text-emerald-400" />{:else}<Copy class="size-3.5" />{/if}
@@ -219,8 +219,8 @@
                     variant="ghost"
                     size="sm"
                     class="h-7 gap-1 px-2 text-[10px] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                    disabled={state.cs2LogLines.length === 0}
-                    onclick={state.clearCs2Log}
+                    disabled={editor.cs2LogLines.length === 0}
+                    onclick={editor.clearCs2Log}
                 >
                     <Trash2 class="size-3.5" />
                     Clear
@@ -229,10 +229,10 @@
         </div>
 
         <div bind:this={scrollHost} class="min-h-0 flex-1 overflow-auto px-2 py-2 font-mono text-[10px] leading-relaxed text-zinc-200" role="log" aria-live="polite">
-            {#if state.cs2LogLines.length === 0}
+            {#if editor.cs2LogLines.length === 0}
                 <span class="text-zinc-500">No messages yet. On-load diagnostics and script runs appear here.</span>
             {:else}
-                {#each state.cs2LogLines as line (line.id)}
+                {#each editor.cs2LogLines as line (line.id)}
                     <div class="flex gap-2 border-b border-zinc-800/60 py-1 last:border-b-0">
                         <span class="shrink-0 text-zinc-500">{line.at}</span>
                         <span class={cn("shrink-0 rounded px-1 py-0 text-[9px] font-medium uppercase ring-1 ring-inset", levelBadgeClass(line.level))}>

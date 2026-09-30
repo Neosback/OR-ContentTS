@@ -493,7 +493,7 @@ export function method898(var0: number, var1: Script, var2: boolean): number {
     if (var6.type !== 0) return 1;
     const parentReady = prepareParentForCcCreate(var6, var11, var13, var1);
     if (!parentReady) return 1;
-    const nextChildren = var6.children;
+    const nextChildren = var6.children!;
     const var12 = makeWidgetLikeJava(var6, var4, var11);
     if (var4 === 12) {
       initType12Widget(var12);
@@ -611,11 +611,9 @@ export function method6300(var0: number, var1: Script, var2: boolean): number {
     var4 = (var2 ? scriptDotWidget : scriptActiveWidget) as RuntimeWidget | null;
   }
 
-  const hasWidget = var4 != null;
-
   if (var0 === ScriptOpcodes.CC_SETPOSITION) {
     Interpreter.Interpreter_intStackSize -= 4;
-    if (hasWidget) {
+    if (var4) {
       var4.x = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       var4.y = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
       var4.xMode = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
@@ -625,7 +623,7 @@ export function method6300(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETSIZE) {
     Interpreter.Interpreter_intStackSize -= 4;
-    if (hasWidget) {
+    if (var4) {
       var4.width = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       var4.height = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
       var4.widthMode = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
@@ -635,18 +633,18 @@ export function method6300(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETHIDE) {
     const var5 = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget && var5 !== var4.hide) {
+    if (var4 && var5 !== var4.hide) {
       var4.hide = var5;
       invalidateWidgetRuntime(var4);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETNOCLICKTHROUGH) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) var4.noClickThrough = v;
+    if (var4) var4.noClickThrough = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETNOSCROLLTHROUGH) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) (var4 as RuntimeWidget & { noScrollThrough?: boolean }).noScrollThrough = v;
+    if (var4) (var4 as RuntimeWidget & { noScrollThrough?: boolean }).noScrollThrough = v;
     return 1;
   } else {
     return 2;
@@ -665,11 +663,10 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
   } else {
     var3 = (var2 ? scriptDotWidget : scriptActiveWidget) as RuntimeWidget | null;
   }
-  const hasWidget = var3 != null;
 
   if (var0 === ScriptOpcodes.CC_SETSCROLLPOS) {
     Interpreter.Interpreter_intStackSize -= 2;
-    if (hasWidget) {
+    if (var3) {
       (var3 as RuntimeWidget & { scrollX?: number }).scrollX = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       (var3 as RuntimeWidget & { scrollY?: number }).scrollY =
         Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
@@ -678,56 +675,56 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETCOLOUR) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.colour1 = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETFILL) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.fill = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTRANS) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.trans1 = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETLINEWID) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.lineWid = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETGRAPHIC) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.graphic = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SET2DANGLE) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.angle2d = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTILING) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.tiling = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETMODEL) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.modelKind = 1;
       var3.model = v;
       invalidateWidgetRuntime(var3);
@@ -735,7 +732,7 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETMODELANGLE) {
     Interpreter.Interpreter_intStackSize -= 6;
-    if (hasWidget) {
+    if (var3) {
       var3.modelX = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       var3.modelY = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
       var3.modelAngleX = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
@@ -747,7 +744,7 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETMODELANIM) {
     const var8 = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget && var8 !== var3.modelAnim) {
+    if (var3 && var8 !== var3.modelAnim) {
       var3.modelAnim = var8;
       (var3 as RuntimeWidget & { modelFrame?: number; modelFrameCycle?: number }).modelFrame = 0;
       (var3 as RuntimeWidget & { modelFrame?: number; modelFrameCycle?: number }).modelFrameCycle = 0;
@@ -756,28 +753,28 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETMODELORTHOG) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.modelOrthog = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTEXT) {
     const var7 = asCs2String(Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize]);
-    if (hasWidget && var7 !== var3.text) {
+    if (var3 && var7 !== var3.text) {
       var3.text = var7;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTEXTFONT) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.textFont = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTEXTALIGN) {
     Interpreter.Interpreter_intStackSize -= 3;
-    if (hasWidget) {
+    if (var3) {
       var3.textAlignH = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       var3.textAlignV = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
       var3.textLineHeight = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
@@ -786,42 +783,42 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTEXTSHADOW) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.textShadow = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETOUTLINE) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.outline = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETGRAPHICSHADOW) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.graphicShadow = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETVFLIP) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.vFlip = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETHFLIP) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       var3.hFlip = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETSCROLLSIZE) {
     Interpreter.Interpreter_intStackSize -= 2;
-    if (hasWidget) {
+    if (var3) {
       var3.scrollWidth = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
       var3.scrollHeight = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
       invalidateWidgetRuntime(var3);
@@ -829,35 +826,35 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETGRAPHIC2) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.secondaryGraphic = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETFILLCOLOUR) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.colour2 = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTRANSBOTTOM) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       (var3 as RuntimeWidget & { transparencyBot?: number }).transparencyBot = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETFILLMODE) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       (var3 as RuntimeWidget & { fillMode?: number }).fillMode = v;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETMODELTRANSPARENT) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) {
+    if (var3) {
       (var3 as RuntimeWidget & { modelTransparency?: boolean }).modelTransparency = v;
     }
     return 1;
@@ -869,7 +866,7 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     Interpreter.Interpreter_intStackSize -= 2;
     const itemId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
     const itemQty = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
-    if (hasWidget) {
+    if (var3) {
       var3.modelKind = 4;
       var3.model = itemId;
       (var3 as RuntimeWidget & { itemId?: number; itemQuantity?: number; itemQuantityMode?: number }).itemId = itemId;
@@ -881,14 +878,14 @@ export function method6861(var0: number, var1: Script, var2: boolean): number {
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETNPCHEAD) {
     const npcId = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) {
+    if (var3) {
       var3.modelKind = 2;
       var3.model = npcId;
       invalidateWidgetRuntime(var3);
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETPLAYERHEAD_SELF) {
-    if (hasWidget) {
+    if (var3) {
       var3.modelKind = 3;
       var3.model = 0;
       invalidateWidgetRuntime(var3);
@@ -911,13 +908,12 @@ export function method7946(var0: number, var1: Script, var2: boolean): number {
   } else {
     var4 = (var2 ? scriptDotWidget : scriptActiveWidget) as RuntimeWidget | null;
   }
-  const hasWidget = var4 != null;
 
   if (var0 === ScriptOpcodes.CC_SETOP) {
     const var11 = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! - 1;
     if (var11 >= 0 && var11 <= 9) {
       const value = asCs2String(Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize]);
-      if (hasWidget) {
+      if (var4) {
         const nextOps = Array.isArray(var4.op) ? [...var4.op] : [];
         nextOps[var11] = value;
         var4.op = nextOps;
@@ -931,33 +927,33 @@ export function method7946(var0: number, var1: Script, var2: boolean): number {
     Interpreter.Interpreter_intStackSize -= 2;
     const parentId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
     const childIndex = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
-    if (hasWidget && entry) {
+    if (var4 && entry) {
       const dragParent = getWidgetChild(entry, parentId, childIndex);
       (var4 as RuntimeWidget & { dragParent?: RuntimeWidget | null }).dragParent = dragParent;
     }
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETDRAGGABLEBEHAVIOR) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]! === 1;
-    if (hasWidget) var4.draggableBehavior = v;
+    if (var4) var4.draggableBehavior = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETDRAGDEADZONE) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) var4.dragDeadZone = v;
+    if (var4) var4.dragDeadZone = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETDRAGDEADTIME) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    if (hasWidget) var4.dragDeadTime = v;
+    if (var4) var4.dragDeadTime = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETOPBASE) {
     const v = asCs2String(Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize]);
-    if (hasWidget) var4.opBase = v;
+    if (var4) var4.opBase = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_SETTARGETVERB) {
     const v = asCs2String(Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize]);
-    if (hasWidget) var4.targetVerb = v;
+    if (var4) var4.targetVerb = v;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_CLEAROPS) {
-    if (hasWidget) var4.op = [];
+    if (var4) var4.op = [];
     return 1;
   } else {
     return 2;
@@ -1311,7 +1307,7 @@ export function method1204(var0: number, var1: Script, var2: boolean): number {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.height ?? 0;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETHIDE) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.isHidden ? 1 : 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.hide ? 1 : 0;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETLAYER) {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.layer ?? -1;

@@ -1,4 +1,9 @@
 import { vec2 } from "gl-matrix";
+
+export type JoystickInputVector = {
+    x?: number;
+    y?: number;
+};
 /** Wheel delta in pixels, whatever unit the device reports (Firefox mouse wheels use lines). */
 export function wheelDeltaPixels(event: { deltaY: number; deltaMode: number }): number {
     if (event.deltaMode === 1) {
@@ -85,8 +90,8 @@ export class InputManager {
     pickX: number = -1;
     pickY: number = -1;
 
-    positionJoystickEvent?: object;
-    cameraJoystickEvent?: object;
+    positionJoystickEvent?: JoystickInputVector;
+    cameraJoystickEvent?: JoystickInputVector;
 
     gamepadIndex?: number;
 
@@ -129,7 +134,7 @@ export class InputManager {
 
         element.addEventListener("dblclick", this.onDoubleClick);
 
-        // Window-level keys so Ctrl/Alt/Shift still work while React UI (overlay panel, etc.) has focus.
+        // Window-level keys so Ctrl/Alt/Shift still work while Studio UI has focus.
         window.addEventListener("keydown", this.onKeyDown, true);
         window.addEventListener("keyup", this.onKeyUp, true);
         window.addEventListener("blur", this.onWindowBlur);

@@ -8,7 +8,7 @@
     import { Label } from "../../components/ui/label";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
-    let { state }: { state: InterfaceEditorState } = $props();
+    let { state: editor }: { state: InterfaceEditorState } = $props();
 
     let tab = $state<"properties" | "scripts">("properties");
     let selectedHookKey = $state<keyof ComponentType>("onLoad");
@@ -105,9 +105,9 @@
     ];
     const HOOK_INT_LIST_KEYS = new Set<string>(["onVarTransmitList", "onInvTransmitList", "onStatTransmitList"]);
 
-    const component = $derived(state.selectedComponent);
-    const storageKey = $derived(findComponentStorageKey(state.interfaceData, component));
-    const isLegacy = $derived(state.rootWidgetV3 === false);
+    const component = $derived(editor.selectedComponent);
+    const storageKey = $derived(findComponentStorageKey(editor.interfaceData, component));
+    const isLegacy = $derived(editor.rootWidgetV3 === false);
 
     $effect(() => {
         storageKey;
@@ -182,7 +182,7 @@
     function patch(partial: Partial<ComponentType>): void {
         const key = storageKey;
         if (key == null) return;
-        state.setInterfaceData((previous) => {
+        editor.setInterfaceData((previous) => {
             if (!previous) return previous;
             const current = previous.components[key];
             if (!current) return previous;
@@ -194,7 +194,7 @@
                 },
             };
         });
-        state.cs2RedrawNonce += 1;
+        editor.cs2RedrawNonce += 1;
     }
 
     function numVal(key: keyof ComponentType): number {
@@ -249,11 +249,11 @@
     }
 </script>
 
-{#if state.selectedId == null}
+{#if editor.selectedId == null}
     <div class="flex h-full min-h-0 items-center justify-center bg-background px-3 text-xs text-muted-foreground">
         Select an interface first.
     </div>
-{:else if !state.isInterfaceLoaded || !state.interfaceData}
+{:else if !editor.isInterfaceLoaded || !editor.interfaceData}
     <div class="flex h-full min-h-0 items-center justify-center bg-background px-3 text-xs text-muted-foreground">
         Loading…
     </div>
