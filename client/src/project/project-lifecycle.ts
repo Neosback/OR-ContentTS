@@ -67,6 +67,18 @@ function stateKey(project: Project, edits: EditBatchV1): string {
     });
 }
 
+function copiedEditBatch(edits: EditBatchV1, createdAt: number): EditBatchV1 {
+    const id =
+        typeof globalThis.crypto?.randomUUID === "function"
+            ? globalThis.crypto.randomUUID()
+            : `edit-${createdAt}-${Math.random().toString(36).slice(2, 10)}`;
+    return {
+        ...cloneEdits(edits),
+        id,
+        createdAt,
+    };
+}
+
 export class ProjectLifecycle {
     private project?: Project;
     private workingEdits?: EditBatchV1;
@@ -195,19 +207,12 @@ export class ProjectLifecycle {
             throw new ProjectLifecycleError("INVALID_NAME", "Project name must not be empty.");
         }
 
-        const created = await this.store.createProject({
+        const copied = await this.store.createProject({
             id: input.id,
             name,
             base: structuredClone(project.base),
+            edits: copiedEditBatch(workingEdits, this.now()),
         });
-        const copied: Project = {
-            ...created,
-            edits: {
-                ...created.edits,
-                transactions: structuredClone(workingEdits.transactions),
-            },
-        };
-        await this.store.saveProject(copied);
         this.activate(copied);
         return cloneProject(copied);
     }
