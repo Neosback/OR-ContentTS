@@ -9,7 +9,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary, [ROADMAP.md](RO
 ## Packages
 
 - [`client/`](client/): the Studio frontend (Vite, Svelte 5, dockview-core, TypeScript, WebGL2 rendering).
-- [`server/`](server/): **legacy/reference infrastructure, not the target Studio backend**. The Studio currently uses it only for cache bootstrap (`server/scripts/ensure-cache.ts`) and optional legacy `/api/world` data. Do not add new Studio architecture to this server. New backend integration targets the OpenRune server and its FileStore/domain layer.
+- [`Neosback/OpenRune-Server`](https://github.com/Neosback/OpenRune-Server): the companion OpenRune game/backend project. Studio backend integration targets its FileStore/domain and map/content model; it remains a separate repository rather than being vendored into the frontend.
 
 ## Quick start
 
@@ -17,10 +17,10 @@ Install [Node.js 22.16 or later](https://nodejs.org/en/download). No separate Ya
 
 ```bash
 npm run setup
-npm run client
+npm run start
 ```
 
-Open <http://localhost:3000>. The first start downloads the OSRS cache (about 200 MB) from OpenRS2 into `server/caches`.
+Open <http://localhost:3000>. The first start downloads the configured OSRS cache from OpenRS2 directly into `client/caches`. The committed `client/cache-target.json` currently tracks revision 240 to match OpenRune Server.
 
 | Route | What it opens |
 | --- | --- |
@@ -54,7 +54,11 @@ Run these from `client/`:
 
 Client settings live in `client/.env` (see [`client/.env.example`](client/.env.example)). Vite inlines `VITE_*` variables at build time, so never put secrets in them. The most useful one is `VITE_CACHE_BASE_URL`, which points the client at a cache served from somewhere other than `/caches/`.
 
-The dev server sends COOP/COEP headers and temporarily serves `server/caches` at `/caches` with HTTP Range support. This is a local-development compatibility path, not the long-term server architecture. The client streams only the cache ranges it needs and keeps them in browser storage.
+The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` with HTTP Range support. `npm run ensure-cache` bootstraps the configured revision without requiring a game server. The client streams only the cache ranges it needs and keeps them in browser storage.
+
+## OpenRune backend
+
+The legacy TypeScript game server has been removed from this repository. OpenRune Server is now the only intended server-side target. The Studio remains fully usable offline/local-first while `ProjectStore`, project lifecycle, `CacheSource`, and `WorldSource` seams are completed. Backend work should be implemented in the OpenRune Server repository rather than recreating server code here.
 
 ## Credits
 
