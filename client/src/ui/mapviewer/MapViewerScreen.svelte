@@ -1,11 +1,19 @@
-<script lang="ts" context="module">
+<script module lang="ts">
     import { registerSerializer } from "threads";
 
     import { fetchCacheList } from "../../mapviewer/Caches";
     import { renderDataLoaderSerializer } from "../../mapviewer/worker/RenderDataLoader";
 
-    registerSerializer(renderDataLoaderSerializer);
-    const cachesPromise = fetchCacheList();
+    let serializerRegistered = false;
+    let cacheListPromise: ReturnType<typeof fetchCacheList> | undefined;
+
+    function getViewerCacheList() {
+        if (!serializerRegistered) {
+            registerSerializer(renderDataLoaderSerializer);
+            serializerRegistered = true;
+        }
+        return (cacheListPromise ??= fetchCacheList());
+    }
 </script>
 
 <script lang="ts">
@@ -37,6 +45,7 @@
     async function load(): Promise<void> {
         const controller = new AbortController();
         abortController = controller;
+        const cachesPromise = getViewerCacheList();
         const objSpawnsPromise = fetchObjSpawns();
 
         loadingLabel = "Resolving cache profile...";
