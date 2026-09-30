@@ -6,8 +6,6 @@ import {
     IndexedDbProjectStore,
     PROJECT_STORE_OBJECT_STORE,
 } from "./indexeddb-project-store";
-import { ProjectStoreError } from "./project-errors";
-
 let dbCounter = 0;
 
 function createStore(now = 1_700_000_000_000): IndexedDbProjectStore {
@@ -120,13 +118,13 @@ describe("IndexedDbProjectStore", () => {
     it("reports missing exports and invalid project saves with typed errors", async () => {
         const store = createStore();
 
-        await expect(store.exportProject("missing")).rejects.toEqual(
-            expect.objectContaining<ProjectStoreError>({ code: "NOT_FOUND" }),
-        );
+        await expect(store.exportProject("missing")).rejects.toMatchObject({
+            code: "NOT_FOUND",
+        });
 
         const project = await store.createProject({ id: "invalid-save", name: "Valid first", base });
         await expect(
             store.saveProject({ ...project, name: "" }),
-        ).rejects.toEqual(expect.objectContaining<ProjectStoreError>({ code: "INVALID_PROJECT" }));
+        ).rejects.toMatchObject({ code: "INVALID_PROJECT" });
     });
 });
