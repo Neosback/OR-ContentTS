@@ -6,6 +6,7 @@
     import type { Sprite } from "../../../rs/sprite/InterfaceCanvasSprite";
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
+    import { cn } from "../../lib/utils";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     const CS1_GENERAL_SPRITE_COMBAT = 881;
@@ -55,6 +56,9 @@
     const inventoryScriptsUsed = $derived(
         Cs1Interpreter.interfaceScriptsUseOpcodes(state.interfaceData, Cs1Interpreter.SIM_INVENTORY_OPCODES),
     );
+    const combatSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_COMBAT)));
+    const runSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_RUN)));
+    const weightSpriteSrc = $derived(spriteToPngDataUrl(state.viewer.spritesById.get(CS1_GENERAL_SPRITE_WEIGHT)));
 
     $effect(() => {
         if (!skillsUsed) skillsOpen = false;
@@ -110,7 +114,9 @@
     }
 
     function generalSprite(id: number): string {
-        return spriteToPngDataUrl(state.viewer.spritesById.get(id));
+        if (id === CS1_GENERAL_SPRITE_COMBAT) return combatSpriteSrc;
+        if (id === CS1_GENERAL_SPRITE_RUN) return runSpriteSrc;
+        return weightSpriteSrc;
     }
 </script>
 
@@ -189,11 +195,10 @@
         }}
     >
         <summary
-            class="flex list-none items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold [&::-webkit-details-marker]:hidden"
-            class:cursor-pointer={skillsUsed}
-            class:hover:bg-muted\/50={skillsUsed}
-            class:bg-muted\/25={!skillsUsed}
-            class:text-muted-foreground={!skillsUsed}
+            class={cn(
+                "flex list-none items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold [&::-webkit-details-marker]:hidden",
+                skillsUsed ? "cursor-pointer hover:bg-muted/50" : "bg-muted/25 text-muted-foreground",
+            )}
         >
             <span class="flex min-w-0 flex-1 items-center gap-2">
                 <span>Skills</span>
@@ -276,7 +281,7 @@
         </p>
     </div>
 
-    <div class="rounded-md border border-dashed border-border p-2 text-[11px] text-muted-foreground" class:bg-muted\/15={!variablesUsed}>
+    <div class={cn("rounded-md border border-dashed border-border p-2 text-[11px] text-muted-foreground", !variablesUsed && "bg-muted/15")}>
         <div class="flex flex-wrap items-center gap-2">
             <span class="font-medium text-foreground">Variables</span>
             {#if !variablesUsed}
