@@ -62,9 +62,15 @@ export class ProjectSessionController {
         this.projects = await this.lifecycle.listProjects();
     }
 
-    async createProject(name: string, profileId: string, profileName: string): Promise<Project> {
+    async createProject(
+        name: string,
+        profileId: string,
+        profileName: string,
+        discardChanges = false,
+    ): Promise<Project> {
         const host = this.requireHost();
         return this.run(async () => {
+            this.ensureCanReplaceCurrent(discardChanges);
             this.pauseHistorySync();
             this.resetEditorToBase();
             const project = await this.lifecycle.createProject({
@@ -84,6 +90,7 @@ export class ProjectSessionController {
 
     async openProject(id: string, discardChanges = false): Promise<Project> {
         return this.run(async () => {
+            this.ensureCanReplaceCurrent(discardChanges);
             this.pauseHistorySync();
             this.resetEditorToBase();
             const project = await this.lifecycle.openProject(id, { discardChanges });
@@ -94,6 +101,7 @@ export class ProjectSessionController {
 
     async importProject(serialized: string, discardChanges = false): Promise<Project> {
         return this.run(async () => {
+            this.ensureCanReplaceCurrent(discardChanges);
             this.pauseHistorySync();
             this.resetEditorToBase();
             const project = await this.lifecycle.importProject(serialized, { discardChanges });
@@ -160,6 +168,16 @@ export class ProjectSessionController {
             snapshot = host.getHistorySnapshot();
         }
         host.clearHistory();
+    }
+
+    private ensureCanReplaceCurrent(discardChanges: boolean): void {
+        const snapshot = this.lifecycle.getSnapshot();
+        if (snapshot.project && snapshot.dirty && !discardChanges) {
+            throw new ProjectLifecycleError(
+                "DIRTY_PROJECT",
+                "Current project has unsaved changes. Save it or explicitly discard changes before switching projects.",
+            );
+        }
     }
 
     private syncNow(): void {
