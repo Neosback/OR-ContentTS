@@ -1,13 +1,14 @@
-import { CacheFiles, ProgressListener } from "../rs/cache/CacheFiles";
-import { CacheInfo, getLatestCache } from "../rs/cache/CacheInfo";
-import { cacheRequiresMapXteas, parseXteaMapFromJsonText, type XteaMap } from "../rs/cache/map-xtea";
-import { CacheType, detectCacheType } from "../rs/cache/CacheType";
-
-const CACHE_PATH = "/caches/";
+import type { LoadedCache } from "../cache/cache-source";
+import {
+    fetchXteasOptional,
+    staticRangeCacheSource,
+} from "../cache/static-range-cache-source";
+import type { ProgressListener } from "../rs/cache/CacheFiles";
+import { type CacheInfo, getLatestCache } from "../rs/cache/CacheInfo";
+import { parseXteaMapFromJsonText, type XteaMap } from "../rs/cache/map-xtea";
 
 export async function fetchCacheInfos(): Promise<CacheInfo[]> {
-    const resp = await fetch(CACHE_PATH + "caches.json");
-    return resp.json();
+    return staticRangeCacheSource.listCaches();
 }
 
 export type CacheList = {
@@ -27,14 +28,9 @@ export async function fetchCacheList(): Promise<CacheList | undefined> {
     };
 }
 
+export type { LoadedCache } from "../cache/cache-source";
 export type { XteaMap } from "../rs/cache/map-xtea";
-
-export type LoadedCache = {
-    info: CacheInfo;
-    type: CacheType;
-    files: CacheFiles;
-    xteas: XteaMap;
-};
+export { fetchXteasOptional } from "../cache/static-range-cache-source";
 
 export async function loadCacheFiles(
     info: CacheInfo,
@@ -43,51 +39,11 @@ export async function loadCacheFiles(
     /** false skips the browser's Cache Storage copy (a local dev server is already fast). */
     browserCache: boolean = true,
 ): Promise<LoadedCache> {
-    const cachePath = CACHE_PATH + info.name + "/";
-
-    const cacheType = detectCacheType(info);
-    const files = await CacheFiles.fetchFiles(
-        cacheType,
-        cachePath,
-        info.name,
-        true,
+    return staticRangeCacheSource.loadCache(info, {
         signal,
         progressListener,
         browserCache,
-    );
-
-    const xteas = cacheRequiresMapXteas(info)
-        ? await fetchMapXteas(cachePath, signal)
-        : new Map<number, number[]>();
-
-    return {
-        info,
-        type: cacheType,
-        files,
-        xteas,
-    };
-}
-
-async function fetchMapXteas(cachePath: string, signal?: AbortSignal): Promise<XteaMap> {
-    const keysUrl = cachePath + "keys.json";
-    const fromKeys = await fetchXteasOptional(keysUrl, signal);
-    if (fromKeys.size > 0) {
-        return fromKeys;
-    }
-    return fetchXteasOptional(cachePath + "xteas.json", signal);
-}
-
-export async function fetchXteasOptional(url: RequestInfo, signal?: AbortSignal): Promise<XteaMap> {
-    try {
-        const resp = await fetch(url, { signal });
-        if (!resp.ok) {
-            return new Map();
-        }
-        const text = await resp.text();
-        return parseXteaMapFromJsonText(text);
-    } catch {
-        return new Map();
-    }
+    });
 }
 
 /** @deprecated Prefer {@link fetchXteasOptional} or revision-aware loading via {@link loadCacheFiles}. */
