@@ -12,7 +12,7 @@
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
     import PreviewPanel from "./panels/PreviewPanel.svelte";
 
-    let { state }: { state: InterfaceEditorState } = $props();
+    let { state: editor }: { state: InterfaceEditorState } = $props();
     let host = $state<HTMLDivElement>();
     let dock: StudioDock | undefined;
 
@@ -20,9 +20,9 @@
         if (!host) return;
 
         const panels = [
-            sveltePanel({ id: "ifaceInterfaces", title: "Interfaces", component: InterfacesPanel, props: { state }, isolateInput: true }),
-            sveltePanel({ id: "ifacePreview", title: "Client preview", component: PreviewPanel, props: { state }, keepAlive: true }),
-            sveltePanel({ id: "ifaceComponentTree", title: "Component view", component: ComponentTreePanel, props: { state }, isolateInput: true }),
+            sveltePanel({ id: "ifaceInterfaces", title: "Interfaces", component: InterfacesPanel, props: { state: editor }, isolateInput: true }),
+            sveltePanel({ id: "ifacePreview", title: "Client preview", component: PreviewPanel, props: { state: editor }, keepAlive: true }),
+            sveltePanel({ id: "ifaceComponentTree", title: "Component view", component: ComponentTreePanel, props: { state: editor }, isolateInput: true }),
             sveltePanel({
                 id: "ifaceClientScript",
                 title: "Client script",
@@ -50,11 +50,11 @@
 
     onDestroy(() => {
         dock?.dispose();
-        state.dispose();
+        editor.dispose();
     });
 </script>
 
 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
     <div bind:this={host} class="interface-editor-workbench-dockview h-full w-full min-h-0 min-w-0"></div>
-    <InterfaceDialogs {state} />
+    <InterfaceDialogs state={editor} />
 </div>
