@@ -7,7 +7,7 @@
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
     import { cn } from "../../lib/utils";
-    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
     import InventorySimulator from "./InventorySimulator.svelte";
 
     const CS1_GENERAL_SPRITE_COMBAT = 881;
