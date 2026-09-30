@@ -10,7 +10,7 @@
     import { Label } from "../../components/ui/label";
     import { clickOutside } from "../../lib/actions";
     import { cn } from "../../lib/utils";
-    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     type ItemRowDraft = { itemIdText: string; qtyText: string };
     type GamevalEntry = { id: number; name: string; lowerName: string };
