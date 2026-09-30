@@ -9,7 +9,7 @@ const DB_NAME = "openrune-cache-files-v1";
 const DB_VERSION = 1;
 const STORE = "profile-cache-files";
 
-type StoredProfileCache = {
+export type StoredProfileCache = {
   files: Record<string, ArrayBuffer>;
   savedAt: string;
 };
@@ -24,7 +24,7 @@ export function serverProfileId(cacheName: string): string {
   return SERVER_PROFILE_PREFIX + cacheName;
 }
 
-function serverCacheName(profileId: string): string | undefined {
+export function serverCacheName(profileId: string): string | undefined {
   return profileId.startsWith(SERVER_PROFILE_PREFIX) ? profileId.slice(SERVER_PROFILE_PREFIX.length) : undefined;
 }
 
@@ -181,6 +181,17 @@ function buildInfo(profile: LocalCacheProfile, files: Map<string, ArrayBuffer>):
     timestamp: new Date().toISOString(),
     size,
   };
+}
+
+export async function readImportedProfileCache(
+  profileId: string,
+): Promise<StoredProfileCache | undefined> {
+  const db = await openDb();
+  try {
+    return await getStoredProfileCache(db, profileId);
+  } finally {
+    db.close();
+  }
 }
 
 export async function hasProfileCache(profileId: string): Promise<boolean> {
