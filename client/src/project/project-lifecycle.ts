@@ -96,22 +96,34 @@ export class ProjectLifecycle {
         return this.store.listProjects();
     }
 
-    async createProject(input: CreateProjectInput): Promise<Project> {
+    async createProject(
+        input: CreateProjectInput,
+        options: CloseProjectOptions = {},
+    ): Promise<Project> {
+        this.ensureCanReplaceCurrent(options);
         const project = await this.store.createProject(input);
         this.activate(project);
         return cloneProject(project);
     }
 
-    async openProject(id: string): Promise<Project> {
+    async openProject(
+        id: string,
+        options: CloseProjectOptions = {},
+    ): Promise<Project> {
         const project = await this.store.loadProject(id);
         if (!project) {
             throw new ProjectLifecycleError("NOT_FOUND", `Project "${id}" was not found.`);
         }
+        this.ensureCanReplaceCurrent(options);
         this.activate(project);
         return cloneProject(project);
     }
 
-    async importProject(serialized: string): Promise<Project> {
+    async importProject(
+        serialized: string,
+        options: CloseProjectOptions = {},
+    ): Promise<Project> {
+        this.ensureCanReplaceCurrent(options);
         const project = await this.store.importProject(serialized);
         this.activate(project);
         return cloneProject(project);
@@ -123,7 +135,7 @@ export class ProjectLifecycle {
         const exportProject: Project = {
             ...cloneProject(project),
             updatedAt: this.dirty
-                ? Math.max(project.createdAt, this.now())
+                ? Math.max(project.createdAt, project.updatedAt, this.now())
                 : project.updatedAt,
             edits: cloneEdits(edits),
         };
@@ -167,7 +179,7 @@ export class ProjectLifecycle {
         const edits = this.requireWorkingEdits();
         const saved: Project = {
             ...cloneProject(project),
-            updatedAt: Math.max(project.createdAt, this.now()),
+            updatedAt: Math.max(project.createdAt, project.updatedAt, this.now()),
             edits: cloneEdits(edits),
         };
         await this.store.saveProject(saved);
@@ -220,6 +232,15 @@ export class ProjectLifecycle {
             this.closeProject(options);
         }
         await this.store.deleteProject(id);
+    }
+
+    private ensureCanReplaceCurrent(options: CloseProjectOptions): void {
+        if (this.project && this.dirty && !options.discardChanges) {
+            throw new ProjectLifecycleError(
+                "DIRTY_PROJECT",
+                "Current project has unsaved changes. Save it or explicitly discard changes before switching projects.",
+            );
+        }
     }
 
     private activate(project: Project): void {
