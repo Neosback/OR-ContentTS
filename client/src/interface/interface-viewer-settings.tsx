@@ -3,18 +3,18 @@ import * as React from "react";
 import { Maximize2, Monitor, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { RsInterfaceMode } from "@/components/ui/rs-interface";
+import type { RsInterfaceMode, StateSetter } from "./interface-editor-workbench-model";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 export type InterfaceViewerSettingsProps = {
   mode: RsInterfaceMode;
-  setMode: React.Dispatch<React.SetStateAction<RsInterfaceMode>>;
+  setMode: StateSetter<RsInterfaceMode>;
   showOverlays: boolean;
-  setShowOverlays: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowOverlays: StateSetter<boolean>;
   showViewportBorder: boolean;
-  setShowViewportBorder: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowViewportBorder: StateSetter<boolean>;
   showPixelGrid: boolean;
-  setShowPixelGrid: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowPixelGrid: StateSetter<boolean>;
   onViewportColorChange: (color: string) => void;
 };
 
