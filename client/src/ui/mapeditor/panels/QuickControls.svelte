@@ -3,6 +3,7 @@
     import Boxes from "@lucide/svelte/icons/boxes";
 
     import { keybindChordToLabel } from "../../../mapeditor/editor-tool-input";
+    import { executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
     import { workbenchBindingKey, workbenchDefaultChords } from "../../../mapeditor/plugins/builtins/workbench-keybinds.builtin";
     import { Button } from "../../components/ui/button";
     import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
@@ -23,7 +24,7 @@
 <Tooltip>
     <TooltipTrigger>
         {#snippet child({ props })}
-            <Button {...props} variant={smoothing ? "secondary" : "ghost"} size="sm" class="h-7 gap-1.5 px-2 text-xs" onclick={() => host.toggleTerrainSmoothingEnabled()} aria-pressed={smoothing}>
+            <Button {...props} variant={smoothing ? "secondary" : "ghost"} size="sm" class="h-7 gap-1.5 px-2 text-xs" onclick={() => executeEditorCommand("workbench.toggle-terrain-smoothing", { host })} aria-pressed={smoothing}>
                 <Blend class="size-3.5" />
                 <span>{smoothing ? "Terrain Smoothing on" : "Terrain Smoothing off"}</span>
             </Button>
@@ -37,7 +38,7 @@
 <Tooltip>
     <TooltipTrigger>
         {#snippet child({ props })}
-            <Button {...props} variant={objects ? "secondary" : "ghost"} size="sm" class="h-7 gap-1.5 px-2 text-xs" onclick={() => host.toggleObjectsVisible()} aria-pressed={objects}>
+            <Button {...props} variant={objects ? "secondary" : "ghost"} size="sm" class="h-7 gap-1.5 px-2 text-xs" onclick={() => executeEditorCommand("workbench.toggle-objects-visible", { host })} aria-pressed={objects}>
                 <Boxes class="size-3.5" />
                 <span>{objects ? "Objects on" : "Objects off"}</span>
             </Button>

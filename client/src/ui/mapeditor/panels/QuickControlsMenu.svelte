@@ -1,6 +1,8 @@
 <script lang="ts">
     import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
 
+    import { executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
+
     import { Button } from "../../components/ui/button";
     import {
         DropdownMenu,
@@ -27,10 +29,10 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" side="bottom" collisionPadding={8} class="w-52">
         <div class="px-2 py-1.5 text-sm font-semibold">Quick controls</div>
-        <DropdownMenuCheckboxItem checked={smoothing} onCheckedChange={() => host.toggleTerrainSmoothingEnabled()}>
+        <DropdownMenuCheckboxItem checked={smoothing} onCheckedChange={() => executeEditorCommand("workbench.toggle-terrain-smoothing", { host })}>
             Terrain smoothing: {smoothing ? "On" : "Off"}
         </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem checked={objects} onCheckedChange={() => host.toggleObjectsVisible()}>
+        <DropdownMenuCheckboxItem checked={objects} onCheckedChange={() => executeEditorCommand("workbench.toggle-objects-visible", { host })}>
             Objects: {objects ? "On" : "Off"}
         </DropdownMenuCheckboxItem>
         <DropdownMenuItem onSelect={() => host.setViewMode("editor")}>Switch to Editor view</DropdownMenuItem>
