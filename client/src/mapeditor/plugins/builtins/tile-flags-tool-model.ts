@@ -5,7 +5,13 @@ import {
     TILE_RENDER_FLAG_DESCRIPTORS,
 } from "../../../rs/map/TileRenderFlags";
 import type { IEditorPluginHost } from "../editor-plugin-host";
-import type { MapEditorFloatingPanelRect } from "../../MapEditorFloatingPanel";
+
+export type MapEditorFloatingPanelRect = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+};
 
 const TILE_FLAGS_FLOATING_PANEL_STORAGE_KEY = "map-editor-tile-flags-floating-panel-v1";
 
