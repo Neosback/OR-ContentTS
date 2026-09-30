@@ -1,10 +1,7 @@
 import { Pool, spawn } from "threads";
-import type { ModuleThread } from "threads";
-import type { QueuedTask } from "threads/dist/master/pool";
-import type { WorkerDescriptor } from "threads/dist/master/pool-types";
-import type { ObservablePromise } from "threads/dist/observable-promise";
+import type { ModuleThread, QueuedTask } from "threads";
 
-import type { LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
+import type { LiveMinimapWorkerRequest, LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
 import { transferLiveMinimapWorkerRequest } from "../../mapeditor/liveMinimapWorkerPayload";
 import { EditorMapData } from "../../mapeditor/webgl/loader/EditorMapData";
 import { EditorMapTerrainData } from "../../mapeditor/webgl/loader/EditorMapTerrainData";
@@ -20,6 +17,10 @@ import { RenderDataWorker } from "./RenderDataWorker";
 
 type RenderDataWorkerThread = ModuleThread<RenderDataWorker>;
 
+type WorkerDescriptor<ThreadType> = {
+    init: Promise<ThreadType>;
+};
+
 function spawnWorker(): Promise<RenderDataWorkerThread> {
     const worker = new Worker(new URL("./RenderDataWorker.ts", import.meta.url), { type: "module" });
     return spawn<RenderDataWorker>(worker);
@@ -28,7 +29,7 @@ function spawnWorker(): Promise<RenderDataWorkerThread> {
 export class RenderDataWorkerPool {
     static create(size: number): RenderDataWorkerPool {
         const pool = Pool(() => spawnWorker(), size);
-        const workers = pool["workers"] as WorkerDescriptor<RenderDataWorkerThread>[];
+        const workers = (pool as unknown as { workers: WorkerDescriptor<RenderDataWorkerThread>[] }).workers;
         return new RenderDataWorkerPool(pool, workers, size);
     }
 
@@ -60,7 +61,7 @@ export class RenderDataWorkerPool {
         loader: Loader,
         input: I,
     ): QueuedTask<RenderDataWorkerThread, D> {
-        return this.pool.queue((w) => w.load(loader, input) as ObservablePromise<D>);
+        return this.pool.queue((w) => w.load(loader, input));
     }
 
     queueLoadEditorMapData(
@@ -68,9 +69,7 @@ export class RenderDataWorkerPool {
         mapY: number,
         smoothUnderlays: boolean,
     ): QueuedTask<RenderDataWorkerThread, EditorMapData | undefined> {
-        return this.pool.queue(
-            (w) => w.loadEditorMapData(mapX, mapY, smoothUnderlays) as ObservablePromise<EditorMapData | undefined>,
-        );
+        return this.pool.queue((w) => w.loadEditorMapData(mapX, mapY, smoothUnderlays));
     }
 
     queueLoadEditorMapTerrainData(
@@ -79,11 +78,8 @@ export class RenderDataWorkerPool {
         heightMapTextureData: Float32Array,
         smoothUnderlays: boolean,
     ): QueuedTask<RenderDataWorkerThread, EditorMapTerrainData | undefined> {
-        return this.pool.queue(
-            (w) =>
-                w.loadEditorMapTerrainData(mapX, mapY, heightMapTextureData, smoothUnderlays) as ObservablePromise<
-                    EditorMapTerrainData | undefined
-                >,
+        return this.pool.queue((w) =>
+            w.loadEditorMapTerrainData(mapX, mapY, heightMapTextureData, smoothUnderlays),
         );
     }
 
@@ -96,17 +92,16 @@ export class RenderDataWorkerPool {
         chunkIds: number[],
         smoothUnderlays: boolean,
     ): QueuedTask<RenderDataWorkerThread, EditorMapObjectChunkData[] | undefined> {
-        return this.pool.queue(
-            (w) =>
-                w.loadEditorMapObjectData(
-                    mapX,
-                    mapY,
-                    borderSize,
-                    scene,
-                    sceneLocData,
-                    chunkIds,
-                    smoothUnderlays,
-                ) as ObservablePromise<EditorMapObjectChunkData[] | undefined>,
+        return this.pool.queue((w) =>
+            w.loadEditorMapObjectData(
+                mapX,
+                mapY,
+                borderSize,
+                scene,
+                sceneLocData,
+                chunkIds,
+                smoothUnderlays,
+            ),
         );
     }
 
@@ -116,9 +111,7 @@ export class RenderDataWorkerPool {
         flipH: boolean,
         brightness: number,
     ): QueuedTask<RenderDataWorkerThread, Int32Array> {
-        return this.pool.queue(
-            (w) => w.loadTexture(id, size, flipH, brightness) as ObservablePromise<Int32Array>,
-        );
+        return this.pool.queue((w) => w.loadTexture(id, size, flipH, brightness));
     }
 
     queueMapImage(
@@ -134,7 +127,7 @@ export class RenderDataWorkerPool {
     queueEditorLiveMinimap(
         payload: ReturnType<typeof transferLiveMinimapWorkerRequest>,
     ): QueuedTask<RenderDataWorkerThread, LiveMinimapWorkerResult> {
-        return this.pool.queue((w) => w.renderLiveEditorMinimap(payload));
+        return this.pool.queue((w) => w.renderLiveEditorMinimap(payload as unknown as LiveMinimapWorkerRequest));
     }
 
     setVars(vars: Int32Array): Promise<void> {
