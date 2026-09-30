@@ -56,3 +56,24 @@ Svelte components must not access this IndexedDB database directly. The next lay
 ### Validation baseline
 
 The ProjectStore slice is covered by the normal client gate. The current green baseline includes 11 Vitest files / 42 tests, including real IndexedDB API behavior through `fake-indexeddb`. Run `npm run validate` from `client/` before merging project-contract changes.
+
+
+## ProjectLifecycle
+
+`project-lifecycle.ts` is the application-level project service above `ProjectStore`.
+
+It owns:
+
+- current open project state
+- working Edit Format v1 data
+- dirty-state tracking
+- create/open/save/Save As/close
+- import/export orchestration
+- project renaming
+- safe dirty-project transition guards
+
+The lifecycle deliberately persists only the **applied** portion of map-editor history. If the history contains A, B, C and C is currently undone, `syncFromHistory()` serializes A + B. Redo entries remain editor history and are not authoritative project content.
+
+Export includes current unsaved working edits without implicitly saving them to `ProjectStore`. Closing, creating, importing, or switching away from a dirty project requires an explicit discard decision.
+
+The lifecycle remains framework-neutral. Svelte should consume it through a thin reactive adapter rather than implementing project rules in components.
