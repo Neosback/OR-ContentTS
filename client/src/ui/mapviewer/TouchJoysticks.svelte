@@ -4,7 +4,7 @@
 
     import type { MapViewerUiState } from "./map-viewer-state.svelte";
 
-    let { state }: { state: MapViewerUiState } = $props();
+    let { state: viewerState }: { state: MapViewerUiState } = $props();
     let movementZone = $state<HTMLDivElement>();
     let cameraZone = $state<HTMLDivElement>();
     const managers: Array<ReturnType<typeof nipplejs.create>> = [];
@@ -40,15 +40,15 @@
         if (movementZone) {
             bind(
                 movementZone,
-                state.mapViewer.inputManager.onPositionJoystickMove,
-                state.mapViewer.inputManager.onPositionJoystickStop,
+                viewerState.mapViewer.inputManager.onPositionJoystickMove,
+                viewerState.mapViewer.inputManager.onPositionJoystickStop,
             );
         }
         if (cameraZone) {
             bind(
                 cameraZone,
-                state.mapViewer.inputManager.onCameraJoystickMove,
-                state.mapViewer.inputManager.onCameraJoystickStop,
+                viewerState.mapViewer.inputManager.onCameraJoystickMove,
+                viewerState.mapViewer.inputManager.onCameraJoystickStop,
             );
         }
     });
