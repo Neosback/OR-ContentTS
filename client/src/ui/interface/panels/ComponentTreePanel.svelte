@@ -4,6 +4,7 @@
 
     import { componentTypeName } from "../../../interface/interface-editor-tree-utils";
     import { Button } from "../../components/ui/button";
+    import { cn } from "../../lib/utils";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     let { state }: { state: InterfaceEditorState } = $props();
@@ -57,8 +58,10 @@
                     type="button"
                     onclick={() => (state.selectedComponentNodeKey = row.nodeKey)}
                     oncontextmenu={(event) => state.handleComponentRightClick(event, row.nodeKey)}
-                    class="flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-xs hover:bg-muted/50"
-                    class:bg-cyan-500\/10={state.selectedComponentNodeKey === row.nodeKey}
+                    class={cn(
+                        "flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-xs hover:bg-muted/50",
+                        state.selectedComponentNodeKey === row.nodeKey && "bg-cyan-500/10",
+                    )}
                     style:padding-left="{12 + row.depth * 14}px"
                 >
                     <span class="shrink-0 font-mono text-muted-foreground">{row.id}</span>
