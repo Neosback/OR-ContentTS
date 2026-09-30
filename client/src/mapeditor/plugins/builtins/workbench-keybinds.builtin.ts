@@ -1,6 +1,5 @@
 import {
-    executeEditorCommand,
-    getEditorCommand,
+    editorCommandKeyBinding,
     type EditorCommandId,
 } from "../../commands/editor-command-registry";
 import type { EditorToolKeyBinding, EditorToolKeyChord, EditorToolKeybindTrigger } from "./builtin-plugin-types";
@@ -16,65 +15,23 @@ type WorkbenchCommandBinding = {
 };
 
 const WORKBENCH_COMMAND_BINDINGS: readonly WorkbenchCommandBinding[] = [
-    {
-        bindingId: "brush-size-up",
-        commandId: "workbench.brush-size-up",
-        defaultChords: [{ code: "BracketRight" }],
-        trigger: "PRESSED",
-    },
-    {
-        bindingId: "brush-size-down",
-        commandId: "workbench.brush-size-down",
-        defaultChords: [{ code: "BracketLeft" }],
-        trigger: "PRESSED",
-    },
-    {
-        bindingId: "toggle-objects-visible",
-        commandId: "workbench.toggle-objects-visible",
-        defaultChords: [{ code: "KeyO" }],
-        trigger: "PRESSED",
-    },
-    {
-        bindingId: "toggle-terrain-smoothing",
-        commandId: "workbench.toggle-terrain-smoothing",
-        defaultChords: [{ code: "KeyM" }],
-        trigger: "PRESSED",
-    },
-    {
-        bindingId: "toggle-paint-tools-panel",
-        commandId: "workbench.toggle-paint-tools-panel",
-        defaultChords: [{ code: "KeyT" }],
-        trigger: "PRESSED",
-    },
-    {
-        bindingId: "undo",
-        commandId: "workbench.undo",
-        defaultChords: [{ code: "KeyZ", ctrlKey: true }],
-        trigger: "PRESSED",
-    },
+    { bindingId: "brush-size-up", commandId: "workbench.brush-size-up", defaultChords: [{ code: "BracketRight" }], trigger: "PRESSED" },
+    { bindingId: "brush-size-down", commandId: "workbench.brush-size-down", defaultChords: [{ code: "BracketLeft" }], trigger: "PRESSED" },
+    { bindingId: "toggle-objects-visible", commandId: "workbench.toggle-objects-visible", defaultChords: [{ code: "KeyO" }], trigger: "PRESSED" },
+    { bindingId: "toggle-terrain-smoothing", commandId: "workbench.toggle-terrain-smoothing", defaultChords: [{ code: "KeyM" }], trigger: "PRESSED" },
+    { bindingId: "toggle-paint-tools-panel", commandId: "workbench.toggle-paint-tools-panel", defaultChords: [{ code: "KeyT" }], trigger: "PRESSED" },
+    { bindingId: "undo", commandId: "workbench.undo", defaultChords: [{ code: "KeyZ", ctrlKey: true }], trigger: "PRESSED" },
     {
         bindingId: "redo",
         commandId: "workbench.redo",
-        defaultChords: [
-            { code: "KeyY", ctrlKey: true },
-            { code: "KeyZ", ctrlKey: true, shiftKey: true },
-        ],
+        defaultChords: [{ code: "KeyY", ctrlKey: true }, { code: "KeyZ", ctrlKey: true, shiftKey: true }],
         trigger: "PRESSED",
     },
 ];
 
 export const WORKBENCH_KEY_BINDINGS: readonly EditorToolKeyBinding[] = WORKBENCH_COMMAND_BINDINGS.map(
-    ({ bindingId, commandId, defaultChords, trigger }) => {
-        const command = getEditorCommand(commandId);
-        return {
-            id: bindingId,
-            name: command.name,
-            description: command.description,
-            defaultChords,
-            trigger,
-            action: (context) => executeEditorCommand(commandId, context),
-        };
-    },
+    ({ bindingId, commandId, defaultChords, trigger }) =>
+        editorCommandKeyBinding(commandId, { id: bindingId, defaultChords, trigger }),
 );
 
 const workbenchChordByBindingId = new Map<string, readonly EditorToolKeyChord[]>();

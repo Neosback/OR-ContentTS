@@ -7,6 +7,7 @@
     import Upload from "@lucide/svelte/icons/upload";
 
     import { groupProviders } from "../../mapeditor/plugins/builtins/import-export-providers";
+    import { executeEditorCommand } from "../../mapeditor/commands/editor-command-registry";
     import { Badge } from "../components/ui/badge";
     import { Button } from "../components/ui/button";
     import {
@@ -21,7 +22,7 @@
     } from "../components/ui/dropdown-menu";
     import { Separator } from "../components/ui/separator";
     import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "../components/ui/tooltip";
-    import { notifyError, notifyMessage, notifySuccess } from "../lib/notify";
+    import { notifyMessage, notifySuccess } from "../lib/notify";
     import { useEditorState } from "./editor-state.svelte";
     import PluginHub from "./PluginHub.svelte";
     import SettingsDialog from "./settings/SettingsDialog.svelte";
@@ -39,20 +40,20 @@
         return editor.layout?.reopenablePanels() ?? [];
     });
 
+    const commandContext = () => ({
+        host,
+        layout: editor.layout,
+        notify: { success: notifySuccess, message: notifyMessage },
+    });
+
     function reopen(id: string, title: string): void {
-        if (!editor.layout) return notifyError("Workbench is still loading.");
-        editor.layout.openPanel(id);
-        notifySuccess(`${title} opened`);
+        executeEditorCommand("workbench.open-panel", commandContext(), { panelId: id, panelTitle: title });
     }
     function restoreAll(): void {
-        if (!editor.layout) return notifyError("Workbench is still loading.");
-        editor.layout.restoreAllPanels();
-        notifySuccess("Closed panels restored where possible.");
+        executeEditorCommand("workbench.restore-panels", commandContext());
     }
     function resetLayout(): void {
-        if (!editor.layout) return notifyError("Workbench is still loading.");
-        editor.layout.resetLayout();
-        notifyMessage("Workspace reset to default layout.");
+        executeEditorCommand("workbench.reset-layout", commandContext());
     }
 </script>
 

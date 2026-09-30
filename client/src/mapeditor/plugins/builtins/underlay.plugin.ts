@@ -1,6 +1,7 @@
 import type { EditorToolPlugin } from "./builtin-plugin-types";
 import { getUnderlayGradientModel } from "./underlay-gradient-model";
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 
 export const underlayEditorTool: EditorToolPlugin = {
     id: "underlay",
@@ -19,15 +20,10 @@ export const underlayEditorTool: EditorToolPlugin = {
         },
     },
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-underlay", {
             id: "select-tool",
-            name: "Select Underlay tool",
-            description: "Switch active paint tool to Underlay.",
             defaultChords: [{ code: "Digit1" }],
-            action: ({ host }) => {
-                host.setEditorTool("underlay");
-            },
-        },
+        }),
         {
             id: "toggle-gradient-phase",
             name: "Hold gradient phase modifier",

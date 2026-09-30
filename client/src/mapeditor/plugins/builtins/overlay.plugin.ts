@@ -1,4 +1,5 @@
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import type { EditorToolDataFns, EditorToolPlugin } from "./builtin-plugin-types";
 import { getOverlayGradientModel } from "./overlay-gradient-model";
 
@@ -25,15 +26,10 @@ export const overlayEditorTool: EditorToolPlugin = {
     actions: [{ kind: "select-tool", tool: "overlay" }],
     data: overlayToolData,
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-overlay", {
             id: "select-tool",
-            name: "Select Overlay tool",
-            description: "Switch active paint tool to Overlay.",
             defaultChords: [{ code: "Digit2" }],
-            action: ({ host }) => {
-                host.setEditorTool("overlay");
-            },
-        },
+        }),
         {
             id: "toggle-flood-mode",
             name: "Toggle fill mode",

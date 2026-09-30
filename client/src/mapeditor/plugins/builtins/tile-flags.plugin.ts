@@ -1,3 +1,4 @@
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import type { EditorToolPlugin } from "./builtin-plugin-types";
 
 export const tileFlagsEditorTool: EditorToolPlugin = {
@@ -8,14 +9,9 @@ export const tileFlagsEditorTool: EditorToolPlugin = {
     workspaces: [{ panelId: "editor-tile-flags", activateTab: true }],
     actions: [{ kind: "select-tool", tool: "tile-flags" }],
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-tile-flags", {
             id: "select-tool",
-            name: "Select Tile flags tool",
-            description: "Switch active paint tool to Tile flags.",
             defaultChords: [{ code: "Digit5" }],
-            action: ({ host }) => {
-                host.setEditorTool("tile-flags");
-            },
-        },
+        }),
     ],
 };

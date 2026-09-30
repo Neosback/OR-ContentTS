@@ -1,3 +1,4 @@
+import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import type { EditorToolPlugin } from "./builtin-plugin-types";
 
 export const objectDeleteEditorTool: EditorToolPlugin = {
@@ -9,15 +10,10 @@ export const objectDeleteEditorTool: EditorToolPlugin = {
     actions: [{ kind: "select-tool", tool: "object-delete" }],
     usesBrushControls: false,
     keyBindings: [
-        {
+        editorCommandKeyBinding("tool.select-object-delete", {
             id: "select-tool",
-            name: "Select Object Delete tool",
-            description: "Switch active tool to Object Delete.",
             defaultChords: [{ code: "Digit5" }],
-            action: ({ host }) => {
-                host.setEditorTool("object-delete");
-            },
-        },
+        }),
         {
             id: "delete-object-mode",
             name: "Delete hovered object",
