@@ -148,7 +148,12 @@ describe("ProjectLifecycle", () => {
         expect(lifecycle.getSnapshot().dirty).toBe(false);
     });
 
-    it("requires explicit discard before closing a dirty project", async () => {
+    it("requires explicit discard before replacing or closing a dirty project", async () => {
+        const other = createLifecycle();
+        await other.lifecycle.createProject({ id: "other", name: "Other", base });
+        const otherSerialized = other.lifecycle.exportCurrentProject();
+
+
         const { lifecycle } = createLifecycle();
         await lifecycle.createProject({ name: "Dirty", base });
         lifecycle.syncFromHistory(history([transaction("a", 2)]));
@@ -157,6 +162,12 @@ describe("ProjectLifecycle", () => {
         expect(() => lifecycle.closeProject()).toThrow(
             "Project has unsaved changes",
         );
+        await expect(
+            lifecycle.createProject({ id: "replacement", name: "Replacement", base }),
+        ).rejects.toMatchObject({ code: "DIRTY_PROJECT" });
+        await expect(lifecycle.importProject(otherSerialized)).rejects.toMatchObject({
+            code: "DIRTY_PROJECT",
+        });
 
         lifecycle.closeProject({ discardChanges: true });
         expect(lifecycle.getSnapshot().project).toBeUndefined();
