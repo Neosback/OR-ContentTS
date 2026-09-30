@@ -36,8 +36,8 @@ npm run dev
 npm run validate
 ```
 
-This runs the blocking UI architecture boundary check, Vitest suite and production Vite build.
+This runs the complete blocking client gate: Svelte UI architecture boundary, Svelte check, TypeScript, Vitest and the production Vite build.
 
-Full-tree Svelte and TypeScript diagnostics are available separately with `npm run validate:types`. They currently report retained migration/type debt and remain advisory in CI until that debt is cleared.
+Retained legacy TSX is excluded from the active typecheck root unless active code imports it.
 
 See the repository [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROADMAP.md](../ROADMAP.md) for the current architecture and planned work.
