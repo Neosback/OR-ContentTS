@@ -1,18 +1,16 @@
-import type { MapEditorTool } from "./map-editor-kinds";
+import type {
+    EditorMutation,
+    EditorObjectMutation,
+    EditorTileFieldSnapshot,
+    EditorTileMutation,
+    EditorTransaction,
+    EditorTransactionSource,
+} from "./editor-transaction";
 import { overlayWorldKey } from "./overlay-flood-fill";
 import type { SceneTileLocData } from "./webgl/sceneLocData";
 
 /** Sparse per-tile terrain fields (only changed keys are stored). */
-export type TileFieldSnapshot = {
-    h?: number;
-    /** Heights from edit level through top level (when height changed). */
-    hl?: number[];
-    u?: number;
-    o?: number;
-    s?: number;
-    r?: number;
-    f?: number;
-};
+export type TileFieldSnapshot = EditorTileFieldSnapshot;
 
 export type MapSquareTileDelta = {
     mapId: number;
@@ -27,17 +25,19 @@ export type MapSquareObjectDelta = {
     after: SceneTileLocData[];
 };
 
-export type MapEditorHistoryTool = MapEditorTool | "sandbox" | "bulk";
+export type MapEditorHistoryTool = EditorTransactionSource;
 
-export type MapEditorHistoryEntry = {
-    id: string;
-    label: string;
+/**
+ * History entries are editor transactions with compatibility projections for the
+ * existing map-history UI/replay code. New persistence code should prefer `mutations`.
+ */
+export type MapEditorHistoryEntry = EditorTransaction & {
+    /** @deprecated Use `source`. */
     tool: MapEditorHistoryTool;
-    timestamp: number;
+    /** @deprecated Use `mutations`. */
     deltas: MapSquareTileDelta[];
+    /** @deprecated Use `mutations`. */
     objectDeltas: MapSquareObjectDelta[];
-    mapIds: number[];
-    tileCount: number;
 };
 
 export type MapEditorHistorySnapshot = {
@@ -206,9 +206,9 @@ export class MapEditHistory {
     private nextId = 1;
     private listeners = new Set<() => void>();
 
-    private strokeActive = false;
-    private strokeTool: MapEditorHistoryTool = "underlay";
-    private strokeLabel?: string;
+    private transactionActive = false;
+    private transactionSource: MapEditorHistoryTool = "underlay";
+    private transactionLabel?: string;
     private pendingTiles = new Map<
         PendingTileKey,
         { mapId: number; level: number; localTileId: number; before: TileFieldSnapshot; after: TileFieldSnapshot }
@@ -257,15 +257,20 @@ export class MapEditHistory {
         return this.cachedSnapshot;
     }
 
-    beginStroke(tool: MapEditorHistoryTool, label?: string): void {
+    beginTransaction(source: MapEditorHistoryTool, label?: string): void {
         if (this.applying) {
             return;
         }
-        this.strokeActive = true;
-        this.strokeTool = tool;
-        this.strokeLabel = label;
+        this.transactionActive = true;
+        this.transactionSource = source;
+        this.transactionLabel = label;
         this.pendingTiles.clear();
         this.pendingObjectChanges = [];
+    }
+
+    /** Compatibility wrapper for paint-stroke call sites during transaction migration. */
+    beginStroke(tool: MapEditorHistoryTool, label?: string): void {
+        this.beginTransaction(tool, label);
     }
 
     recordTileChange(
@@ -278,8 +283,8 @@ export class MapEditHistory {
         if (this.applying) {
             return;
         }
-        if (!this.strokeActive) {
-            this.beginStroke(this.strokeTool);
+        if (!this.transactionActive) {
+            this.beginTransaction(this.transactionSource);
         }
         mergePendingTile(this.pendingTiles, mapId, level, localTileId, before, after);
     }
@@ -293,8 +298,8 @@ export class MapEditHistory {
         if (this.applying) {
             return;
         }
-        if (!this.strokeActive) {
-            this.beginStroke(this.strokeTool);
+        if (!this.transactionActive) {
+            this.beginTransaction(this.transactionSource);
         }
         if (JSON.stringify(before) === JSON.stringify(after)) {
             return;
@@ -307,28 +312,46 @@ export class MapEditHistory {
         });
     }
 
-    commitStroke(): void {
-        if (this.applying || !this.strokeActive) {
-            this.strokeActive = false;
+    commitTransaction(): MapEditorHistoryEntry | undefined {
+        if (this.applying || !this.transactionActive) {
+            this.transactionActive = false;
             this.pendingTiles.clear();
             this.pendingObjectChanges = [];
-            return;
+            return undefined;
         }
-        this.strokeActive = false;
+        this.transactionActive = false;
 
         const deltas = buildDeltasFromPending(this.pendingTiles);
         const objectDeltas = this.pendingObjectChanges;
         this.pendingTiles.clear();
         this.pendingObjectChanges = [];
         if (deltas.length === 0 && objectDeltas.length === 0) {
-            return;
+            return undefined;
         }
 
         const mapIds = [...new Set([...deltas.map((d) => d.mapId), ...objectDeltas.map((d) => d.mapId)])];
-        let tileCount = 0;
-        for (const delta of deltas) {
-            tileCount += delta.tiles.length;
-        }
+        const tileCount = deltas.reduce((count, delta) => count + delta.tiles.length, 0);
+        const mutations: EditorMutation[] = [
+            ...deltas.flatMap((delta): EditorTileMutation[] =>
+                delta.tiles.map(([localTileId, before, after]) => ({
+                    kind: "map.tile",
+                    mapId: delta.mapId,
+                    level: delta.level,
+                    localTileId,
+                    before,
+                    after,
+                })),
+            ),
+            ...objectDeltas.map(
+                (delta): EditorObjectMutation => ({
+                    kind: "map.objects",
+                    mapId: delta.mapId,
+                    level: delta.level,
+                    before: delta.before,
+                    after: delta.after,
+                }),
+            ),
+        ];
 
         if (this.currentIndex < this.entries.length - 1) {
             this.entries.length = this.currentIndex + 1;
@@ -336,9 +359,11 @@ export class MapEditHistory {
 
         const entry: MapEditorHistoryEntry = {
             id: String(this.nextId++),
-            label: toolHistoryLabel(this.strokeTool, this.strokeLabel),
-            tool: this.strokeTool,
+            label: toolHistoryLabel(this.transactionSource, this.transactionLabel),
+            source: this.transactionSource,
+            tool: this.transactionSource,
             timestamp: Date.now(),
+            mutations,
             deltas,
             objectDeltas,
             mapIds,
@@ -347,12 +372,23 @@ export class MapEditHistory {
         this.entries.push(entry);
         this.currentIndex = this.entries.length - 1;
         this.notify();
+        return entry;
     }
 
-    cancelStroke(): void {
-        this.strokeActive = false;
+    /** Compatibility wrapper for paint-stroke call sites during transaction migration. */
+    commitStroke(): void {
+        this.commitTransaction();
+    }
+
+    cancelTransaction(): void {
+        this.transactionActive = false;
         this.pendingTiles.clear();
         this.pendingObjectChanges = [];
+    }
+
+    /** Compatibility wrapper for paint-stroke call sites during transaction migration. */
+    cancelStroke(): void {
+        this.cancelTransaction();
     }
 
     getUndoEntry(): MapEditorHistoryEntry | undefined {
@@ -405,7 +441,7 @@ export class MapEditHistory {
         this.currentIndex = -1;
         this.pendingTiles.clear();
         this.pendingObjectChanges = [];
-        this.strokeActive = false;
+        this.transactionActive = false;
         this.notify();
     }
 }
