@@ -119,4 +119,5 @@ export interface ComponentType {
     y1?: number;
     field3770?: number;
     field3677?: number;
+    children?: ComponentType[] | null;
 }
