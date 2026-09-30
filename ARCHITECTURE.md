@@ -98,7 +98,7 @@ The frontend should continue to implement local/offline versions of these interf
 Project persistence is framework-neutral:
 
 ```text
-project lifecycle service
+ProjectLifecycle
     -> ProjectStore
        -> IndexedDbProjectStore (local/offline)
        -> OpenRuneProjectStore (future)
@@ -108,7 +108,9 @@ The portable project envelope is `openrune.project` v1. It contains stable proje
 
 The local cache profile id is only a binding hint. Portable identity must not depend on a browser-specific profile id because project exports need to remain meaningful on another installation.
 
-IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. The next application layer is the project lifecycle service that will own open/save/close/dirty-state behavior.
+IndexedDB is an implementation detail of `IndexedDbProjectStore`. Svelte UI must not access the project database directly. `ProjectLifecycle` now owns current-project state, create/open/save/Save As/close, dirty-state tracking, import/export, and conversion of the applied editor-history cursor into authoritative Edit Format v1 data.
+
+Undo/Redo history beyond the current applied cursor is never project content. UI integration should subscribe to `ProjectLifecycle` rather than reimplementing those rules in Svelte.
 
 ## Validation
 
