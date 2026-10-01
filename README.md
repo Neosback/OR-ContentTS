@@ -59,15 +59,17 @@ The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` w
 
 ## Studio backend and OpenRune compatibility
 
-The legacy TypeScript game server has been removed from this repository. Content Studio uses a **TypeScript-first, backend-minimal architecture**. Normal cache/map editing, GameVal/RSCM work, project persistence, and Tauri filesystem access should work without the Kotlin backend.
+The legacy TypeScript game server has been removed from this repository. Content Studio uses a **TypeScript-first, source-first, backend-minimal architecture**. Normal cache/map editing, GameVal/RSCM work, OpenRune TOML/source updates, project persistence, and Tauri filesystem access should work without the Kotlin backend.
 
 OpenRune Server itself is a compatibility/reference target, not the repository where Content Studio should add backend endpoints or Studio-specific server changes. The backend under [`backend/`](backend/) should inspect and operate against an ordinary compatible OpenRune project.
 
 **Content Studio requires zero Studio-specific OpenRune Server modifications.** Unsupported capabilities degrade rather than triggering an OpenRune Server fork, endpoint, hook, accessor, module, or framework patch.
 
-The moved backend is validated independently for compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging. It is retained for explicit JVM/OpenRune capabilities such as bounded Gradle builds/tests and FileStore verification, and should be started lazily when needed.
+The moved backend is validated independently for compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging. It is retained for explicit JVM/OpenRune capabilities such as bounded Gradle builds/tests, OpenRune-FileStore `PackMaps + PackWorldMap` publication, and FileStore verification, and should be started lazily when needed.
 
-`ProjectStore`, project lifecycle/replay, `CacheSource`, `WorldSource`, future `ProjectFileSystem`, GameVal/RSCM services, and map codecs remain local-first frontend seams.
+`ProjectStore`, project lifecycle/replay, `CacheSource`, `WorldSource`, future `ProjectFileSystem`, GameVal/RSCM services, source-aware TOML adapters, and map codecs remain local-first frontend seams.
+
+When OpenRune already provides an authoritative source form, Studio should update it and let OpenRune build the caches. LIVE is the full/base generated cache; SERVER is derived from LIVE and augmented with server-specific sources.
 
 See [docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md](docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md) for the map/cache/GameVal ownership model and [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the optional backend lifecycle/security plan.
 
