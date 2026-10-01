@@ -26,7 +26,9 @@
     const isPopout = $derived(path.startsWith("/map/editor/popout"));
     const isMapRoute = $derived(path.startsWith("/map"));
     const isInterfaceRoute = $derived(path.startsWith("/interface"));
-    const hideSidebar = $derived(isInterfaceRoute || isPopout);
+    // Interface Editor uses the same Studio navigation shell as Map. Only
+    // dedicated editor popouts should suppress the global sidebar.
+    const hideSidebar = $derived(isPopout);
     const fullBleed = $derived(isMapRoute || isInterfaceRoute || path === "/__dock");
 
     // Unknown routes go home, like the React router's catch-all.
