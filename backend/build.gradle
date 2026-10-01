@@ -34,8 +34,20 @@ subprojects {
     }
 }
 
-tasks.register('foundationGate') {
-    description = 'Runs the deterministic OpenRune Server Studio foundation checks.'
+tasks.register('backendCheck') {
+    description = 'Compiles and tests the OpenRune Content Studio backend.'
     group = 'verification'
     dependsOn ':Protocol:check', ':StudioService:check'
+}
+
+tasks.register('backendDistribution') {
+    description = 'Builds the runnable StudioService distribution.'
+    group = 'verification'
+    dependsOn ':StudioService:installDist'
+}
+
+tasks.register('validateBackend') {
+    description = 'Runs backend checks and proves the runnable distribution can be assembled.'
+    group = 'verification'
+    dependsOn 'backendCheck', 'backendDistribution'
 }
