@@ -40,7 +40,7 @@ OpenRune Server remains an important compatibility/reference target because its 
 6. existing Gradle/cache build tasks;
 7. source-vs-generated-output authority.
 
-Content Studio should adapt to these structures without requiring a patched OpenRune runtime. Portable inspection and file-based integration should be implemented in TypeScript first; the backend remains available for JVM/OpenRune build and verification operations.
+Content Studio should adapt to these structures without requiring a patched OpenRune runtime. Portable inspection and file-based integration should be implemented in TypeScript first; existing OpenRune source formats should remain authoritative; and the backend remains available for JVM/OpenRune build, FileStore map publication, and verification operations.
 
 ## Verified project/build model
 
@@ -79,7 +79,7 @@ Typical path:
 .data/cache/LIVE
 ```
 
-LIVE is generally the client/render/export cache output.
+LIVE is the full/base generated cache used by the normal build and client-facing tooling.
 
 ### SERVER
 
@@ -89,9 +89,9 @@ Typical path:
 .data/cache/SERVER
 ```
 
-SERVER contains server-oriented generated definitions/data.
+SERVER is reseeded from LIVE, with configured client-heavy indices omitted/emptied, then augmented with server-specific config and map data.
 
-Studio must not treat LIVE and SERVER as interchangeable.
+Studio must not treat LIVE and SERVER as interchangeable or independent authoring targets.
 
 Generated caches are outputs, not automatically authoritative editable source.
 
@@ -101,10 +101,12 @@ Where an authoritative project source exists, Studio should preserve that author
 
 Examples include:
 
-- Kotlin content source;
 - GameVal TOML/source declarations;
-- RSCM-generated identities;
+- existing RSCM source where appropriate;
 - dedicated content pack modules;
+- pack config/interface/CS2/model/sprite resources;
+- `.data/raw-cache/server/**/*.toml`;
+- `.data/raw-cache/map/{npcs,objs,area}/**/*.toml`;
 - project configuration used by existing build tasks.
 
 Preferred lifecycle:
@@ -113,13 +115,16 @@ Preferred lifecycle:
 Studio semantic edit
   -> versioned Studio edit/project contract
   -> portable TypeScript validation
-  -> explicit user-owned source/config or cache-package update
-  -> optional existing OpenRune build task
+  -> update authoritative OpenRune source
+  -> explicit OpenRune build
+  -> LIVE
+  -> SERVER derivation when relevant
   -> optional output verification
-  -> explicit publish/deploy
 ```
 
 Do not silently mutate generated cache outputs as a substitute for source publication.
+
+Terrain/static-loc placement is the main exception because OpenRune Server has no matching TOML source. Studio keeps semantic state/portable encoders and may publish through OpenRune-FileStore `PackMaps + PackWorldMap` into LIVE.
 
 ## GameVals and RSCM
 
@@ -248,12 +253,14 @@ Priorities are:
 2. direct Tauri project filesystem adapter;
 3. optional browser File System Access adapter;
 4. TypeScript RSCM/GameVal registry and project index;
-5. OpenRune NPC/ground-Obj/Area TOML adapters;
+5. source-aware OpenRune config/server/map TOML adapters;
 6. TypeScript terrain/static-loc encoders;
-7. region/package and cache-patch export;
-8. writable cache target/store;
-9. optional `StudioBackendClient` for explicit Gradle/OpenRune build/test/verification;
-10. lazy web/Tauri backend transports only for those backend-only actions.
+7. portable raw/region package export;
+8. optional `StudioBackendClient` for explicit Gradle/OpenRune build/test/map-publication/verification;
+9. bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication into LIVE;
+10. normal OpenRune cache build to derive SERVER;
+11. lazy web/Tauri backend transports only for backend-only actions;
+12. generic writable JS5/DAT2 support only later if standalone workflows justify it.
 
 ## Confidence boundary
 
@@ -269,3 +276,16 @@ We have enough verified OpenRune architectural knowledge to:
 We do **not** need complete OpenRune runtime internals to proceed with Content Studio.
 
 When compatibility uncertainty appears, prefer capability detection and graceful degradation over upstream modification.
+
+
+## Verified map publication behavior
+
+OpenRune-FileStore `PackMaps` accepts paired raw `lX_Y/mX_Y` files and RSPSi-style `.pack` files.
+
+For revision 237+ it writes terrain to map-group file 0 and static loc placements to file 1.
+
+OpenRune Server's current normal LIVE task list does not register `PackMaps`, so Studio should invoke it externally through the optional backend rather than changing OpenRune Server.
+
+`PackMaps` records changed map squares in `PackedMapSquares`; `PackWorldMap` consumes that same in-memory state. They should run in one bounded publication operation.
+
+After LIVE is updated, OpenRune's normal SERVER pass reseeds SERVER from LIVE and then applies map NPC file 5, ground-Obj file 6, and area file 7 from OpenRune TOML sources.

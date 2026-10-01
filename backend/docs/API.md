@@ -139,3 +139,30 @@ Operation snapshots expose lifecycle state, elapsed duration, exit status when a
 Only one Gradle operation may run against the same canonical checkout at a time, even when that checkout is opened through multiple Studio sessions. Recent snapshots remain session-scoped for lookup.
 
 The OpenRune server `run` task is intentionally excluded from the allowlist. Content Studio does not own OpenRune game-server lifecycle and does not need to launch or modify OpenRune Server for normal backend integration.
+
+
+## Planned bounded map-publication operation
+
+The next cache-writing capability should not be arbitrary archive/file mutation.
+
+It should be a versioned, project-scoped operation dedicated to publishing validated terrain/static-loc payloads through OpenRune-FileStore:
+
+```text
+validated Studio map payload
+  -> PackMaps against opened project's LIVE cache
+  -> PackWorldMap in the same operation
+  -> verify affected map groups/world-map output
+```
+
+The API contract must:
+
+- accept only project-scoped, validated map publication inputs;
+- reject arbitrary filesystem/cache targets;
+- reject arbitrary FileStore operations;
+- retain the existing opaque project/session boundary;
+- expose structured status/log/cancel behavior consistent with Gradle operations;
+- never mutate SERVER directly.
+
+A subsequent explicit `cache-build` operation is responsible for the normal OpenRune LIVE/SERVER build flow.
+
+The endpoint/DTO shape is intentionally not documented as current API until implementation exists.

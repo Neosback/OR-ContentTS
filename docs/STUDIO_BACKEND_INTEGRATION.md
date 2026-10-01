@@ -4,7 +4,7 @@
 
 OpenRune Content Studio has a **separate optional Studio backend service** for capabilities that genuinely require or materially benefit from the OpenRune/JVM execution environment.
 
-The default architecture is TypeScript-first. Normal cache loading, map editing, GameVal/RSCM parsing, project persistence, package export, and Tauri filesystem access must not require the backend.
+The default architecture is TypeScript-first and source-first. Normal cache loading, editing, GameVal/RSCM parsing, project persistence, OpenRune source-file updates, package export, and Tauri filesystem access must not require the backend.
 
 See `docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md` for the detailed map/cache/GameVal ownership model.
 
@@ -52,6 +52,7 @@ OpenRune Content Studio
         +-- optional StudioBackendClient
                |
                +-- exact OpenRune Gradle/build/test operations
+               +-- bounded OpenRune-FileStore PackMaps + PackWorldMap publication
                +-- OpenRune FileStore/JVM parity verification
                +-- JVM/compiler-aware analysis when truly needed
 ```
@@ -142,7 +143,7 @@ platform adapters
 
 The backend client is **not** the universal transport for OpenRune project access.
 
-Use `StudioBackendClient` only for backend-only capabilities such as exact Gradle/OpenRune builds, tests, FileStore parity checks, or JVM-aware analysis. Ordinary Tauri project file reads/writes should go through a scoped `ProjectFileSystem` adapter.
+Use `StudioBackendClient` only for backend-only capabilities such as exact Gradle/OpenRune builds, bounded FileStore map publication, FileStore parity checks, or JVM-aware analysis. Ordinary Tauri project/source file reads/writes should go through a scoped `ProjectFileSystem` adapter.
 
 This keeps Svelte, map rendering, editor history, persistence, codecs, and project metadata independent from Ktor, ports, tokens, or process management.
 
@@ -179,6 +180,8 @@ Examples that may request the sidecar:
 - Build OpenRune Project;
 - run allowlisted Gradle tests/assemble;
 - exact `:or-cache:buildCache`;
+- publish Studio terrain/static-loc payloads into LIVE through OpenRune-FileStore `PackMaps`;
+- run `PackWorldMap` in the same bounded publication operation;
 - OpenRune FileStore parity/output verification;
 - JVM/compiler-aware analysis.
 
@@ -278,21 +281,31 @@ The backend is not the authority for portable Studio semantics.
 
 Generated OpenRune caches are outputs, not automatically the authoritative source for every edit.
 
-Preferred write lifecycle:
+Preferred write lifecycle for OpenRune-owned source:
 
 ```text
 Studio semantic edit
    -> versioned TypeScript edit/project contract
    -> local TypeScript validation
-   -> authoritative source/config update when available
-   -> explicit file apply/export
-   -> optional backend OpenRune build
+   -> authoritative OpenRune TOML/GameVal/pack source update
+   -> explicit OpenRune build
+   -> LIVE output
+   -> SERVER derivation
    -> optional output verification
 ```
 
-Terrain/static-loc edits are special because current OpenRune raw map source covers NPC/Obj/Area data, not map-group terrain/loc files 0/1. For those edits, Studio project/Edit Format data remains authoritative until an explicit cache/package apply.
+Terrain/static-loc edits are special because OpenRune Server currently has no equivalent TOML source for map-group files 0/1. For those edits:
 
-Direct generated-cache mutation should not silently become the fallback publication model.
+```text
+Studio semantic/Edit Format state
+   -> TypeScript terrain/loc payload
+   -> optional bounded backend PackMaps + PackWorldMap
+   -> LIVE
+   -> explicit normal OpenRune build
+   -> SERVER derived from LIVE
+```
+
+Direct generated-cache mutation should not silently become the fallback publication model. The bounded PackMaps operation is an explicit publisher using OpenRune's own FileStore tooling, not a general cache-patching API.
 
 ## Local/offline behavior
 
@@ -309,20 +322,22 @@ Backend availability should unlock capabilities, not make the entire application
 
 ## Near-term integration sequence
 
-The next integration work should reduce backend dependence rather than expand it.
+The next integration work should reduce backend dependence while preserving OpenRune's existing source/build system.
 
 1. keep all existing local/offline behavior;
-2. implement the TypeScript-first ownership documented in `OPENRUNE_MAP_CACHE_ARCHITECTURE.md`;
-3. add `ProjectFileSystem` and a Tauri filesystem adapter;
-4. add pure TypeScript RSCM/GameVal registry and OpenRune project metadata indexing;
-5. add OpenRune NPC/Obj/Area TOML adapters;
-6. add TypeScript terrain and static-loc encoders;
-7. add region/package and cache-patch export;
-8. add writable cache support when the codecs are stable;
-9. narrow `StudioBackendClient` around optional native/JVM build and verification operations;
-10. add `HttpBackendTransport` only for explicitly paired web backend use;
-11. add lazy Tauri backend supervision only for backend-only actions;
-12. keep OpenRune Server unchanged.
+2. implement `ProjectFileSystem` and a Tauri filesystem adapter;
+3. add pure TypeScript RSCM/GameVal registry and OpenRune project indexing;
+4. add source-aware OpenRune config/server/map TOML adapters;
+5. update OpenRune-owned source files rather than compiled caches when a source exists;
+6. add TypeScript terrain and static-loc encoders for portable/offline output;
+7. add region/raw map package export;
+8. narrow `StudioBackendClient` around explicit build/test/map-publish/verification operations;
+9. add a bounded `PackMaps + PackWorldMap` backend operation for terrain/static-loc publication into LIVE;
+10. use the existing `:or-cache:buildCache` operation when the user requests full OpenRune LIVE/SERVER output;
+11. add `HttpBackendTransport` only for explicitly paired web backend use;
+12. add lazy Tauri backend supervision only for backend-only actions;
+13. keep OpenRune Server unchanged;
+14. defer generic JS5/DAT2 writing until standalone workflows prove it is needed.
 
 Do not prioritize backend-backed `ProjectStore`, `CacheSource`, or `WorldSource` merely because the backend can expose files. Prefer direct local implementations when the platform already has the necessary capability.
 
@@ -336,3 +351,23 @@ Do not prioritize backend-backed `ProjectStore`, `CacheSource`, or `WorldSource`
 - requiring the backend for normal editing, cache access, GameVal/RSCM parsing, or Tauri filesystem integration;
 - routing ordinary Tauri filesystem operations through Ktor;
 - making the backend start automatically when no backend-only capability is requested.
+
+
+## LIVE and SERVER publication model
+
+OpenRune's SERVER cache is not an independent authoring target.
+
+```text
+OpenRune source + base cache
+   -> LIVE
+   -> SERVER reseed from LIVE with configured client-heavy indices omitted
+   -> server-specific config/map overlays
+   -> completed SERVER
+```
+
+Studio should therefore:
+
+- update OpenRune-owned source first;
+- publish terrain/static-loc data to LIVE only through the explicit FileStore map operation;
+- let the normal OpenRune SERVER pass derive SERVER from the resulting LIVE cache;
+- never expose "edit SERVER directly" as the normal authoring workflow.

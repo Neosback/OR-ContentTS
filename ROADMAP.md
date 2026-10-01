@@ -81,15 +81,18 @@ Goal: the frontend works fully offline, with portable TypeScript services first 
 - [ ] Validation overlays for clipping, blocked tiles and missing definitions.
 - [ ] Consistent selection/inspection model across maps, interfaces and future definition editors.
 
-## Phase 4: OpenRune project integration, cache writing, and optional backend
+## Phase 4: OpenRune source integration, map publication, and optional backend
 
 OpenRune Server is a compatibility/reference target and should require zero Studio-specific modifications.
 
-The integration policy is TypeScript-first:
+The integration policy is **source-first and TypeScript-first**:
 
 - browser/Tauri local capabilities should not be routed through the backend when they can be implemented safely in TypeScript;
+- when OpenRune already owns a source format, Studio should update that source and let OpenRune pack it;
 - Tauri should read/write user-selected OpenRune project files directly through a scoped filesystem adapter;
-- the backend should be lazy/optional and focused on exact OpenRune/JVM build, test, and verification operations.
+- LIVE is the full/base generated cache;
+- SERVER is derived from LIVE and then augmented with server-specific sources;
+- the backend should be lazy/optional and focused on exact OpenRune/JVM build, map-publication, test, and verification operations.
 
 Backend foundation already completed:
 
@@ -97,32 +100,43 @@ Backend foundation already completed:
 - [x] Split backend CI across compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging.
 - [x] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
 - [x] Document OpenRune map/cache/RSCM behavior and establish the TypeScript-first/backend-minimal architecture.
+- [x] Document the complete LIVE -> SERVER cache lifecycle and source-first OpenRune publication rules.
+- [x] Confirm OpenRune-FileStore `PackMaps` supports raw `l/m` map payloads and RSPSi-style `.pack` files.
 
-Portable/local work next:
+Portable/source work next:
 
 - [ ] Add a framework-neutral `ProjectFileSystem` capability boundary.
 - [ ] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
 - [ ] Add optional browser File System Access adapter with import/download fallback.
 - [ ] Add pure TypeScript RSCM parsing/indexing.
-- [ ] Add pure TypeScript GameVal DAT parsing and OpenRune GameVal validation rules.
-- [ ] Add TypeScript OpenRune project discovery/indexing for modules, GameVals, RSCM, raw map sources, and cache paths.
+- [ ] Add pure TypeScript GameVal DAT parsing, provenance, and OpenRune validation rules.
+- [ ] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
+- [ ] Add source-aware OpenRune config TOML adapters for definitions.
 - [ ] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters.
+- [ ] Add server TOML adapters for future server-content/shop tooling.
 - [ ] Implement TypeScript terrain map-file-0 encoder.
 - [ ] Implement TypeScript static-loc map-file-1 encoder.
 - [ ] Add golden decode/encode round-trip fixtures.
-- [ ] Replace placeholder map import/export providers with a versioned region/package format.
-- [ ] Add cache-patch output before attempting complete DAT2/JS5 rewrite.
-- [ ] Add a writable modern cache-store implementation in TypeScript.
-- [ ] Add filesystem-backed cache write targets for File System Access/Tauri.
+- [ ] Replace placeholder map import/export providers with a versioned region/raw map package.
+- [ ] Preserve OpenRune-owned source files as the authoritative project form whenever one exists.
 
-Optional backend work:
+OpenRune publication work:
 
-- [ ] Narrow `StudioBackendClient` around native build/test/verification capabilities.
+- [ ] Add a bounded backend map-publication operation that uses OpenRune-FileStore `PackMaps`.
+- [ ] Run `PackWorldMap` in the same operation so `PackedMapSquares` changed-region state is preserved.
+- [ ] Verify published file 0/1 data by reopening LIVE through FileStore.
+- [ ] Run the normal OpenRune build explicitly after map publication when the user wants SERVER/project output.
+- [ ] Verify SERVER was reseeded from updated LIVE and map files 5/6/7 were added from OpenRune TOML sources.
+- [ ] Keep `StudioBackendClient` narrow around build/test/map-publish/verification capabilities.
 - [ ] Add `HttpBackendTransport` for explicit browser pairing to an already-running backend.
 - [ ] Add lazy Tauri backend supervision/transport; do not start the sidecar for ordinary editing.
-- [ ] Add explicit **Build OpenRune Project** / verification actions with structured output.
-- [ ] Keep golden parity checks between TypeScript codecs and OpenRune/FileStore where useful.
 - [ ] Preserve the invariant that no Studio-specific OpenRune Server endpoints, forks, accessors, hooks, modules, or framework patches are required.
+
+Later/standalone cache writing:
+
+- [ ] Add cache-patch output if standalone workflows need it.
+- [ ] Add a writable modern cache-store implementation only if browser/standalone requirements justify duplicating JS5/DAT2 writing.
+- [ ] Do not make a custom writable cache store the primary OpenRune-project publication path.
 
 ## Phase 5: rendering and performance
 

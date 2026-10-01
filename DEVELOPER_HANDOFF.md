@@ -15,7 +15,7 @@ As of PR #34:
 - The inherited monolithic `foundationGate` has been replaced by explicit, diagnosable backend validation stages.
 - There are no required Content Studio changes in `Neosback/OpenRune-Server`.
 - OpenRune Server must remain an external compatibility/reference target. If a Studio feature would require patching OpenRune Server framework code, that feature must degrade/remain unavailable until it can be implemented externally.
-- Backend runtime integration with the frontend is not wired yet. That is intentional: the next integration work should first add portable project filesystem, GameVal/RSCM, OpenRune source, and map encode/write seams. Backend transport comes later for optional JVM/OpenRune build and verification operations.
+- Backend runtime integration with the frontend is not wired yet. That is intentional: the next integration work should first add portable project filesystem, GameVal/RSCM, and OpenRune source adapters. Backend transport comes later for explicit OpenRune build, map publication through FileStore `PackMaps`, and verification operations.
 
 
 ## 1. Critical direction
@@ -191,7 +191,7 @@ Do not send:
 - entity/model instances
 - cache-encoded region bytes
 
-The portable **TypeScript map/cache layer should be the encoder**. The backend may provide parity verification or exact OpenRune build output, but terrain/static-loc encoding must not require it.
+The portable **TypeScript map layer should encode terrain/static-loc payloads**, but OpenRune-project publication should reuse OpenRune-FileStore `PackMaps` to write those payloads into LIVE. Generic DAT2/JS5 writing is not the primary OpenRune path.
 
 ### Strict versioning
 
@@ -441,9 +441,17 @@ Zones/areas are intentionally not modeled yet because there is no concrete activ
 
 Future OpenRune world/source adapters should satisfy `WorldSource` without changing Svelte viewer code or render-worker initialization. Prefer direct project-file adapters; backend delivery is optional.
 
-### D. OpenRune project integration + optional Studio backend
+### D. OpenRune source integration + optional Studio backend
 
-The backend move is complete and validated, but it is no longer the next universal integration layer.
+The backend move is complete and validated, but it is not the universal integration layer.
+
+The canonical design is now **source-first**:
+
+- if OpenRune already has an authoritative TOML/GameVal/pack source, Studio edits that source;
+- OpenRune's own packers produce LIVE/SERVER output;
+- LIVE is the full/base cache;
+- SERVER is reseeded from LIVE, strips server-unneeded client indices, then adds server-specific data;
+- Studio should not directly author SERVER.
 
 Current backend capabilities remain useful:
 
@@ -455,23 +463,32 @@ Current backend capabilities remain useful:
 - allowlisted asynchronous Gradle operations;
 - status/log/cancel/SSE.
 
-The next implementation sequence is TypeScript/local first:
+Important OpenRune map findings:
+
+- file 0 = terrain;
+- file 1 = static loc placements;
+- file 5 = NPC spawns from OpenRune map TOML;
+- file 6 = ground-item/Obj spawns from OpenRune map TOML;
+- file 7 = areas from OpenRune map TOML;
+- OpenRune-FileStore already provides `PackMaps` for raw `l/m` map files and RSPSi-style `.pack` files;
+- the current OpenRune Server LIVE task list does not register `PackMaps`;
+- `PackMaps` records changed squares in memory and `PackWorldMap` consumes them, so Studio map publication should run both in one bounded JVM operation.
+
+The next implementation sequence is:
 
 1. `ProjectFileSystem`;
 2. Tauri direct project filesystem adapter;
 3. optional browser File System Access adapter;
-4. pure TypeScript RSCM/GameVal registry;
+4. pure TypeScript RSCM/GameVal registry with provenance;
 5. TypeScript OpenRune project/source index;
-6. OpenRune NPC/ground-Obj/Area TOML adapters;
+6. source-aware OpenRune config/server/map TOML adapters;
 7. terrain file-0 and static-loc file-1 encoders;
-8. region/package and cache-patch export;
-9. writable cache store.
+8. portable raw/region package export;
+9. bounded backend `PackMaps + PackWorldMap` publication into LIVE;
+10. explicit normal OpenRune build when SERVER output is requested;
+11. output verification.
 
-Only then narrow the backend client around capabilities that still need it:
-
-- exact OpenRune Gradle build/test operations;
-- FileStore/JVM parity verification;
-- compiler/classpath-aware source analysis if a future feature needs it.
+Do not prioritize a general writable JS5/DAT2 cache implementation for OpenRune publication. Reuse OpenRune-FileStore first.
 
 Do not modify OpenRune Server merely to satisfy Studio integration.
 
@@ -600,9 +617,11 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The **immediate OpenRune integration work after this baseline** should stay portable: start with `ProjectFileSystem`, direct Tauri filesystem access, and the TypeScript RSCM/GameVal/project-index layer. After that, implement map source adapters and TypeScript terrain/loc encoders.
+The **immediate OpenRune integration work after this baseline** should stay portable: start with `ProjectFileSystem`, direct Tauri filesystem access, and the TypeScript RSCM/GameVal/project-index layer. Then add source-aware TOML adapters and TypeScript terrain/loc encoders.
 
-Do not make `StudioBackendClient` the next dependency for ordinary editing. Add it when an explicit build/test/verification workflow needs the existing backend.
+After those portable seams exist, add the first narrow backend publication feature: an explicit `PackMaps + PackWorldMap` operation against LIVE, followed by the existing allowlisted OpenRune cache build when SERVER output is requested.
+
+Do not make `StudioBackendClient` a dependency for ordinary editing or source-file updates.
 
 Keep all local implementations available so the Studio remains usable without the backend or OpenRune Server running.
 
@@ -641,3 +660,19 @@ Critical distinctions:
 - OpenRune currently has no raw TOML source layer for terrain/static-loc map files;
 - Studio Edit Format/project state remains authoritative for those edits until explicit encode/export/apply;
 - terrain/loc encoders, RSCM/GameVal parsing, and project-file integration should be TypeScript-first.
+
+
+### Source-first publication rule
+
+When OpenRune already owns a source representation, update it and let OpenRune pack the cache:
+
+- definitions -> pack `configs/*.toml`;
+- GameVals -> module `gamevals.toml` / existing RSCM source;
+- server metadata and shops -> `.data/raw-cache/server/**/*.toml`;
+- NPC spawns -> `.data/raw-cache/map/npcs/*.toml`;
+- ground-item spawns -> `.data/raw-cache/map/objs/*.toml`;
+- areas -> `.data/raw-cache/map/area/*.toml`.
+
+Terrain/static locs are the special case. OpenRune Server does not currently provide matching TOML source, but OpenRune-FileStore already has `PackMaps`. Keep Studio semantic/Edit Format state authoritative for those edits, encode raw terrain/loc payloads in TypeScript, then use the bounded FileStore publication operation when publishing into an OpenRune checkout.
+
+SERVER is always treated as generated output derived from LIVE plus server-specific packers.

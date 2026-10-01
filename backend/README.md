@@ -14,16 +14,17 @@ Portable Studio behavior belongs in TypeScript first. In particular, the fronten
 
 - inspect an OpenRune directory through `ProjectFileSystem`;
 - parse/index GameVals and RSCM;
-- read/write project source files;
+- read/write authoritative OpenRune TOML/RSCM/pack source files;
 - load and edit caches;
-- encode map terrain/static loc data;
-- export region/packages/cache patches;
+- encode map terrain/static-loc payloads;
+- export region/raw packages;
 
 without starting StudioService.
 
 StudioService remains valuable for operations that genuinely use the OpenRune/JVM environment:
 
 - allowlisted Gradle build/test/cache-build execution;
+- bounded OpenRune-FileStore `PackMaps + PackWorldMap` terrain/static-loc publication into LIVE;
 - OpenRune FileStore/JVM parity and output verification;
 - optional compiler/PSI-aware source analysis;
 - diagnostic comparison with upstream OpenRune behavior.
@@ -63,7 +64,9 @@ Neutral contracts shared by Studio components and runtime integrations.
 
 The opened OpenRune-compatible checkout remains authoritative for its project/source content.
 
-Studio reads project structure and source directly from the checkout. Generated LIVE and SERVER caches are treated as build outputs. Studio does not replace OpenRune's Gradle build, source layout, GameVals, or cache tooling.
+Studio reads project structure and source directly from the checkout. Generated LIVE and SERVER caches are treated as build outputs. LIVE is the full/base generated cache; SERVER is derived from LIVE and then augmented with server-specific sources. Studio does not replace OpenRune's Gradle build, source layout, GameVals, or cache tooling.
+
+When OpenRune already owns a source representation, Studio updates that source and lets OpenRune pack it. The planned terrain/static-loc publication operation is the exception because OpenRune Server has no matching TOML source; it reuses OpenRune-FileStore `PackMaps` rather than implementing a competing cache writer.
 
 **Content Studio requires zero Studio-specific OpenRune Server modifications.** The backend must not add or depend on custom OpenRune HTTP endpoints, forks, accessors, hooks, modules, or framework patches. If a capability cannot be implemented externally, it must degrade/remain unavailable.
 
@@ -153,3 +156,18 @@ The fixed development default remains `127.0.0.1:8765` when no host/port argumen
 - `docs/OPENRUNE.md`
 - `docs/CACHE.md`
 - `docs/OPENRUNE_SERVER_FOUNDATION.md`
+
+
+## Planned map publication
+
+The first backend cache-writing feature should be a bounded map publisher, not a generic cache mutation API.
+
+It should:
+
+1. accept validated terrain/static-loc payloads for an opened project;
+2. use OpenRune-FileStore `PackMaps` against `.data/cache/LIVE`;
+3. run `PackWorldMap` in the same operation;
+4. verify file 0/1 output;
+5. leave SERVER generation to the existing explicit `cache-build` operation.
+
+No OpenRune Server modification is required.

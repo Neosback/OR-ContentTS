@@ -1,154 +1,238 @@
-# OpenRune map/cache integration: TypeScript-first architecture
+# OpenRune map/cache integration: source-first, TypeScript-first architecture
 
 ## Status and intent
 
-This document defines how OpenRune Content Studio should integrate with an OpenRune Server checkout for map editing, cache work, GameVals/RSCM, and build/publish workflows.
+This document defines how OpenRune Content Studio should integrate with an ordinary compatible OpenRune Server checkout for cache editing, map editing, GameVals/RSCM, source authoring, and build/publish workflows.
 
-The design priority is:
+The architecture has two complementary rules:
 
-> If the Studio can perform a capability safely and correctly in TypeScript, it should not require the Kotlin backend.
+> **Portable editing and inspection should work without the Kotlin backend whenever practical.**
 
-The Studio backend is optional infrastructure for capabilities that genuinely benefit from or require the JVM/OpenRune execution environment. It must not become a mandatory middle layer between the UI and ordinary cache/project operations.
+> **When OpenRune already owns an authoritative source format and packer, Studio should edit that source and let OpenRune produce the cache output.**
 
-Research in this document was checked against OpenRune Server `main` at commit:
+The second rule is critical. TypeScript-first does **not** mean reimplementing every OpenRune packer. It means Studio owns portable editor semantics, project/file access, parsing, validation, and offline export. OpenRune remains the preferred publisher for OpenRune-owned source formats.
+
+Research for this model was checked against OpenRune Server `main` at commit:
 
 ```text
 625fe96abf802bc932d18e66832ed6ce90b60a0a
 ```
 
-and Content Studio `main` immediately before this document at:
+and OpenRune-FileStore `main` at commit:
 
 ```text
-fe928d9adc5026c6e8c2668da8c43619e3bcbde1
+46e2be195489a288a0607b565e20811f26e81f62
 ```
 
-OpenRune Server remains an external compatibility/reference target. Content Studio must require zero Studio-specific changes to OpenRune Server.
+Content Studio documentation work in this revision started from `main` at:
+
+```text
+4d116f2b41f3301bcfb11209cff3364659799c6c
+```
+
+OpenRune Server remains an external compatibility target. Content Studio must require **zero Studio-specific OpenRune Server changes**.
 
 ---
 
-## 1. Architectural rule: TypeScript owns portable behavior
+## 1. Source-of-truth rule
 
-Portable domain logic should live in framework-neutral TypeScript whenever practical.
+Content Studio has three classes of data.
 
-That includes:
+### 1.1 OpenRune-owned source
 
-- cache decoding;
-- map decoding;
-- map editing;
-- semantic edit transactions;
-- project persistence contracts;
-- terrain/loc encoding;
-- GameVal/RSCM parsing;
-- OpenRune map TOML parsing/generation;
-- validation that does not require JVM execution;
+Examples:
+
+- content/plugin `gamevals.toml`;
+- `.data/gamevals/*.rscm`;
+- pack `configs/*.toml`;
+- pack interfaces;
+- pack CS2;
+- pack models and sprites;
+- DB-table DSL sources;
+- `.data/raw-cache/server/**/*.toml`;
+- `.data/raw-cache/map/npcs/*.toml`;
+- `.data/raw-cache/map/objs/*.toml`;
+- `.data/raw-cache/map/area/*.toml`.
+
+When Studio edits one of these concepts in an OpenRune project, the **source file is authoritative**.
+
+Preferred lifecycle:
+
+```text
+Studio semantic edit
+  -> update the authoritative OpenRune source
+  -> explicit OpenRune build/publish
+  -> LIVE cache
+  -> derived SERVER cache
+```
+
+Studio should not silently bypass the source file by patching the generated cache.
+
+### 1.2 Studio-owned portable semantic state
+
+Examples:
+
+- Edit Format;
+- Studio project metadata;
+- unsaved/undoable map edits;
+- offline region packages;
+- terrain/static-loc edits when no OpenRune source representation exists.
+
+This state must remain usable in plain web mode with no Java, Gradle, Tauri, or backend.
+
+### 1.3 Generated cache outputs
+
+Examples:
+
+- `.data/cache/LIVE`;
+- `.data/cache/SERVER`;
+- generated cache GameVals;
+- generated world-map data.
+
+Generated cache output is not normally the authoring source.
+
+---
+
+## 2. Runtime environments
+
+### 2.1 Plain web baseline
+
+Must work without a backend:
+
+- static/range cache loading;
+- cache-folder import;
+- IndexedDB cache profiles;
+- map/interface decode and editing;
+- Studio project persistence;
+- cache GameVal reads;
+- RSCM/`gamevals.toml` parsing;
+- TOML source editing after import;
 - region/package export;
-- cache-patch generation;
-- project metadata/indexing that can be derived from files;
-- filesystem-independent source/update planning.
+- portable terrain/static-loc encoding;
+- downloads/ZIP exports.
 
-Platform layers should provide capabilities, not reimplement domain rules.
+### 2.2 Web File System Access
 
-```text
-Svelte UI
-   |
-framework-neutral TypeScript domain services
-   |
-   +-- storage/filesystem adapters
-   |     +-- browser IndexedDB / downloads
-   |     +-- browser File System Access when available
-   |     +-- Tauri dialog + filesystem
-   |
-   +-- optional native execution adapter
-         +-- Studio backend only for JVM/OpenRune operations that need it
-```
+Where supported, a user-approved project directory can provide direct read/write access.
 
-The default application must remain useful when the backend is absent.
-
----
-
-## 2. Three execution environments
-
-Content Studio has three meaningful runtime modes.
-
-### 2.1 Plain web, universal baseline
-
-This is the lowest common denominator and must not assume direct arbitrary filesystem access.
-
-Available today or with normal browser APIs:
-
-- static/range-backed caches;
-- cache-folder import through file selection;
-- IndexedDB-backed cache profiles;
-- local project persistence;
-- map decode/render/edit;
-- interface decode/render/edit;
-- GameVals from the loaded cache;
-- pure TypeScript RSCM parsing;
-- generated JSON/text/binary downloads;
-- ZIP/region/package export;
-- importing previously exported Studio/OpenRune files.
-
-This mode should work without:
-
-- Tauri;
-- Kotlin backend;
-- OpenRune Server process;
-- Java;
-- Gradle.
-
-### 2.2 Plain web with File System Access API
-
-Supporting browsers can grant a web app direct access to a user-selected directory.
-
-This is a progressive enhancement, not the universal web contract.
-
-A capable browser can potentially:
-
-- select an OpenRune project directory;
-- recursively inspect files after permission is granted;
-- read RSCM/TOML/raw map source files;
-- write updated source files;
-- write exported cache/region files.
-
-Important limitations:
-
-- browser support is not universal;
-- permission requires explicit user interaction;
-- permissions can be revoked;
-- secure context requirements apply;
-- the product must retain import/download fallbacks.
-
-Therefore do not make `showDirectoryPicker()` the only way to use OpenRune project integration on the web.
+Use this only as progressive enhancement. Import/download remains the universal fallback.
 
 ### 2.3 Tauri desktop
 
-Tauri should provide the best local project experience without requiring the Kotlin backend for normal filesystem work.
+Tauri should be the best direct-filesystem experience.
 
-The repository already includes:
+Tauri responsibilities:
 
-- `@tauri-apps/plugin-dialog`;
-- `@tauri-apps/plugin-fs`;
-- the matching Rust plugins.
-
-The intended Tauri responsibilities are:
-
-- native directory/file selection;
-- scoped recursive project reads;
-- scoped project writes;
-- atomic file replacement helpers;
+- native project/cache selection;
+- scoped `ProjectFileSystem` reads/writes;
+- atomic source-file updates;
 - optional file watching;
-- application lifecycle;
-- optional lazy launch of the Studio backend when a backend-only action is requested.
+- optional lazy Studio backend launch.
 
-Tauri filesystem permissions/scopes must be configured explicitly. A native picker can add user-selected paths to allowed scopes, but the Studio should still expose a narrow project-filesystem abstraction rather than letting arbitrary Svelte components read paths directly.
+Do not start Ktor merely to read or write TOML/RSCM/project files.
 
-The Kotlin backend should **not** be required merely to read or write an OpenRune checkout from Tauri.
+### 2.4 Optional Studio backend
+
+The backend is justified for capabilities that materially benefit from the exact OpenRune/JVM toolchain:
+
+- exact OpenRune Gradle builds/tests;
+- OpenRune-FileStore `PackMaps` publication into LIVE;
+- `PackWorldMap` regeneration in the same map-publish operation;
+- FileStore parity/output verification;
+- compiler/classpath-aware analysis where genuinely useful.
+
+The backend remains lazy and optional.
 
 ---
 
-## 3. OpenRune cache build model
+## 3. OpenRune cache lifecycle
 
-OpenRune's `or-cache` module exposes these relevant Gradle tasks:
+OpenRune Server uses:
+
+```text
+.data/cache/LIVE
+.data/cache/SERVER
+```
+
+The relationship is not two independent builds.
+
+### 3.1 LIVE is the base/full cache
+
+The normal BUILD pass modifies the LIVE cache in place from OpenRune project sources.
+
+Conceptually:
+
+```text
+base OSRS cache
+      |
+      v
+.data/cache/LIVE
+      |
+      +-- PackConfig
+      +-- PackModels
+      +-- PackSprites
+      +-- PackIfType
+      +-- PackCs2
+      +-- PackDBTables
+      +-- plugin extra tasks
+      +-- PackGameVals
+      +-- PackWorldMap when changed map squares are recorded
+      |
+      v
+completed LIVE
+```
+
+### 3.2 SERVER is derived from completed LIVE
+
+For `SERVER_CACHE_BUILD`, OpenRune-FileStore seeds SERVER from LIVE.
+
+The default compact path rebuilds LIVE into SERVER while leaving configured client-only indices empty. OpenRune then runs server-oriented pack tasks over that seed.
+
+Conceptually:
+
+```text
+completed LIVE
+      |
+      | seed/rebuild, stripping server-unneeded indices
+      v
+SERVER base
+      |
+      +-- PackServerConfig
+      +-- MapNpcPacker
+      +-- MapObjPacker
+      +-- MapAreaPacker
+      +-- other server-safe/shared pack tasks
+      |
+      v
+completed SERVER
+```
+
+OpenRune preserves recorded server-only outputs across reseeding when incremental state allows it.
+
+### 3.3 Client-heavy indices stripped from SERVER
+
+The current server-cache minification set includes indices such as:
+
+- animations;
+- skeletons;
+- sound effects;
+- music tracks/patches/jingles;
+- models;
+- textures;
+- Vorbis;
+- defaults;
+- world-map geography/areas/ground;
+- Animaya data.
+
+Therefore:
+
+> **Studio should treat SERVER as a generated, compact server derivative of LIVE, not as a separate authoring target.**
+
+---
+
+## 4. Gradle cache tasks
+
+OpenRune Server exposes:
 
 ```text
 :or-cache:buildCache
@@ -156,357 +240,171 @@ OpenRune's `or-cache` module exposes these relevant Gradle tasks:
 :or-cache:mergePluginGamevals
 ```
 
-### `buildCache`
+### 4.1 `buildCache`
 
-OpenRune's current build flow:
+Current high-level flow:
 
-1. loads GameVal sources;
-2. discovers pack modules;
-3. validates plugin packs;
-4. builds cache pack tasks;
-5. builds the LIVE cache;
-6. builds the SERVER cache;
-7. performs generated GameVal/codegen work.
+1. load GameVal sources;
+2. discover plugin packs;
+3. validate packs;
+4. build LIVE pack tasks;
+5. update LIVE;
+6. seed SERVER from LIVE;
+7. apply server-oriented tasks;
+8. dump/generate server-derived GameVal/codegen outputs.
 
-The important point for Studio architecture is that this is a **whole OpenRune build pipeline**, not a minimal map encoder API.
+Studio should invoke this when the user explicitly wants an OpenRune project build/publish, not for ordinary editor interaction.
 
-Content Studio should not need to invoke `buildCache` to perform ordinary local map edits or exports.
+### 4.2 `freshCache`
 
-It is useful for:
+OpenRune-FileStore's fresh path:
 
-- exact OpenRune output generation;
-- integration verification;
-- build parity;
-- final project build/publish workflows.
+1. resolves the configured OSRS revision/environment;
+2. downloads/uses an OpenRS2 cache archive;
+3. installs it into LIVE;
+4. handles XTEAs for older revisions;
+5. clears stale incremental state;
+6. OpenRune dumps base GameVals from the fresh cache;
+7. OpenRune then performs its normal BUILD flow.
 
-### `freshCache`
+This is bootstrap/update behavior, not normal Studio save behavior.
 
-The fresh-install flow initializes the OpenRune cache, clears incremental state, and dumps base GameVals.
+### 4.3 `mergePluginGamevals`
 
-This is project/bootstrap behavior. It is not required for normal Studio cache importing or offline editing.
+Release tooling merges plugin/module `gamevals.toml` mappings into `.data/gamevals/*.rscm`.
 
-### `mergePluginGamevals`
+Normal OpenRune builds already load module `gamevals.toml` directly, so Studio should not require a merge before every edit/build.
 
-This task scans content plugin `gamevals.toml` files and appends missing entries into `.data/gamevals/<namespace>.rscm`.
+The source-aware rule is:
 
-The behavior is simple enough to reproduce in TypeScript:
-
-- scan source TOML;
-- validate namespace;
-- read existing RSCM keys;
-- append missing `key=id` entries;
-- retain existing mappings.
-
-Therefore the Studio does not need the backend merely to understand, preview, validate, or generate this merge.
-
-The backend/Gradle task remains useful as an optional parity check against upstream OpenRune behavior.
+- edit the declaration where OpenRune owns it;
+- preserve provenance;
+- let OpenRune's own merge/release workflow produce central mappings when appropriate.
 
 ---
 
-## 4. OpenRune cache directories
+## 5. OpenRune pack-source system
 
-OpenRune currently uses:
+OpenRune's `or-cache` runtime classpath includes dedicated content `pack` modules without requiring game-script modules to be part of cache packing.
+
+A `PluginPack` can contribute:
 
 ```text
-.data/cache/LIVE
-.data/cache/SERVER
+src/main/resources/pack/
+  configs/
+  models/
+  sprites/
+  cs2/
+  interfaces/
 ```
 
-### LIVE
+and Kotlin pack code can additionally contribute DB tables, interface DSL definitions, or extra cache tasks.
 
-The LIVE cache is the client-facing/full cache used by normal cache tooling.
+This is an important Content Studio integration point.
 
-### SERVER
+### Studio policy
 
-The SERVER cache is a server-oriented cache. OpenRune excludes several client-only pack tasks and adds server-specific packers.
+When an editor is modifying a concept represented by one of these sources:
 
-OpenRune's current server build adds:
+```text
+Studio editor
+  -> semantic TypeScript model
+  -> deterministic update to the correct OpenRune pack source
+  -> OpenRune build
+```
 
-- server config packing;
-- map NPC packing;
-- map ground-item packing;
-- map area packing.
+Do not invent a parallel Studio JSON format as the OpenRune project's authoritative copy.
 
-Generated caches are outputs. They should not automatically become the authoritative Studio project format.
-
-The Studio's semantic project/edit data remains authoritative for Studio work until an explicit apply/build/export action is requested.
+Studio's own project format remains useful for unsaved history, offline work, portability, and content not represented by OpenRune source.
 
 ---
 
-## 5. OpenRune map-group layout
+## 6. Client/cache TOML via PackConfig
 
-For modern OpenRune map groups, `GameMapDecoder` reads a map-square group with:
+OpenRune-FileStore `PackConfig` scans TOML blocks and packs recognized definitions into the cache.
 
-| File | Meaning |
-| --- | --- |
-| 0 | terrain/map tile data |
-| 1 | static loc/object placement data |
-| 5 | NPC spawn data |
-| 6 | ground-item/Obj spawn data |
-| 7 | area data |
+Current supported concepts include categories such as:
 
-The group id is effectively:
+- item / `obj`;
+- object definition / `loc`;
+- NPC definition;
+- enum;
+- sequence/animation;
+- spotanim/graphics;
+- varbit;
+- varp;
+- inventory;
+- overlay;
+- underlay;
+- texture;
+- map element;
+- health bar;
+- hitsplat;
+- params;
+- identity kit;
+- other registered config definitions.
 
-```text
-(mapX << 8) | mapY
-```
+OpenRune supports symbolic values through ConstantProvider/GameVals and supports inheritance from existing definitions.
 
-This distinction is critical because OpenRune naming differs from what can be casually called an "object" in an editor.
-
-### Static locs are not OpenRune `obj` spawns
-
-The Studio Map Editor's `map.objects` mutations represent static world locs such as:
-
-- walls;
-- scenery;
-- doors;
-- floor decorations;
-- wall decorations.
-
-Those belong to map-group **file 1**.
-
-OpenRune's `.data/raw-cache/map/objs/*.toml` represents **ground item/Obj spawns**, which are packed into map-group **file 6**.
-
-Do not map Studio static loc edits to OpenRune `objs` TOML files.
-
-Use explicit terminology in code and docs:
-
-- **loc** = static scene/world location object;
-- **obj** = ground item;
-- **npc** = NPC spawn;
-- **area** = OpenRune area membership.
-
----
-
-## 6. What OpenRune map source files actually cover
-
-OpenRune currently has these project-owned map source directories:
-
-```text
-.data/raw-cache/map/npcs
-.data/raw-cache/map/objs
-.data/raw-cache/map/area
-```
-
-There is currently no corresponding OpenRune raw-source directory for the main terrain and static-loc files edited by the Studio Map Editor.
-
-### NPC source
-
-Example shape:
+Example:
 
 ```toml
-[[spawn]]
-npc = "npc.some_name"
-coords = "0_50_50_38_52"
+[[object]]
+id = "loc.farming_shed_poordoor"
+inherit = "loc.farming_shed_poordoor"
+contentGroup = "content.closed_single_door"
 ```
 
-The coordinate format is:
+For an OpenRune project, a future Definitions Editor should update this source rather than directly changing only the compiled cache.
+
+---
+
+## 7. Server TOML via PackServerConfig
+
+OpenRune owns a separate server-source family under:
 
 ```text
-level_mapX_mapY_localX_localY
+.data/raw-cache/server/
 ```
 
-`MapNpcPacker` resolves the RSCM symbol and writes file 5.
+Current source includes areas such as:
 
-### Ground-item source
+- NPC server definitions;
+- loc/object server definitions;
+- items;
+- varp/varbit and other vars;
+- movement/hunt/projectile/server config;
+- inventories/shops;
+- Slayer data;
+- other server-specific metadata.
 
-Example shape:
+`PackServerConfig` supports multiple models:
+
+1. merge a server TOML overlay onto the corresponding client/base cache definition;
+2. build a server representation from cache-backed base definitions;
+3. pack server-only TOML definitions.
+
+Example shop inventory:
 
 ```toml
-[[spawn]]
-obj = "obj.some_item"
-coords = "0_50_50_10_20"
-count = 1
+[[inventory]]
+isServerOnly = true
+id = "inv.generalshop1"
+name = "Al Kharid General Store"
+...
 ```
 
-`MapObjPacker` resolves the RSCM symbol and writes file 6.
+### Studio policy
 
-### Area source
+A future Shop Editor, server-NPC editor, or other server-content editor should edit these existing TOML sources and let OpenRune build SERVER.
 
-Areas use symbolic `area.*` identifiers and polygons expressed in world coordinates.
-
-Example shape:
-
-```toml
-[[area]]
-name = "Lumbridge"
-area_id = "area.lumbridge"
-levels = [0, 1, 2, 3]
-
-[[area.polygons]]
-vertices = [
-    [3136, 3136],
-    [3253, 3136],
-    ...
-]
-```
-
-The packer:
-
-1. resolves `area.*` through RSCM;
-2. clips polygons by map square;
-3. creates square/zone/coord area membership;
-4. writes file 7.
-
-### Consequence for Content Studio
-
-The existing OpenRune map packers **do not cover the primary terrain/static-loc editing output** of the Studio.
-
-Therefore:
-
-> Core Map Editor save/export must not depend on OpenRune `MapPackers` or the backend.
-
-The Studio needs its own portable terrain and loc encoders.
+Do not create a second Studio-only shop/config database.
 
 ---
 
-## 7. Studio terrain and loc encoding
+## 8. GameVal/RSCM system
 
-The Studio already has the read side:
-
-- cache store decoding;
-- modern map group loading;
-- terrain decoding;
-- loc decoding;
-- live editor mutation state;
-- Edit Format v1 terrain/loc semantics.
-
-The missing portable piece is the write side.
-
-### Required TypeScript components
-
-Add framework-neutral TypeScript implementations for:
-
-```text
-MapTerrainEncoder
-MapLocEncoder
-WritableCacheStore
-MapRegionPackage
-```
-
-Exact names may change.
-
-### Terrain encoder
-
-The encoder should produce the exact map-group file-0 payload for a map square.
-
-It should accept semantic editor tile state, not WebGL buffers.
-
-### Loc encoder
-
-The encoder should produce the exact map-group file-1 payload for semantic loc placements.
-
-Input should use the existing semantic loc shape:
-
-- loc id;
-- flags/shape/rotation;
-- world/map/local coordinate;
-- level.
-
-Do not encode renderer instances.
-
-### Golden parity
-
-Encoder work needs fixtures.
-
-At minimum:
-
-```text
-known cache region
- -> TS decode
- -> TS encode
- -> byte/semantic parity check
-```
-
-Where byte identity is not guaranteed because of equivalent encodings, decode-after-encode must prove semantic equality.
-
-OpenRune/FileStore can be used as an optional backend parity oracle, but the TS implementation remains the product implementation.
-
----
-
-## 8. Writable cache architecture
-
-The existing client cache system is read-only.
-
-`MemoryStore` reads `main_file_cache.dat/dat2` and index files. It does not currently write JS5 sectors/reference tables.
-
-Introduce a framework-neutral write boundary rather than putting writes into UI code.
-
-Conceptually:
-
-```ts
-interface WritableCacheTarget {
-    writeMapFile(
-        mapX: number,
-        mapY: number,
-        fileId: number,
-        data: Uint8Array,
-    ): Promise<void>;
-
-    finalize(): Promise<CacheWriteResult>;
-}
-```
-
-This can evolve into generic archive/index writes when needed.
-
-Potential targets:
-
-- in-memory/package target;
-- downloadable cache-patch target;
-- browser File System Access target;
-- Tauri filesystem target;
-- optional backend/FileStore parity target.
-
-### Do not require full-cache rewriting on day one
-
-A region package or cache patch can be implemented before a complete JS5/dat2 writer.
-
-Recommended progression:
-
-1. encode terrain/loc payloads;
-2. export a portable region package;
-3. validate re-import;
-4. add a cache-patch format;
-5. add direct writable cache support;
-6. add full-cache rebuild only where needed.
-
-This keeps map editing independent from backend work.
-
----
-
-## 9. Recommended region/package format
-
-The Studio should have a portable region package separate from raw cache-sector layout.
-
-It should contain:
-
-- format/version;
-- source cache identity;
-- map square coordinates;
-- terrain file-0 payload or semantic representation;
-- loc file-1 payload or semantic representation;
-- optional NPC file-5 payload;
-- optional Obj file-6 payload;
-- optional area file-7 payload;
-- optional GameVal/RSCM metadata;
-- validation hashes;
-- Edit Format history or final semantic state as appropriate.
-
-This package can be:
-
-- downloaded by any browser;
-- imported by any browser;
-- written directly by Tauri;
-- applied to a cache by a later cache writer;
-- validated by the backend when available.
-
-A portable package avoids making `main_file_cache.dat2` sector layout the project's interchange format.
-
----
-
-## 10. RSCM and GameVal model
-
-OpenRune's GameVal system currently loads from several sources:
+OpenRune loads GameVals from:
 
 ```text
 .data/gamevals-binary/gamevals.dat
@@ -516,140 +414,304 @@ api/**/gamevals.toml
 .data/gamevals/*.rscm
 ```
 
-### RSCM files
+### 8.1 Base binary GameVals
 
-RSCM files are simple namespace-specific mapping files.
+`gamevals.dat` is dumped from the base/fresh OSRS cache. It provides official symbols and base-ID ceilings.
 
-Example:
+`gamevals_generated.dat` contains generated mappings such as generated component/column identities.
+
+### 8.2 Module `gamevals.toml`
+
+Module-local declarations look like:
+
+```toml
+[gamevals.varp]
+lumbridge_tutor_claim = 63630
+lumbridge_advisor_state = 63631
+```
+
+These are first-class OpenRune project sources.
+
+### 8.3 RSCM
+
+Namespace-specific files under `.data/gamevals` use forms such as:
 
 ```text
 lumbridge=32764
 wilderness=32760
 ```
 
-The namespace comes from the filename:
+The filename supplies the namespace.
+
+### 8.4 Assignment and provenance
+
+OpenRune's `GameValProvider` remembers which TOML/RSCM file declared a mapping.
+
+An unassigned mapping can use:
 
 ```text
-.data/gamevals/area.rscm -> area.*
+-1
 ```
 
-OpenRune supports prefixes including:
+OpenRune-FileStore's `GameValAssigner` can choose free custom IDs above the base OSRS range and write assignments back through the mutable mapping provider. OpenRune Server's BUILD configuration enables auto-cert, which causes the assignment path to run for unassigned project mappings while also handling cert IDs.
 
-- area;
-- component;
-- content;
-- dbcol;
-- dbrow;
-- dbtable;
-- interface;
-- inv;
-- loc;
-- npc;
-- obj;
-- seq;
-- sprite/model-related namespaces;
-- vars and other server/client symbols.
+Therefore the normal OpenRune-project policy is:
 
-### `gamevals.toml`
+> **Do not invent a competing Studio ID allocator. Preserve the OpenRune source declaration and let OpenRune assign/write IDs during its supported build workflow when assignment is needed.**
 
-Content/API modules can declare mappings under:
+TypeScript may still:
+
+- parse all source formats;
+- show unassigned symbols;
+- validate conflicts;
+- preview available ranges;
+- provide offline diagnostics;
+- preserve provenance.
+
+### 8.5 Cache GameVals
+
+During a cache build:
+
+1. `CollectGameVals` seeds ConstantProvider from existing cache GameVals without overwriting declared project mappings;
+2. source-driven packers register newly packed GameVals;
+3. `PackGameVals` encodes the collected mappings into the cache;
+4. CS2 runs after GameVals are encoded so symbol generation/compilation can see final IDs.
+
+That ordering should be treated as OpenRune-owned build behavior.
+
+---
+
+## 9. Modern map-group layout
+
+For revision 237+ map groups:
+
+| File | Meaning |
+| ---: | --- |
+| 0 | terrain/tile data |
+| 1 | static loc placements |
+| 5 | NPC spawns |
+| 6 | ground-item/Obj spawns |
+| 7 | areas |
+
+Group id:
+
+```text
+(mapX << 8) | mapY
+```
+
+Terminology must remain explicit:
+
+- **loc** = static scene/world object placement;
+- **obj** = ground item;
+- **npc** = NPC spawn;
+- **area** = OpenRune area membership.
+
+Studio `map.objects` are loc placements in file 1. They are **not** OpenRune ground-item `obj` spawns in file 6.
+
+---
+
+## 10. OpenRune map TOML sources
+
+OpenRune Server currently owns source TOML for:
+
+```text
+.data/raw-cache/map/npcs/
+.data/raw-cache/map/objs/
+.data/raw-cache/map/area/
+```
+
+### NPC spawns -> file 5
+
+Source shape:
 
 ```toml
-[gamevals.some_namespace]
-some_name = 12345
+[[spawn]]
+npc = "npc.some_name"
+coords = "0_50_50_38_52"
 ```
 
-OpenRune's provider tracks the source file of declared GameVals.
+The packer resolves symbols through ConstantProvider/GameVals, groups by map square, and encodes NPC spawn lists.
 
-### Base GameVal binary
+### Ground-item spawns -> file 6
 
-`gamevals.dat` provides base cache mappings and the maximum base id per table.
+Source shape:
 
-The file format is simple enough for TypeScript:
+```toml
+[[spawn]]
+obj = "obj.some_item"
+coords = "0_50_50_10_20"
+count = 1
+```
+
+This is ground-item data, not static loc placement.
+
+### Areas -> file 7
+
+Area source contains symbolic area IDs and polygons. OpenRune clips polygons across map squares and encodes the resulting square/zone/coordinate membership.
+
+### Studio policy
+
+For OpenRune-connected projects:
+
+- NPC placement editor -> update NPC map TOML;
+- ground-item editor -> update Obj map TOML;
+- area editor -> update Area TOML;
+- then let OpenRune's existing SERVER build pack files 5/6/7.
+
+Studio should not manually write files 5/6/7 in the normal OpenRune source workflow.
+
+Offline/browser package export may still encode equivalent portable data.
+
+---
+
+## 11. Terrain/static locs and OpenRune-FileStore PackMaps
+
+OpenRune Server does **not** currently expose an equivalent TOML source directory for map-group files 0 and 1.
+
+However, OpenRune-FileStore already provides `PackMaps`.
+
+### 11.1 Inputs accepted by PackMaps
+
+Regular map files:
 
 ```text
-int32 tableCount
-repeat tableCount:
-    int16 tableNameUtf8Length
-    bytes tableName
-    int32 entryCount
-    repeat entryCount:
-        int16 entryUtf8Length
-        bytes "key=id" (or supported subproperty form)
+lX_Y.dat / lX_Y.gz
+mX_Y.dat / mX_Y.gz
 ```
 
-`gamevals_generated.dat` uses the same container format for generated mappings such as components/dbcols.
+In `PackMaps` naming:
 
-### Validation rules worth matching in TypeScript
+- `lX_Y` is the terrain/tile payload;
+- matching `mX_Y` is the static-loc payload.
 
-OpenRune's `GameValProvider` currently enforces important rules:
+It also accepts RSPSi-style:
 
-- custom non-placeholder ids must exceed the maximum base id for that namespace;
-- one key cannot resolve to conflicting ids;
-- one id cannot map to multiple custom keys in the same table;
-- `-1` represents unassigned entries;
-- namespaces must be recognized RSCM prefixes.
+```text
+*.pack
+```
 
-These rules are portable and should be implemented in TypeScript.
+packages.
 
-The backend is not needed to enforce them.
+### 11.2 Modern output
+
+For revision 237+:
+
+```text
+terrain bytes -> map group file 0
+loc bytes     -> map group file 1
+```
+
+For older revisions it uses named map/land archives and optional XTEAs.
+
+### 11.3 Changed-map tracking
+
+`PackMaps` records changed squares through `PackedMapSquares`.
+
+`PackWorldMap` uses that in-memory set to regenerate only affected world-map areas.
+
+Therefore a Studio OpenRune map-publish operation should run:
+
+```text
+PackMaps
+  -> PackWorldMap
+```
+
+inside the same JVM/cache-tool operation, or explicitly rebuild all world-map areas if that shared changed-square state cannot be preserved.
+
+### 11.4 Important OpenRune Server integration gap
+
+OpenRune Server's current `PluginPacks.buildPackTasks()` does not register `PackMaps` in the normal LIVE build task list.
+
+It does register `PackWorldMap`, but without `PackMaps` there are no Studio-produced changed squares for that task to consume.
+
+Therefore merely placing `l/m` files in the OpenRune checkout does not currently make `:or-cache:buildCache` pack them.
+
+### 11.5 Studio solution without OpenRune Server changes
+
+Do **not** patch OpenRune Server.
+
+Instead, the optional Studio backend can use the same OpenRune-FileStore library already used by OpenRune and expose one bounded map-publish operation:
+
+```text
+Studio semantic terrain/loc edits
+  -> TypeScript encode raw terrain/loc payloads
+  -> backend bounded map-publish request
+  -> OpenRune-FileStore PackMaps
+  -> OpenRune-FileStore PackWorldMap (same operation)
+  -> updated LIVE
+  -> normal OpenRune build/server pass
+  -> SERVER reseeded from updated LIVE
+  -> OpenRune map TOML packs files 5/6/7
+```
+
+This reuses OpenRune's cache writing instead of implementing a duplicate DAT2/JS5 writer as the primary OpenRune publication path.
 
 ---
 
-## 11. TypeScript GameVal/RSCM services
+## 12. Portable terrain/static-loc encoding still matters
 
-Introduce a framework-neutral registry.
+Source-first OpenRune publication does not remove the need for TypeScript encoders.
 
-Conceptually:
+TypeScript still needs to produce correct semantic/raw terrain and loc payloads for:
 
-```ts
-interface GameValRegistry {
-    resolve(symbol: string): number | undefined;
-    reverse(namespace: string, id: number): readonly GameValSymbol[];
-    sourceOf(symbol: string): GameValSource | undefined;
-    diagnostics(): readonly GameValDiagnostic[];
-}
+- plain-web export;
+- offline projects;
+- region packages;
+- round-trip testing;
+- Tauri without backend;
+- input to the bounded `PackMaps` publication operation.
+
+Required portable pieces remain conceptually:
+
+```text
+MapTerrainEncoder
+MapLocEncoder
+MapRegionPackage
 ```
 
-Inputs can include:
+But a full custom `WritableCacheStore` is no longer a near-term requirement for OpenRune project publishing.
 
-- cache index-24 GameVals;
-- base `gamevals.dat`;
-- generated GameVals binary;
-- RSCM files;
-- source `gamevals.toml`.
+### Priority change
 
-### Authority/provenance must remain explicit
+Prefer:
 
-Never flatten all names into one anonymous map.
-
-Each symbol should retain:
-
-- namespace;
-- name;
-- id;
-- origin;
-- source path if known;
-- module path if known;
-- cache/project identity;
-- diagnostic/conflict state.
-
-This supports:
-
-- interface labels;
-- loc/npc/obj selection;
-- OpenRune source navigation;
-- validation;
-- generated map TOML;
-- conflict reporting.
+1. semantic terrain/loc encoders;
+2. portable region/raw map package;
+3. exact `PackMaps + PackWorldMap` OpenRune publish operation;
+4. source-first OpenRune build;
+5. only later, generic direct JS5/DAT2 writing if standalone use cases justify it.
 
 ---
 
-## 12. OpenRune project filesystem abstraction
+## 13. OpenRune source-first publishing matrix
 
-Do not make OpenRune project integration synonymous with "backend connection."
+| Studio concept | Authoritative OpenRune input | OpenRune packer/build owner |
+| --- | --- | --- |
+| item definition | pack `configs/*.toml` | `PackConfig` |
+| loc definition | pack `configs/*.toml` | `PackConfig` |
+| NPC definition | pack `configs/*.toml` | `PackConfig` |
+| client vars/configs | pack `configs/*.toml` | `PackConfig` |
+| interfaces | pack interface source/DSL | `PackIfType` |
+| CS2 | pack CS2 source | `PackCs2` / Neptune |
+| models | pack model resources | `PackModels` |
+| sprites | pack sprite resources/manifest | `PackSprites` |
+| DB tables | OpenRune DB-table DSL | `PackDBTables` |
+| GameVal declarations | module `gamevals.toml` / existing RSCM source | GameVal provider/assigner + `PackGameVals` |
+| server NPC/item/loc metadata | `.data/raw-cache/server/**/*.toml` / pack configs | `PackServerConfig` |
+| shops/inventories | server TOML | `PackServerConfig` |
+| NPC placement | `.data/raw-cache/map/npcs/*.toml` | `MapNpcPacker` |
+| ground-item placement | `.data/raw-cache/map/objs/*.toml` | `MapObjPacker` |
+| areas | `.data/raw-cache/map/area/*.toml` | `MapAreaPacker` |
+| terrain | Studio semantic/raw map source | `PackMaps` via bounded Studio publish operation |
+| static loc placement | Studio semantic/raw map source | `PackMaps` via bounded Studio publish operation |
+| LIVE | generated | OpenRune/OpenRune-FileStore build |
+| SERVER | generated from LIVE + server overlays | OpenRune SERVER pass |
 
-Add a portable project filesystem seam.
+---
+
+## 14. ProjectFileSystem
+
+OpenRune project access must remain separate from backend connection.
 
 Conceptually:
 
@@ -669,711 +731,238 @@ interface ProjectFileSystem {
 }
 ```
 
-Security/path rules belong in the adapter.
+Implementations:
 
-Potential implementations:
+- browser import/export;
+- browser File System Access where supported;
+- Tauri scoped filesystem.
 
-### Web import/export adapter
-
-Read-only/import-oriented:
-
-- selected files;
-- selected directory upload;
-- ZIP package;
-- browser persistence.
-
-Writes become downloadable files/packages.
-
-### Web File System Access adapter
-
-Where supported:
-
-- user grants directory;
-- read/write selected tree;
-- retain handle where browser policy permits.
-
-Must have fallback behavior.
-
-### Tauri project filesystem adapter
-
-Preferred desktop implementation:
-
-- native directory picker;
-- scoped project root;
-- direct read/write through Tauri FS;
-- optional watch capability.
-
-This should be the normal Tauri OpenRune project path.
-
-### Backend filesystem adapter
-
-Not the default.
-
-Use only if a backend-only operation needs the backend to read its own opened project session.
-
-Do not send ordinary file reads through Ktor just because the backend exists.
+Svelte should never contain raw filesystem/Tauri/Ktor logic.
 
 ---
 
-## 13. OpenRune project inspection can be TypeScript-first
+## 15. TypeScript OpenRune project index
 
-The current Kotlin backend recognizes an OpenRune checkout by inspecting paths such as:
+Portable indexing should discover:
 
-- Gradle settings;
-- Gradle wrapper;
-- `or-cache/build.gradle.kts`;
-- `content/`;
-- `engine/`;
-- `server/`;
-- `.data/gamevals/`;
+- `game.yml` revision/environment;
+- Gradle/OpenRune project markers;
+- content modules;
+- pack modules;
+- pack resource roots;
+- `gamevals.toml`;
+- `.data/gamevals/*.rscm`;
+- `.data/gamevals-binary/*`;
+- `.data/raw-cache/map/*`;
+- `.data/raw-cache/server/*`;
 - `.data/cache/LIVE`;
 - `.data/cache/SERVER`.
 
-That check is ordinary filesystem inspection.
+The index should preserve provenance rather than flatten all symbols/files into one map.
 
-It can be implemented in TypeScript on top of `ProjectFileSystem`.
-
-Therefore project recognition should not require the backend.
-
-The backend can retain its own inspection before executing privileged JVM operations, but that is a security boundary for the backend, not the frontend's only project model.
+A backend/compiler index is optional enrichment, not the required project model.
 
 ---
 
-## 14. OpenRune content indexing can be mostly TypeScript
+## 16. Editing workflow by content type
 
-The existing backend currently scans:
-
-- content modules;
-- `gamevals.toml`;
-- generated RSCM;
-- Kotlin source facts.
-
-The first three are straightforward portable file indexing.
-
-Implement TypeScript project metadata indexing for:
-
-- content module discovery;
-- GameVal source discovery;
-- RSCM discovery;
-- raw map source discovery;
-- cache directory discovery;
-- simple source text/reference search.
-
-A JVM/backend source index is justified only when the feature requires semantics that are materially better than portable text/structural indexing.
-
-For example:
-
-- exact Kotlin compiler/PSI semantics;
-- Gradle model resolution;
-- classpath-aware symbol resolution.
-
-Do not require that level of analysis for basic "find files that reference `area.lumbridge`" behavior.
-
----
-
-## 15. Raw OpenRune map source adapter
-
-Create a TypeScript OpenRune source adapter for the map sources OpenRune actually owns.
-
-Conceptually:
+### Source-backed OpenRune content
 
 ```text
-OpenRuneRawMapSource
-  +-- npcs/*.toml
-  +-- objs/*.toml
-  +-- area/*.toml
+OpenRune source
+   -> TypeScript parse
+   -> Studio semantic editor
+   -> Edit Format/history
+   -> deterministic source update
+   -> explicit OpenRune build
+   -> generated LIVE/SERVER
 ```
 
-Responsibilities:
+### Terrain/static-loc content
 
-- parse source TOML;
-- resolve RSCM symbols through `GameValRegistry`;
-- expose semantic NPC/Obj/Area models;
-- validate coordinates and ids;
-- generate deterministic TOML;
-- preserve source provenance where practical.
+```text
+LIVE/base cache
+   -> TypeScript decode
+   -> Studio semantic editor
+   -> Edit Format/history
+   -> TypeScript terrain/loc encode
+   -> portable raw/region package
+   -> optional backend PackMaps + PackWorldMap
+   -> updated LIVE
+   -> OpenRune SERVER derivation
+```
 
-### TOML implementation note
+### Offline/browser-only
 
-The client currently does not include a TOML parser dependency.
+```text
+cache/import
+   -> semantic editor
+   -> Studio project/Edit Format
+   -> region/raw/package download
+```
 
-Options:
-
-1. add a small maintained TOML parser;
-2. implement a constrained parser/formatter for the exact OpenRune map and GameVal schemas.
-
-Avoid a hand-written general TOML implementation unless necessary.
-
-The domain model should not expose parser-specific objects.
-
----
-
-## 16. Terrain/static-loc authority
-
-OpenRune currently does not expose `.data/raw-cache/map` source files for map-group files 0/1.
-
-That means Content Studio needs an explicit authority policy.
-
-### Recommended policy
-
-For terrain/static-loc work:
-
-1. the selected base cache is the immutable base;
-2. Studio Edit Format/project state is the authoritative edit layer;
-3. TypeScript encoders create region/cache output on demand;
-4. direct mutation of OpenRune LIVE/SERVER caches is an explicit export/apply action;
-5. optional OpenRune build/verification happens after that when useful.
-
-Do not silently treat a generated cache as the only saved copy of a Studio project.
-
-### Future OpenRune source format
-
-If OpenRune later gains first-class terrain/loc project source files, add an adapter for that format.
-
-Do not require upstream changes today.
+No backend required.
 
 ---
 
-## 17. Cache packing should be layered
+## 17. Backend capability boundary
 
-"Cache packing" is several different capabilities and should not be one backend operation.
+The backend should not become a generic filesystem proxy.
 
-### Layer A: semantic encoder
+Appropriate bounded operations:
 
-Pure TypeScript.
+- build OpenRune project;
+- run allowlisted tests/assemble;
+- pack Studio terrain/loc outputs into LIVE with OpenRune-FileStore;
+- regenerate affected world map in the same operation;
+- verify LIVE/SERVER outputs;
+- optional JVM/compiler-aware source analysis.
 
-Examples:
+Not appropriate as backend requirements:
 
-- terrain semantic state -> map file 0;
-- loc placements -> map file 1;
-- NPC spawns -> file 5;
-- ground objs -> file 6;
-- area definitions -> file 7.
-
-### Layer B: region/package assembly
-
-Pure TypeScript.
-
-Creates portable packages, patches, previews, validation metadata.
-
-### Layer C: cache archive/store writer
-
-Prefer TypeScript.
-
-Writes group/file payloads into a cloned/in-memory/cache target.
-
-This requires proper JS5/cache store reference/sector writing but is not inherently JVM-specific.
-
-### Layer D: OpenRune project build
-
-Optional backend.
-
-Runs the exact project's Gradle/OpenRune build pipeline.
-
-This is where the backend adds the most value.
-
-Do not collapse A-D into one backend-only "publish" endpoint.
+- read/write TOML;
+- read/write RSCM;
+- ordinary project browsing;
+- parse GameVals;
+- edit definitions;
+- edit NPC/Obj/Area source;
+- normal Tauri file access;
+- local Studio project persistence.
 
 ---
 
-## 18. Web capability matrix
+## 18. Build and publication safety
 
-Legend:
+All publication must be explicit.
 
-- ✅ expected capability;
-- ◐ possible with progressive enhancement or additional TS work;
-- ❌ unavailable by browser design;
-- O optional backend can add it.
+Opening an OpenRune project must remain passive:
 
-| Capability | Universal web | FS Access web | Backend |
-| --- | ---: | ---: | ---: |
-| Load static/range cache | ✅ | ✅ | not needed |
-| Import cache folder | ✅ | ✅ | not needed |
-| Persist cache in IndexedDB | ✅ | ✅ | not needed |
-| Decode/render maps | ✅ | ✅ | not needed |
-| Edit terrain/locs | ✅ | ✅ | not needed |
-| Edit/save Studio projects | ✅ | ✅ | not needed |
-| Parse cache GameVals | ✅ | ✅ | not needed |
-| Parse RSCM/GameVal DAT | ◐ | ◐ | not needed |
-| Parse/generate OpenRune TOML | ◐ | ◐ | not needed |
-| Export region/package download | ✅ | ✅ | not needed |
-| Write user-selected OpenRune files directly | ❌ baseline | ✅ where supported | optional |
-| Watch project files | ❌ baseline | browser-dependent | optional |
-| Direct full cache write | ◐ after TS writer | ◐ after TS writer | optional parity |
-| Run Gradle/OpenRune build | ❌ | ❌ | ✅ |
-| Run OpenRune tests | ❌ | ❌ | ✅ |
-| JVM/FileStore parity validation | ❌ | ❌ | ✅ |
-| Exact Kotlin/Gradle semantic analysis | ❌ | ❌ | ✅ when needed |
+- no Gradle;
+- no cache build;
+- no server process;
+- no source writes;
+- no map packing.
 
-The application must not degrade ordinary editing because an optional backend connection is absent.
+Before source writes:
 
----
+1. validate project root;
+2. show planned files;
+3. preserve unknown TOML data/format where practical;
+4. write atomically;
+5. keep recoverable backups or transactional save behavior where practical.
 
-## 19. Tauri capability matrix
+Before backend build/map publication:
 
-| Capability | Tauri without backend | Backend needed? |
-| --- | ---: | ---: |
-| Native project folder picker | ✅ | no |
-| Read OpenRune project tree | ✅ | no |
-| Write RSCM/TOML files | ✅ | no |
-| Read/write cache files | ✅ | no |
-| Watch files | ◐ enable FS watch feature | no |
-| Decode/render/edit maps | ✅ TypeScript | no |
-| Terrain/loc encode | ◐ implement TS codecs | no |
-| Region/package export | ✅ | no |
-| Full cache write | ◐ implement TS cache writer | no |
-| Project metadata index | ✅ TypeScript | no |
-| RSCM/GameVal validation | ✅ TypeScript | no |
-| Run exact `:or-cache:buildCache` | technically native-process capable | backend preferred |
-| Run project tests/Gradle operations | technically native-process capable | backend preferred |
-| OpenRune FileStore parity check | possible to port | backend useful |
-| Compiler/classpath-aware Kotlin analysis | not desirable in webview | backend useful |
-
-### Why retain any backend on Tauri?
-
-Tauri/Rust could technically launch Gradle directly.
-
-However the repository already has a bounded, authenticated backend implementation for:
-
-- Gradle operation allowlisting;
-- process cancellation;
-- log/event streaming;
-- OpenRune FileStore parity;
-- JVM-side project checks.
-
-Keeping that existing service for **explicit OpenRune/JVM operations** is preferable to duplicating those rules in Rust.
-
-The important change is lifecycle:
-
-> Do not start or require the backend for ordinary Tauri editing.
-
-Launch/connect to it lazily when the user requests a backend-only action such as an exact OpenRune build.
+1. validate the opened project/session;
+2. bound input paths to project/session roots;
+3. use fixed operation IDs;
+4. do not accept arbitrary shell/Gradle arguments;
+5. stream structured progress/logs;
+6. support cancellation where practical;
+7. verify expected outputs.
 
 ---
 
-## 20. Backend responsibilities after this architecture
+## 19. Testing strategy
 
-The backend should be intentionally narrow.
+### TypeScript
 
-### Backend should own
+Test:
 
-Capabilities that genuinely benefit from the OpenRune/JVM environment:
-
-- run allowlisted Gradle/OpenRune operations;
-- exact `:or-cache:buildCache`;
-- exact project test/assemble operations;
-- optional `freshCache`;
-- optional upstream `mergePluginGamevals` parity run;
-- OpenRune FileStore verification;
-- output CRC/structure verification through OpenRune libraries;
-- JVM/compiler-aware source analysis when a future feature truly needs it.
-
-### Backend should not be required for
-
-- application startup;
-- map viewing;
-- map editing;
-- cache decoding;
-- cache profile loading;
-- project JSON persistence;
-- terrain/loc encoding;
 - RSCM parsing;
+- `gamevals.toml` parsing;
 - GameVal DAT parsing;
-- TOML parsing/generation;
-- OpenRune directory inspection;
-- Tauri file reads/writes;
-- region package import/export;
-- normal source search;
-- basic GameVal validation;
-- direct source-file updates in Tauri.
-
-### Existing backend capabilities
-
-Existing backend endpoints can remain useful, but frontend architecture should stop treating them as the default path for capabilities that can be local.
-
-For example, backend cache inspection may remain a diagnostic/parity feature even if Tauri directly reads the same cache.
-
----
-
-## 21. Backend lifecycle policy
-
-Backend availability should be modeled as a capability, not a prerequisite.
-
-Recommended states:
-
-```text
-unavailable
-available-not-running
-starting
-ready
-failed
-```
-
-### Web
-
-Web does not automatically start a backend.
-
-A user may explicitly pair/connect to an already-running backend to unlock:
-
-- Gradle build;
-- tests;
-- JVM verification;
-- native project operations that the browser cannot do.
-
-### Tauri
-
-Tauri may package the backend but should start it lazily.
-
-Examples that should **not** start the backend:
-
-- open cache;
-- open map;
-- edit region;
-- save project;
-- open OpenRune folder;
-- inspect RSCM;
-- update map TOML;
-- export package.
-
-Examples that may start it:
-
-- Build OpenRune Project;
-- Publish/verify via upstream OpenRune cache build;
-- Run tests;
-- JVM/FileStore parity validation.
-
----
-
-## 22. Proposed service boundaries
-
-### `CacheSource`
-
-Keep it read-oriented and portable.
-
-Current implementations remain valid:
-
-- static/range;
-- IndexedDB profile.
-
-Potential additions:
-
-- File System Access cache source;
-- Tauri filesystem cache source.
-
-Do not require a backend-backed cache source for local OpenRune caches when direct filesystem access is available.
-
-### `ProjectStore`
-
-Keep local browser persistence independent.
-
-A separate OpenRune project/source adapter should not replace `ProjectStore`.
-
-A Studio project and an OpenRune checkout are related but not identical concepts.
-
-### `ProjectFileSystem`
-
-New platform boundary for direct project files.
-
-Implement:
-
-- web import/download;
-- web File System Access;
-- Tauri filesystem.
-
-### `GameValRegistry`
-
-Pure TS metadata and resolution service.
-
-### `OpenRuneProjectIndex`
-
-Pure TS project discovery/index for:
-
-- modules;
-- GameVals;
-- RSCM;
-- raw map sources;
-- cache paths;
-- simple references.
-
-### `MapCodec`
-
-Pure TS decode/encode boundary for files 0/1/5/6/7.
-
-### `WritableCacheTarget`
-
-Pure TS domain interface with platform-specific byte persistence.
-
-### `OpenRuneBuildService`
-
-Optional native/JVM service.
-
-This is the main place where `StudioBackendClient` belongs.
-
----
-
-## 23. Saving to an OpenRune checkout
-
-Different map data must save differently.
-
-### NPC / Obj / Area
-
-When a writable OpenRune project is connected:
-
-```text
-Studio semantic changes
- -> validate symbols through GameValRegistry
- -> update .data/raw-cache/map/*.toml
- -> save via ProjectFileSystem
- -> optional OpenRune build
-```
-
-This is source-authoritative.
-
-### Terrain / static loc
-
-Because OpenRune currently has no raw source format for these:
-
-```text
-Studio semantic changes
- -> Edit Format / Studio project
- -> TS map encoder
- -> region package / cache patch
- -> optional explicit apply to cache copy or OpenRune LIVE cache
- -> optional OpenRune verification/build
-```
-
-The UI must make an in-place generated-cache write explicit.
-
-### GameVals
-
-For project-owned custom symbols:
-
-```text
-source gamevals.toml
-     + .data/gamevals/*.rscm
-     + base/generated GameVal binary metadata
-     -> GameValRegistry
-```
-
-Prefer editing the authoritative source declaration when one exists.
-
-RSCM updates should follow OpenRune's current merge/validation rules.
-
----
-
-## 24. Publish/build workflow
-
-Publish must remain explicit and staged.
-
-Recommended UX:
-
-```text
-1. Save Studio project
-2. Validate edits locally
-3. Prepare source/cache changes
-4. Show proposed file changes
-5. Apply files
-6. Optional: Build OpenRune Project
-7. Verify outputs
-8. Report exact changed outputs
-```
-
-Do not combine "Save" with "run Gradle and overwrite caches."
-
-Offline users should still be able to complete steps 1-4 and export the result.
-
-Tauri users can normally complete steps 1-5 without the backend.
-
-Backend users can add steps 6-7.
-
----
-
-## 25. Conflict and identity rules
-
-A loaded cache and an OpenRune checkout can be different revisions or states.
-
-Track identities explicitly:
-
-- cache name;
-- game/revision;
-- cache fingerprint when practical;
-- project root identity;
-- project index fingerprint;
-- LIVE/SERVER cache fingerprints;
-- GameVal source generation/fingerprint.
-
-When identities do not match:
-
-- allow viewing;
-- show provenance;
-- warn before applying project symbols/source changes;
-- do not silently rename or rewrite based on assumed equality.
-
----
-
-## 26. XTEA handling
-
-Content Studio already recognizes that OSRS map XTEAs are obsolete from revision 237 onward.
-
-For older caches:
-
-- keep XTEA metadata in `CacheSource`;
-- decrypt/encode through portable TS crypto;
-- keep key import/export independent from backend.
-
-Do not make pre-237 support a backend dependency.
-
----
-
-## 27. Performance rules
-
-Backend avoidance should not mean main-thread work.
-
-Portable heavy work can use:
-
-- Web Workers;
-- transferable/shared buffers;
-- streaming parsing;
-- incremental indexes;
-- WASM only for measured hotspots.
-
-Examples suitable for workers:
-
-- cache packing;
-- region encoding;
-- RSCM/GameVal indexing;
-- project text indexing;
-- ZIP/package assembly.
-
-Keep Svelte on orchestration/UI only.
-
----
-
-## 28. Security model
-
-### Web
-
-The browser sandbox is the security boundary.
-
-Only access user-selected files/directories.
-
-### Tauri
-
-Use narrow project scopes.
-
-Do not grant unrestricted filesystem access merely because the app is desktop.
-
-A project picker should establish the selected root and adapters should reject path traversal outside it.
+- source provenance/conflicts;
+- OpenRune map TOML round trips;
+- server/config TOML adapters as they are added;
+- terrain encoding;
+- static-loc encoding;
+- region/raw package round trips;
+- source update planning.
+
+### OpenRune parity fixtures
+
+Keep representative fixtures for:
+
+- GameVal mappings;
+- config TOML;
+- map NPC/Obj/Area TOML;
+- terrain/loc raw payloads;
+- modern map-group output.
 
 ### Backend
 
-Retain:
+Test the bounded map-publish operation using OpenRune-FileStore:
 
-- loopback-only binding;
-- per-launch token;
-- Host/Origin checks;
-- opaque sessions;
-- project-root confinement;
-- allowlisted Gradle operations;
-- no arbitrary shell API.
+```text
+known LIVE fixture
+ + terrain/loc input
+ -> PackMaps
+ -> PackWorldMap
+ -> reopen cache
+ -> verify group file 0/1
+ -> verify expected changed world-map output
+```
 
-Backend security remains valuable precisely because its operations are the privileged ones.
-
----
-
-## 29. Implementation order
-
-### Phase A: document and stabilize contracts
-
-- [x] Document OpenRune map/cache/RSCM behavior.
-- [x] Define TypeScript-first/backend-minimal ownership.
-- [ ] Add capability types for filesystem/native build availability.
-
-### Phase B: GameVals and project files
-
-1. implement pure TS RSCM parser/index;
-2. implement GameVal DAT reader;
-3. add constrained OpenRune GameVal/TOML parsing;
-4. create `GameValRegistry`;
-5. create `ProjectFileSystem`;
-6. implement Tauri project filesystem adapter;
-7. optionally implement File System Access adapter.
-
-### Phase C: map source integration
-
-1. parse OpenRune NPC/Obj/Area TOML;
-2. expose semantic source models;
-3. generate deterministic TOML;
-4. connect source provenance to map/world tooling.
-
-### Phase D: terrain/loc export
-
-1. implement `MapTerrainEncoder`;
-2. implement `MapLocEncoder`;
-3. add golden round-trip tests;
-4. implement region package;
-5. replace placeholder map import/export providers.
-
-### Phase E: cache writing
-
-1. implement a cache-patch target;
-2. implement writable modern cache store;
-3. add File System Access/Tauri persistence targets;
-4. verify against known caches and optional OpenRune FileStore.
-
-### Phase F: optional backend build
-
-1. narrow `StudioBackendClient` around native build/verification capabilities;
-2. use HTTP transport for explicitly paired web backend;
-3. use lazy Tauri sidecar supervision;
-4. run build/test/verification only on explicit user actions.
+Also verify a subsequent OpenRune build carries those LIVE map files into SERVER while adding files 5/6/7 from source TOML.
 
 ---
 
-## 30. Decisions
+## 20. Implementation sequence
 
-The architecture should follow these decisions unless a future measured/technical constraint requires changing them.
+### Phase A: portable project/source foundation
 
-1. **The backend is optional.**
-2. **TypeScript owns cache/map/GameVal semantics whenever practical.**
-3. **Tauri reads/writes OpenRune projects directly through a scoped filesystem adapter.**
-4. **Web remains fully usable without native services.**
-5. **File System Access is progressive enhancement, not a requirement.**
-6. **OpenRune Gradle/JVM execution is the backend's primary responsibility.**
-7. **Terrain/static-loc editing does not depend on OpenRune's NPC/Obj/Area map packers.**
-8. **OpenRune `obj` means ground item; Studio static map objects are locs.**
-9. **Studio projects/Edit Format remain authoritative for terrain/loc edits until an explicit export/apply.**
-10. **RSCM/GameVal parsing and validation should be portable TypeScript.**
-11. **Generated caches are outputs, not silent project persistence.**
-12. **OpenRune Server requires zero Studio-specific changes.**
+1. `ProjectFileSystem`;
+2. Tauri filesystem adapter;
+3. optional browser File System Access adapter;
+4. TypeScript OpenRune project index;
+5. TypeScript GameVal/RSCM registry;
+6. source-aware TOML adapters.
+
+### Phase B: use OpenRune-owned sources
+
+7. config definition editing -> pack TOML;
+8. GameVal declaration/source updates;
+9. NPC spawn editing -> map NPC TOML;
+10. ground-item editing -> map Obj TOML;
+11. area editing -> area TOML;
+12. server/shop editing -> server TOML.
+
+### Phase C: terrain/static-loc publishing
+
+13. TypeScript terrain encoder;
+14. TypeScript static-loc encoder;
+15. raw `l/m` or compatible region-package output;
+16. backend bounded `PackMaps + PackWorldMap` operation;
+17. explicit OpenRune build;
+18. LIVE/SERVER output verification.
+
+### Phase D: optional generic cache writing
+
+Only after the source-first OpenRune workflow is solid:
+
+19. standalone cache-patch target;
+20. generic writable JS5/DAT2 target if offline/standalone requirements justify the complexity.
 
 ---
 
-## 31. OpenRune reference files
+## 21. Non-negotiable invariants
 
-Primary OpenRune Server files used to derive this architecture:
-
-- `or-cache/build.gradle.kts`
-- `or-cache/src/main/kotlin/dev/openrune/CacheTools.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/GameMapDecoder.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/packing/MapPackers.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/packing/MapNpcPacker.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/packing/MapObjPacker.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/packing/MapAreaPacker.kt`
-- `or-cache/src/main/kotlin/dev/openrune/map/tile/MapTileByteEncoder.kt`
-- `or-cache/src/main/kotlin/dev/openrune/gamevals/GameValProvider.kt`
-- `or-cache/src/main/kotlin/dev/openrune/gamevals/GamevalDumper.kt`
-- `or-cache/src/main/kotlin/dev/openrune/gamevals/PluginGamevalMerger.kt`
-- `or-cache/src/main/kotlin/dev/openrune/gamevals/GameValDat.kt`
-- `or-cache/src/main/kotlin/dev/openrune/rscm/RSCM.kt`
-- `.data/raw-cache/map/npcs/*.toml`
-- `.data/raw-cache/map/objs/*.toml`
-- `.data/raw-cache/map/area/*.toml`
-- `.data/gamevals/*.rscm`
-
-Platform references:
-
-- Tauri v2 filesystem plugin: https://v2.tauri.app/plugin/file-system/
-- Tauri v2 dialog plugin: https://v2.tauri.app/plugin/dialog/
-- File System Access API: https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker
-
+1. OpenRune Server requires zero Studio-specific modifications.
+2. Svelte owns UI, not filesystem/cache/build rules.
+3. TypeScript owns portable semantic editor behavior.
+4. Existing OpenRune source formats remain authoritative when present.
+5. Studio does not maintain a duplicate source database for OpenRune-owned content.
+6. LIVE is the full/base generated cache.
+7. SERVER is derived from LIVE and augmented with server-specific data.
+8. Studio does not normally author SERVER directly.
+9. NPC map TOML -> file 5.
+10. ground-item Obj map TOML -> file 6.
+11. area TOML -> file 7.
+12. static locs are file 1 and are not ground Obj spawns.
+13. OpenRune-FileStore `PackMaps` should be reused for OpenRune terrain/loc publication.
+14. `PackMaps` and `PackWorldMap` should run in one bounded operation when using changed-square tracking.
+15. Backend execution is explicit and lazy.
+16. Opening a project never executes Gradle or changes files.
+17. Generated caches are outputs, not the default authoring source.
+18. Offline/browser editing remains first-class.
