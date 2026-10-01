@@ -1,12 +1,9 @@
 import {
     fetchNpcSpawns,
-    getNpcSpawnsUrl,
-    type NpcSpawn,
-} from "../mapviewer/data/npc/NpcSpawn";
-import {
     fetchObjSpawns,
-    type ObjSpawn,
-} from "../mapviewer/data/obj/ObjSpawn";
+    getNpcSpawnsUrl,
+} from "./bundled-spawn-data";
+import type { NpcSpawn, ObjSpawn } from "./world-source";
 import type {
     WorldData,
     WorldLoadOptions,
