@@ -59,11 +59,11 @@ Next:
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
 - [ ] Extra 3D views such as model preview and minimap through shared/scissored rendering where appropriate.
 
-## Phase 2: backend-ready seams
+## Phase 2: portable/local-first seams
 
-Goal: the frontend works fully offline, with every backend dependency behind an interface the separate Studio backend can implement later.
+Goal: the frontend works fully offline, with portable TypeScript services first and platform capabilities behind narrow adapters.
 
-- [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches and browser-imported IndexedDB profiles behind one contract; future backend-backed OpenRune cache delivery implements the same interface.
+- [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches and browser-imported IndexedDB profiles behind one contract; future filesystem-backed cache sources can implement the same interface without requiring the backend.
 - [x] Formalize `WorldSource`: framework-neutral world-data loading with bundled/offline NPC and ground-item/object spawn snapshots behind one contract; zones/areas extend the seam once a concrete domain model exists.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
@@ -81,28 +81,62 @@ Goal: the frontend works fully offline, with every backend dependency behind an 
 - [ ] Validation overlays for clipping, blocked tiles and missing definitions.
 - [ ] Consistent selection/inspection model across maps, interfaces and future definition editors.
 
-## Phase 4: Studio backend integration and OpenRune compatibility
+## Phase 4: OpenRune source integration, map publication, and optional backend
 
-The backend is a separate local service. OpenRune Server is a compatibility/reference target and should not require Studio-specific modifications.
+OpenRune Server is a compatibility/reference target and should require zero Studio-specific modifications.
 
-The backend now lives under `backend/` in this monorepo; the temporary `Neosback/rspsi` repository is no longer the active source.
+The integration policy is **source-first and TypeScript-first**:
+
+- browser/Tauri local capabilities should not be routed through the backend when they can be implemented safely in TypeScript;
+- when OpenRune already owns a source format, Studio should update that source and let OpenRune pack it;
+- Tauri should read/write user-selected OpenRune project files directly through a scoped filesystem adapter;
+- LIVE is the full/base generated cache;
+- SERVER is derived from LIVE and then augmented with server-specific sources;
+- the backend should be lazy/optional and focused on exact OpenRune/JVM build, map-publication, test, and verification operations.
+
+Backend foundation already completed:
 
 - [x] Move the Kotlin backend foundation into `backend/` with `Protocol`, `StudioService`, tests, Gradle wrapper, and retained research docs.
-- [x] Replace the inherited monolithic `foundationGate` with split backend CI covering compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging.
-- [ ] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
-- [ ] Finalize sidecar packaging after the launch contract is stable.
-- [ ] Add a framework-neutral `StudioBackendClient` and transport abstraction.
-- [ ] Add `HttpBackendTransport` for browser/development connections to an already-running local backend.
-- [ ] Add Tauri backend supervision and `TauriBackendTransport` so the desktop app can self-start a packaged backend sidecar.
-- [ ] Define an ephemeral-port/per-launch-token ready handshake that Tauri can consume without scraping logs.
-- [ ] Add an OpenRune-project `ProjectStore` adapter through the Studio backend.
-- [ ] Add backend-backed OpenRune `CacheSource` and `WorldSource` adapters.
-- [ ] Accept edit batches, validate and save/publish through the separate backend.
-- [ ] Add explicit **Publish Cache** and **Build OpenRune Project** actions with structured results and output verification.
-- [ ] Keep golden-fixture parity between TypeScript and the backend Kotlin protocol.
-- [ ] Keep local/offline implementations available when the backend is not connected.
-- [x] Establish the invariant that Content Studio requires no Studio-specific OpenRune Server endpoints, forks, accessors, hooks, modules, or framework patches.
-- [ ] Keep that invariant enforced as backend write/build/publish support expands.
+- [x] Split backend CI across compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging.
+- [x] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
+- [x] Document OpenRune map/cache/RSCM behavior and establish the TypeScript-first/backend-minimal architecture.
+- [x] Document the complete LIVE -> SERVER cache lifecycle and source-first OpenRune publication rules.
+- [x] Confirm OpenRune-FileStore `PackMaps` supports raw `l/m` map payloads and RSPSi-style `.pack` files.
+
+Portable/source work next:
+
+- [ ] Add a framework-neutral `ProjectFileSystem` capability boundary.
+- [ ] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
+- [ ] Add optional browser File System Access adapter with import/download fallback.
+- [ ] Add pure TypeScript RSCM parsing/indexing.
+- [ ] Add pure TypeScript GameVal DAT parsing, provenance, and OpenRune validation rules.
+- [ ] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
+- [ ] Add source-aware OpenRune config TOML adapters for definitions.
+- [ ] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters.
+- [ ] Add server TOML adapters for future server-content/shop tooling.
+- [ ] Implement TypeScript terrain map-file-0 encoder.
+- [ ] Implement TypeScript static-loc map-file-1 encoder.
+- [ ] Add golden decode/encode round-trip fixtures.
+- [ ] Replace placeholder map import/export providers with a versioned region/raw map package.
+- [ ] Preserve OpenRune-owned source files as the authoritative project form whenever one exists.
+
+OpenRune publication work:
+
+- [ ] Add a bounded backend map-publication operation that uses OpenRune-FileStore `PackMaps`.
+- [ ] Run `PackWorldMap` in the same operation so `PackedMapSquares` changed-region state is preserved.
+- [ ] Verify published file 0/1 data by reopening LIVE through FileStore.
+- [ ] Run the normal OpenRune build explicitly after map publication when the user wants SERVER/project output.
+- [ ] Verify SERVER was reseeded from updated LIVE and map files 5/6/7 were added from OpenRune TOML sources.
+- [ ] Keep `StudioBackendClient` narrow around build/test/map-publish/verification capabilities.
+- [ ] Add `HttpBackendTransport` for explicit browser pairing to an already-running backend.
+- [ ] Add lazy Tauri backend supervision/transport; do not start the sidecar for ordinary editing.
+- [ ] Preserve the invariant that no Studio-specific OpenRune Server endpoints, forks, accessors, hooks, modules, or framework patches are required.
+
+Later/standalone cache writing:
+
+- [ ] Add cache-patch output if standalone workflows need it.
+- [ ] Add a writable modern cache-store implementation only if browser/standalone requirements justify duplicating JS5/DAT2 writing.
+- [ ] Do not make a custom writable cache store the primary OpenRune-project publication path.
 
 ## Phase 5: rendering and performance
 
@@ -122,8 +156,13 @@ Done:
 - [x] CS1 simulation.
 - [x] CS2 manual execution.
 - [x] Inventory/gameval simulation.
+- [x] Document Interface Editor cache/GameVal/RSCM data authority and backend enrichment path.
 
 Next:
+
+- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
+- [ ] Add a framework-neutral Interface metadata source backed first by the TypeScript GameValRegistry/project index.
+- [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
 - [ ] Model and animation viewer.
@@ -135,5 +174,5 @@ Next:
 ## Current caveats
 
 - The legacy TypeScript server has been removed. The intended backend is a separate local Studio service; `Neosback/OpenRune-Server` is an external compatibility/reference target, not the place for Studio-specific backend changes.
-- NPC and ground-item/object spawn snapshots are now consumed through `WorldSource`; authoritative/project-owned world content still needs an OpenRune-backed implementation.
+- NPC and ground-item/object spawn snapshots are now consumed through `WorldSource`; project-owned OpenRune NPC/Obj/Area source should be added through direct project-file adapters rather than requiring a backend.
 - The app builds for the site root with Vite. Any old deployment scripts that assume `/play` need to be treated as legacy.

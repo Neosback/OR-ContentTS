@@ -1,6 +1,6 @@
 # Project edit contracts
 
-This directory contains framework-neutral project/persistence contracts used by the Studio and the future OpenRune backend.
+This directory contains framework-neutral project/persistence contracts used by the Studio. They are portable TypeScript contracts; optional backend workflows may consume them but do not own them.
 
 ## Edit Format v1
 
@@ -96,3 +96,17 @@ The replay contract is intentionally strict:
 `ui/mapeditor/project-session.svelte.ts` is the reactive UI adapter. It binds editor-history changes back into `ProjectLifecycle`, provides local project list/create/open/save/Save As/import/export operations, enforces cache game/revision compatibility, and resets the live editor back to its base scene when switching or closing projects.
 
 The setup screen owns New/Open/Import orchestration and required-map loading. The editor title bar owns Save/Save As/Export/Close. Dirty project transitions and browser exit are guarded explicitly.
+
+
+## OpenRune source application
+
+Studio project/Edit Format state is authoritative for local editing, undo/redo, offline work, and unapplied changes.
+
+When a user applies changes into an OpenRune project:
+
+- use `ProjectFileSystem` to update an authoritative OpenRune source file when one exists;
+- do not replace pack/config/server/map TOML with a parallel Studio-only authoring database;
+- preserve GameVal/source provenance;
+- treat LIVE/SERVER caches as generated outputs.
+
+Terrain/static-loc placement has no current OpenRune TOML source. Those mutations remain represented by Studio semantic state and can be encoded into raw map payloads for portable export or explicit OpenRune-FileStore publication.

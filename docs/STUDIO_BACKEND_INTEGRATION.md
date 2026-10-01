@@ -2,7 +2,11 @@
 
 ## Status
 
-OpenRune Content Studio will use a **separate local Studio backend service** for capabilities that a browser alone cannot safely or practically provide.
+OpenRune Content Studio has a **separate optional Studio backend service** for capabilities that genuinely require or materially benefit from the OpenRune/JVM execution environment.
+
+The default architecture is TypeScript-first and source-first. Normal cache loading, editing, GameVal/RSCM parsing, project persistence, OpenRune source-file updates, package export, and Tauri filesystem access must not require the backend.
+
+See `docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md` for the detailed map/cache/GameVal ownership model.
 
 The backend now lives in this repository under:
 
@@ -35,22 +39,22 @@ The preferred relationship is:
 ```text
 OpenRune Content Studio
         |
-        | stable frontend service interfaces
-        v
-Studio Backend Client
+        +-- framework-neutral TypeScript domain services
+        |      +-- cache/map codecs
+        |      +-- ProjectFileSystem
+        |      +-- GameVal/RSCM registry
+        |      +-- OpenRune source adapters
         |
-        | versioned local protocol
-        v
-Studio Backend Service
+        +-- browser storage / downloads
+        +-- browser File System Access (when available)
+        +-- Tauri dialog + scoped filesystem
         |
-        +-- project/source inspection
-        +-- OpenRune FileStore/cache inspection
-        +-- bounded Gradle operations
-        +-- source/content indexing
-        +-- project persistence/publication
-        |
-        v
-User's OpenRune project checkout
+        +-- optional StudioBackendClient
+               |
+               +-- exact OpenRune Gradle/build/test operations
+               +-- bounded OpenRune-FileStore PackMaps + PackWorldMap publication
+               +-- OpenRune FileStore/JVM parity verification
+               +-- JVM/compiler-aware analysis when truly needed
 ```
 
 The backend may use independently available OpenRune libraries and inspect an OpenRune-compatible project, but Content Studio must work **without requiring Studio-specific modifications to OpenRune Server itself**.
@@ -95,6 +99,10 @@ The backend under `backend/` already provides a useful foundation:
 - bounded Gradle task discovery
 - bounded Gradle operation lifecycle with cancellation/status/events
 - no arbitrary shell execution API
+- ephemeral-port launch support with parent-supplied token input
+- one machine-readable READY handshake after the listener is bound
+- stable API/protocol/backend-process identity through `/api/v1/status`
+- loopback-only browser CORS and OPTIONS/preflight handling
 
 `backend/` is now the single source of truth.
 
@@ -107,162 +115,125 @@ The moved backend is validated in CI across:
 - Gradle/process-boundary tests;
 - runnable StudioService distribution packaging.
 
-The old monolithic `foundationGate` is retired as the canonical merge gate. Packaging and launch/discovery contracts are the next runtime-integration boundary.
+The old monolithic `foundationGate` is retired as the canonical merge gate. The launch/discovery contract is now implemented; frontend client/transport integration is the next runtime boundary.
 
 ## Frontend boundary
 
-Svelte components must not call backend URLs directly.
+Svelte components must not call backend URLs, Tauri filesystem APIs, or raw project files directly.
 
-The intended client layering is:
+The intended layering is:
 
 ```text
 Svelte UI
    |
-ProjectLifecycle / CacheSource / WorldSource / future services
+framework-neutral TypeScript domain services
+   +-- ProjectLifecycle / ProjectStore
+   +-- CacheSource / WorldSource
+   +-- ProjectFileSystem
+   +-- GameValRegistry
+   +-- OpenRune source adapters
+   +-- MapCodec / WritableCacheTarget
    |
-framework-neutral StudioBackendClient
-   |
-BackendTransport
-   +-- HttpBackendTransport      (plain web)
-   +-- TauriBackendTransport     (desktop)
+platform adapters
+   +-- browser IndexedDB/download/import
+   +-- browser File System Access (progressive enhancement)
+   +-- Tauri dialog/filesystem
+   +-- optional StudioBackendClient -> BackendTransport
 ```
 
-The transport layer owns connection/authentication mechanics. Domain adapters own semantics.
+The backend client is **not** the universal transport for OpenRune project access.
 
-Examples:
+Use `StudioBackendClient` only for backend-only capabilities such as exact Gradle/OpenRune builds, bounded FileStore map publication, FileStore parity checks, or JVM-aware analysis. Ordinary Tauri project/source file reads/writes should go through a scoped `ProjectFileSystem` adapter.
 
-- `OpenRuneProjectStore` implements `ProjectStore`
-- `OpenRuneCacheSource` implements `CacheSource`
-- `OpenRuneWorldSource` implements `WorldSource`
-- future source/content/build services consume the same `StudioBackendClient`
-
-This keeps Svelte, map rendering, editor history, and persistence contracts independent from Ktor, Tauri, ports, tokens, or process management.
+This keeps Svelte, map rendering, editor history, persistence, codecs, and project metadata independent from Ktor, ports, tokens, or process management.
 
 ## Desktop/Tauri model
 
-Tauri is the best place to make the backend feel like part of one desktop application.
+Tauri should provide direct local filesystem integration first.
 
-Tauri should be a **process supervisor and secure bridge**, not a second backend implementation.
-
-Target desktop startup:
+The repository already includes the Tauri dialog and filesystem plugins. The normal desktop path should therefore be:
 
 ```text
 User launches Content Studio
         |
         v
-Tauri Rust shell
-        |
-        +-- locate packaged Studio Backend sidecar
-        +-- start backend as a child process
-        +-- request ephemeral port
-        +-- generate/pass per-launch secret
-        +-- wait for ready handshake
-        +-- retain process handle and secret
+Svelte + TypeScript domain services
         |
         v
-Svelte UI starts
+ProjectFileSystem (Tauri adapter)
         |
-        v
-TauriBackendTransport
-        |
-        v
-Studio Backend Service
+        +-- choose OpenRune project directory
+        +-- read/write RSCM and TOML
+        +-- read/write cache files
+        +-- inspect project structure
+        +-- optional file watch
 ```
 
-### Recommended Tauri responsibilities
+No Kotlin backend is required for those operations.
 
-The Rust shell should eventually:
+### Lazy backend sidecar
 
-1. start one backend process per Studio desktop application instance;
-2. request an ephemeral loopback port rather than assuming a fixed port;
-3. create or pass a cryptographically random per-launch token;
-4. wait for a bounded startup/health handshake;
-5. retain the token in Rust process state when practical;
-6. terminate the backend child during clean application shutdown;
-7. detect an unexpected backend exit and expose a recoverable disconnected state;
-8. optionally restart the backend only through explicit lifecycle policy;
-9. never expose arbitrary process execution to the webview.
+A packaged backend may still be supervised by Tauri, but it should be started **on demand**, not as an application-start prerequisite.
 
-### Tauri transport
+Examples that may request the sidecar:
 
-Preferred security model:
+- Build OpenRune Project;
+- run allowlisted Gradle tests/assemble;
+- exact `:or-cache:buildCache`;
+- publish Studio terrain/static-loc payloads into LIVE through OpenRune-FileStore `PackMaps`;
+- run `PackWorldMap` in the same bounded publication operation;
+- OpenRune FileStore parity/output verification;
+- JVM/compiler-aware analysis.
 
-```text
-Svelte
-  -> Tauri invoke
-     -> Rust backend bridge
-        -> localhost backend HTTP/SSE
-```
+The existing ephemeral-port, per-launch-token, READY-handshake, and secure Tauri bridge design remains valid for those backend-only actions.
 
-This allows Rust to retain the backend token instead of handing a privileged secret to arbitrary frontend code.
-
-A direct webview-to-localhost transport can still exist as a development fallback, but the packaged desktop application should prefer the Tauri bridge.
-
-### Packaging
-
-The backend should ultimately be delivered as a Tauri sidecar or equivalent bundled companion executable.
-
-Preferred packaging order:
-
-1. produce a platform-specific backend launcher/binary artifact;
-2. bundle that artifact with Tauri;
-3. let Tauri own its lifecycle;
-4. do not require a separately installed system Java if practical.
-
-A JVM distribution with an embedded runtime is acceptable. A native image is optional and should be chosen only if compatibility and build complexity remain acceptable.
-
-Do not rewrite the Kotlin backend in Rust merely because Tauri uses Rust.
+Tauri/Rust should not duplicate cache/map/GameVal domain logic. TypeScript owns portable semantics; Rust provides platform capability and optional backend lifecycle.
 
 ## Plain web model
 
-A normal browser **cannot launch a local native/JVM process**.
+The normal browser experience does **not** require a local backend.
 
-Therefore the web build cannot honestly provide the same automatic startup behavior as Tauri without an installed helper.
+Universal web mode supports:
 
-Target web flow:
+- static/range cache loading;
+- cache-folder import;
+- IndexedDB cache profiles;
+- local Studio projects;
+- map/interface editing;
+- GameVal/RSCM parsing implemented in TypeScript;
+- region/package/cache-patch downloads.
+
+Supporting browsers may additionally use the File System Access API for user-approved direct project directory reads/writes. This is progressive enhancement because support is not universal.
+
+A backend connection is optional and explicit:
 
 ```text
 Browser Content Studio
         |
-        v
-HttpBackendTransport
+        +-- local/browser capabilities (default)
         |
-        v
-already-running local Studio Backend
-        |
-        v
-OpenRune project
+        +-- optional HttpBackendTransport
+                |
+                v
+        already-running local Studio Backend
+                |
+                +-- Gradle/OpenRune build/test
+                +-- JVM/FileStore verification
 ```
 
-Possible launch experiences:
+Do not require backend pairing merely to inspect RSCM/TOML or perform normal editing.
 
-### Development
+### Development/manual backend pairing
 
-The developer explicitly runs the backend service and the Vite Studio.
+When a backend-only capability is requested, a developer/user may run the backend explicitly and connect through `HttpBackendTransport`.
 
-The frontend connects through `HttpBackendTransport` to a configured loopback endpoint/token.
-
-The current backend Origin checks are not enough by themselves for real browser use. The service must add proper loopback-only CORS and `OPTIONS` preflight handling for the authenticated custom-header requests used by the browser transport.
-
-### Installed local backend helper
-
-A future installer may provide a small local backend launcher/daemon. The browser can detect and pair with it over loopback.
-
-This helper must remain authenticated and loopback-scoped.
-
-### Manual pairing fallback
-
-If automatic discovery is unavailable, the user may explicitly provide connection information generated by the backend launcher.
-
-Do not create an unauthenticated localhost control endpoint merely to avoid pairing.
+The existing loopback-only CORS, token, Host, and Origin protections remain required.
 
 ## Connection discovery contract
 
-The next backend implementation slice is the launch/connection contract.
+The backend launch/connection contract is now established.
 
-Before desktop/frontend runtime integration, the backend should settle a small startup/discovery contract.
-
-Recommended backend launch inputs:
+Supported backend launch inputs:
 
 ```text
 --host 127.0.0.1
@@ -270,7 +241,7 @@ Recommended backend launch inputs:
 --token <ephemeral-secret>
 ```
 
-Recommended ready handshake, emitted once through stdout or another parent-owned channel:
+The ready handshake is emitted once through stdout after the HTTP listener is bound:
 
 ```json
 {
@@ -283,7 +254,7 @@ Recommended ready handshake, emitted once through stdout or another parent-owned
 
 The supplied token must **not** be echoed in the ready payload. The parent already owns it.
 
-The backend should not require the frontend to scrape human-readable log output to discover its port.
+The backend does not require the frontend to scrape human-readable log output to discover its port.
 
 For web/manual operation, an owner-readable session descriptor is acceptable, but the browser cannot read arbitrary local files directly. Desktop Tauri should prefer an inherited/stdio handshake.
 
@@ -306,21 +277,35 @@ If OpenRune changes, adapt the separate backend compatibility layer first whenev
 
 ## Backend authority
 
+The backend is not the authority for portable Studio semantics.
+
 Generated OpenRune caches are outputs, not automatically the authoritative source for every edit.
 
-Preferred write lifecycle:
+Preferred write lifecycle for OpenRune-owned source:
 
 ```text
 Studio semantic edit
-   -> versioned edit/project contract
-   -> backend validation
-   -> authoritative source/config update when available
-   -> explicit build
-   -> output verification
-   -> explicit publish/deploy
+   -> versioned TypeScript edit/project contract
+   -> local TypeScript validation
+   -> authoritative OpenRune TOML/GameVal/pack source update
+   -> explicit OpenRune build
+   -> LIVE output
+   -> SERVER derivation
+   -> optional output verification
 ```
 
-Direct generated-cache mutation should not silently become the fallback publication model.
+Terrain/static-loc edits are special because OpenRune Server currently has no equivalent TOML source for map-group files 0/1. For those edits:
+
+```text
+Studio semantic/Edit Format state
+   -> TypeScript terrain/loc payload
+   -> optional bounded backend PackMaps + PackWorldMap
+   -> LIVE
+   -> explicit normal OpenRune build
+   -> SERVER derived from LIVE
+```
+
+Direct generated-cache mutation should not silently become the fallback publication model. The bounded PackMaps operation is an explicit publisher using OpenRune's own FileStore tooling, not a general cache-patching API.
 
 ## Local/offline behavior
 
@@ -337,19 +322,24 @@ Backend availability should unlock capabilities, not make the entire application
 
 ## Near-term integration sequence
 
-Now that the backend has moved into the monorepo:
+The next integration work should reduce backend dependence while preserving OpenRune's existing source/build system.
 
-1. keep Content Studio local/offline services working;
-2. keep backend-facing TypeScript interfaces transport-neutral;
-3. do not modify OpenRune Server for Studio integration;
-4. validate `backend/` independently in CI;
-5. implement the launch/connection contract: port `0`, parent-supplied token, machine-readable ready handshake, stable status/protocol identity, and loopback CORS/preflight;
-6. finalize backend sidecar packaging after that contract is stable;
-7. add a framework-neutral `StudioBackendClient`;
-8. add HTTP transport for browser/development use;
-9. add a Tauri transport/process supervisor for desktop;
-10. implement `OpenRuneProjectStore`, `OpenRuneCacheSource`, and `OpenRuneWorldSource` against that client as backend capabilities become available;
-11. add build/publish workflows only after source authority and output verification are explicit.
+1. keep all existing local/offline behavior;
+2. implement `ProjectFileSystem` and a Tauri filesystem adapter;
+3. add pure TypeScript RSCM/GameVal registry and OpenRune project indexing;
+4. add source-aware OpenRune config/server/map TOML adapters;
+5. update OpenRune-owned source files rather than compiled caches when a source exists;
+6. add TypeScript terrain and static-loc encoders for portable/offline output;
+7. add region/raw map package export;
+8. narrow `StudioBackendClient` around explicit build/test/map-publish/verification operations;
+9. add a bounded `PackMaps + PackWorldMap` backend operation for terrain/static-loc publication into LIVE;
+10. use the existing `:or-cache:buildCache` operation when the user requests full OpenRune LIVE/SERVER output;
+11. add `HttpBackendTransport` only for explicitly paired web backend use;
+12. add lazy Tauri backend supervision only for backend-only actions;
+13. keep OpenRune Server unchanged;
+14. defer generic JS5/DAT2 writing until standalone workflows prove it is needed.
+
+Do not prioritize backend-backed `ProjectStore`, `CacheSource`, or `WorldSource` merely because the backend can expose files. Prefer direct local implementations when the platform already has the necessary capability.
 
 ## Non-goals
 
@@ -358,4 +348,26 @@ Now that the backend has moved into the monorepo:
 - allowing browser code to execute arbitrary Gradle/shell commands;
 - duplicating the backend inside both Kotlin and Rust;
 - making Tauri mandatory for the web application;
-- requiring the backend for existing offline editing.
+- requiring the backend for normal editing, cache access, GameVal/RSCM parsing, or Tauri filesystem integration;
+- routing ordinary Tauri filesystem operations through Ktor;
+- making the backend start automatically when no backend-only capability is requested.
+
+
+## LIVE and SERVER publication model
+
+OpenRune's SERVER cache is not an independent authoring target.
+
+```text
+OpenRune source + base cache
+   -> LIVE
+   -> SERVER reseed from LIVE with configured client-heavy indices omitted
+   -> server-specific config/map overlays
+   -> completed SERVER
+```
+
+Studio should therefore:
+
+- update OpenRune-owned source first;
+- publish terrain/static-loc data to LIVE only through the explicit FileStore map operation;
+- let the normal OpenRune SERVER pass derive SERVER from the resulting LIVE cache;
+- never expose "edit SERVER directly" as the normal authoring workflow.

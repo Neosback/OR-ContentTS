@@ -33,7 +33,7 @@ interface FloatRect {
 }
 
 /** Default floating rectangles (workbench-relative) for the two panels that start as overlays. */
-const PAINT_TOOLS_FLOAT: FloatRect = { x: 16, y: 48, width: 64, height: 300 };
+const PAINT_TOOLS_FLOAT: FloatRect = { x: 16, y: 48, width: 48, height: 266 };
 const BRUSH_FLOAT: FloatRect = { x: 12, y: 120, width: 300, height: 420 };
 
 function panelTitle(panelId: string): string {

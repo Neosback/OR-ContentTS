@@ -28,15 +28,22 @@
         <div class="center-container max-height">
             <OsrsLoadingBar text={launch.loadingLabel} {progress} />
         </div>
-    {:else if launch.phase === "launch"}
-        <LaunchScreen {launch} />
     {:else if launch.phase === "error"}
         <div class="center-container max-height content-text">{launch.errorMessage}</div>
-    {:else if launch.pluginHost}
-        <EditorWorkbench
-            host={launch.pluginHost}
-            projectSession={projects}
-            onCloseProject={closeProjectToLaunch}
-        />
+    {:else if launch.pluginHost && launch.rendererActivated}
+        <div class="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <EditorWorkbench
+                host={launch.pluginHost}
+                projectSession={projects}
+                onCloseProject={closeProjectToLaunch}
+            />
+            {#if launch.showLaunchPanel}
+                <div class="absolute inset-0 z-50 bg-background">
+                    <LaunchScreen {launch} />
+                </div>
+            {/if}
+        </div>
+    {:else}
+        <LaunchScreen {launch} />
     {/if}
 </div>

@@ -220,6 +220,8 @@ export class LaunchController {
 
     // ── entering the editor ──────────────────────────────────
     isEnteringEditor = $state(false);
+    /** Once true, keep the workbench/canvas mounted behind the setup overlay so map streaming can progress. */
+    rendererActivated = $state(false);
     launchMode = $state<LaunchMode | null>(null);
     enteringProgress = $state(0);
     enteringLoaded = $state(0);
@@ -290,6 +292,7 @@ export class LaunchController {
         this.abort.abort("component-unmount");
         for (const timer of this.timers) window.clearTimeout(timer);
         this.timers.clear();
+        this.mapEditor?.dispose();
     }
 
     private async load(): Promise<void> {
@@ -328,6 +331,11 @@ export class LaunchController {
         this.loadingLabel = "Preparing editor setup...";
         this.loadingProgress = 85;
         const editor = new MapEditor(getMapRenderWorkerPool(), cacheList, cache);
+        await editor.ready;
+        if (this.abort.signal.aborted) {
+            editor.dispose();
+            return;
+        }
         this.loadingProgress = 100;
         this.mapEditor = editor;
         this.pluginHost = editor.pluginHost;
@@ -391,16 +399,20 @@ export class LaunchController {
 
         const bounds = boundsAround(meta.mapX, meta.mapY, meta.radius);
         editor.configureRegionFocus(meta.mapX, meta.mapY, meta.radius);
-        for (let x = bounds.minX; x <= bounds.maxX; x++) {
-            for (let y = bounds.minY; y <= bounds.maxY; y++) editor.renderer.mapManager.loadMap(x, y);
-        }
         host.setSandboxModeActive(mode === "sandbox");
         host.setSandboxBounds(mode === "sandbox" ? bounds : undefined);
         this.sandboxSweepBounds = mode === "sandbox" ? bounds : undefined;
         this.launchMeta = meta;
+
+        // Mount/start the renderer before waiting for map squares. The WebGL map
+        // builder advances from the renderer frame loop.
+        this.beginEntering(bounds, mode);
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) editor.renderer.mapManager.loadMap(x, y);
+        }
+
         // Persist immediately so rapid tab switches cannot miss Last Loaded.
         if (persistNow) this.saveLastLoadedEntry(meta, "enter");
-        this.beginEntering(bounds, mode);
     }
 
     launchRegion(mode: LaunchMode = this.activeMode): void {
@@ -476,6 +488,7 @@ export class LaunchController {
         editor.camera.updated = true;
         editor.camera.updatedPosition = true;
 
+        this.rendererActivated = true;
         this.isEnteringEditor = true;
         this.enteringProgress = 5;
         this.enteringLoaded = 0;
@@ -574,6 +587,7 @@ export class LaunchController {
     }
 
     private beginEntering(bounds: Bounds, mode: LaunchMode): void {
+        this.rendererActivated = true;
         this.isEnteringEditor = true;
         this.isSandboxPostProcessing = false;
         this.launchMode = mode;

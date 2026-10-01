@@ -2,13 +2,13 @@
 
 Repository reviewed: `Neosback/OpenRune-Server`
 
-> **Direction update:** this document records useful OpenRune technical findings, but OpenRune Server is no longer the repository where Content Studio backend features should be implemented. The Studio backend is a separate local service. See `STUDIO_BACKEND_INTEGRATION.md`.
+> **Direction update:** this document records useful OpenRune technical findings. The active design is now TypeScript-first and backend-minimal. Read `OPENRUNE_MAP_CACHE_ARCHITECTURE.md` for the canonical ownership model and `STUDIO_BACKEND_INTEGRATION.md` for optional JVM/backend operations.
 
 ## Executive summary
 
-OpenRune Server remains an important **compatibility and reference target** for Content Studio. It contains the project/domain pieces the separate Studio backend needs to understand: a modular RSMod-derived engine, OpenRune FileStore/cache support, map decoding, collision/world construction, content modules, GameVals, and cache pack/build tooling.
+OpenRune Server remains an important **compatibility and reference target** for Content Studio. It contains project/domain behavior the portable TypeScript layer and optional backend need to understand: a modular RSMod-derived engine, OpenRune FileStore/cache support, map decoding, collision/world construction, content modules, GameVals, and cache pack/build tooling.
 
-Content Studio should attempt to operate against an ordinary compatible OpenRune project without requiring Studio-specific changes to OpenRune Server. The separate Studio backend should adapt to OpenRune project structure, supported libraries, source files, Gradle tasks, and generated outputs rather than adding a Studio HTTP service inside the game server.
+Content Studio should operate against an ordinary compatible OpenRune project without requiring Studio-specific changes to OpenRune Server. Ordinary project/cache/source integration should be direct and TypeScript-first; the separate backend should be reserved for explicit OpenRune/JVM build and verification operations rather than becoming a universal file transport.
 
 ## Relevant architecture
 
@@ -38,7 +38,7 @@ It already depends on OpenRune/OpenRS2 FileStore and definition libraries and pr
 - cache pack/build tasks
 - gameval/RSCM tooling
 
-This matches the Studio rule that the backend should own cache encoding and publishing.
+This makes OpenRune a useful parity/reference source. Studio terrain/static-loc encoding should remain portable in TypeScript, while OpenRune-project publication should reuse OpenRune-FileStore `PackMaps` rather than making a custom JS5 writer the primary path.
 
 ### Map model
 
@@ -56,78 +56,92 @@ Useful existing types include:
 
 ## Gaps to close before direct Studio persistence
 
-### 1. Studio transport belongs outside OpenRune Server
+### 1. Keep transport/platform concerns outside OpenRune Server
 
-The reviewed server modules are game-service/engine oriented. That is now treated as the desired separation, not a gap to fill inside OpenRune Server.
+OpenRune Server should remain unchanged.
 
-Recommended direction:
+Normal integration should be:
 
 ```text
+Content Studio TypeScript
+  -> ProjectFileSystem
+     -> browser import/download or File System Access
+     -> Tauri filesystem
+
+optional:
 Content Studio
   -> StudioBackendClient
-     -> separate Studio Backend Service
-        -> project/source services
-        -> FileStore/cache services
-        -> bounded Gradle/build services
-        -> compatible OpenRune project
+     -> exact OpenRune Gradle/FileStore/JVM operation
 ```
 
-Do not expose arbitrary server internals or filesystem paths directly, and do not add Studio-only HTTP endpoints to OpenRune Server as the default integration strategy.
+### 2. Use OpenRune-owned source first
 
-### 2. Project Format/Edit Format parity belongs in the Studio backend
+When OpenRune has an authoritative source representation, Studio should edit it and let OpenRune pack the output.
 
-The frontend has:
+Examples:
 
-- `openrune.project` v1
-- `openrune.edit-batch` v1
-- strict TypeScript decoders
-- golden fixtures
+- pack config TOML -> `PackConfig`;
+- module `gamevals.toml` / RSCM -> GameVal pipeline;
+- server TOML -> `PackServerConfig`;
+- map NPC TOML -> file 5;
+- map ground-Obj TOML -> file 6;
+- map area TOML -> file 7.
 
-The separate Kotlin Studio backend should consume the same golden fixtures and keep protocol parity before accepting writes. This parity should not require OpenRune Server to own the Studio contract.
+Generated LIVE/SERVER caches should not replace those source files as the authoring model.
 
-### 3. Terrain write path needs a semantic encoder
+### 3. Terrain/static-loc editing remains portable
 
-The current `MapTileByteEncoder` writes raw authored map bytes. Its own comment says it does not decode/re-encode terrain before packing.
+Content Studio still needs portable semantic encoders for map-group file 0 terrain and file 1 static locs so plain web/offline workflows can export useful results.
 
-That does not yet satisfy the Studio contract, where the browser sends semantic tile mutations and the backend is responsible for encoding them. OpenRune needs a semantic terrain mutation/apply layer before Studio terrain publishing is enabled.
+### 4. OpenRune-FileStore already has the cache publisher
 
-### 4. Loc write path needs completion
+The upstream FileStore tooling includes `PackMaps`.
 
-The reviewed tree has `MapLocDefinition` and a loc decoder, but no matching `MapLocListEncoder` was present alongside the NPC/object list encoders.
+For revision 237+, it writes:
 
-Because Edit Format v1 includes semantic loc placement edits, OpenRune needs an authoritative loc list encoder/apply path before map-object edits can be published to cache.
+- terrain/raw tile bytes -> map-group file 0;
+- loc bytes -> map-group file 1.
 
-### 5. Project persistence should be separate from live game state
+It accepts paired raw `lX_Y/mX_Y` files and RSPSi-style `.pack` files.
 
-Studio projects should not mutate the running world/cache on every editor action.
+Therefore OpenRune-project publication does not need a Studio-owned DAT2 writer as its first implementation.
 
-Recommended lifecycle:
+### 5. OpenRune Server does not currently register PackMaps
 
-1. open/create project
-2. bind project to a base cache fingerprint/revision
-3. persist versioned edit batches
-4. validate edits against OpenRune definitions/map rules
-5. build into an isolated output cache/project
-6. publish explicitly
-7. reload/deploy separately
+The current OpenRune Server LIVE pack-task list does not add `PackMaps`.
 
-This preserves Undo/Redo semantics on the frontend and keeps production cache changes explicit.
+Studio should not patch OpenRune Server to fix that.
 
-## Recommended integration order
+Instead, the optional Studio backend can run a bounded FileStore map-publication operation against LIVE.
+
+### 6. PackMaps and PackWorldMap should run together
+
+`PackMaps` records changed squares through the in-memory `PackedMapSquares` set.
+
+`PackWorldMap` consumes that set to rebuild affected world-map areas.
+
+Run them in the same operation or deliberately request a full world-map rebuild.
+
+### 7. LIVE and SERVER have a parent/derivative relationship
+
+SERVER is reseeded from compl## Recommended integration order
 
 1. Keep the completed local frontend `ProjectLifecycle`, `ProjectStore`, `CacheSource`, and `WorldSource` seams stable.
-2. Keep the moved backend under `backend/` as the canonical source and finalize its packaging/startup contract.
-3. Keep Kotlin parity tests for Project Format v1 and Edit Format v1 in that backend.
-4. Add a framework-neutral `StudioBackendClient` plus web/Tauri transports in Content Studio.
-5. Implement an `OpenRuneProjectStore` adapter through the Studio backend.
-6. Add backend-backed OpenRune `CacheSource` and `WorldSource` adapters.
-7. Add semantic terrain + loc application/encoding in the Studio backend using supported OpenRune/FileStore semantics.
-8. Add explicit validate/build/publish operations.
-9. Keep OpenRune Server changes optional and upstream-friendly rather than required for Studio compatibility.
+2. Add `ProjectFileSystem` and direct Tauri filesystem integration.
+3. Add optional browser File System Access with import/download fallback.
+4. Implement TypeScript RSCM/GameVal registry and OpenRune project indexing.
+5. Implement source-aware config/server/map TOML adapters.
+6. Implement TypeScript terrain file-0 and static-loc file-1 encoders.
+7. Add portable raw/region package export.
+8. Narrow `StudioBackendClient` to explicit build/test/map-publish/FileStore/JVM verification.
+9. Add bounded `PackMaps + PackWorldMap` publication into LIVE.
+10. Use the existing explicit cache-build operation to derive SERVER from updated LIVE.
+11. Defer generic writable JS5/DAT2 support until standalone requirements justify it.
+12. Keep OpenRune Server changes optional/upstream-friendly and never required for Studio compatibility.
 
 ## Security boundary
 
-The separate Studio backend will read/write projects and run bounded build operations, so it should not expose arbitrary filesystem access after a project session is opened.
+The separate Studio backend runs privileged JVM/build operations, so its existing filesystem/session security remains important even though ordinary project reads/writes should normally bypass it.
 
 At minimum:
 
@@ -140,8 +154,20 @@ At minimum:
 
 ## Conclusion
 
-OpenRune Server remains a valuable source of truth for OpenRune project/cache/content behavior, but it is **not** the Content Studio backend implementation target.
+OpenRune Server remains a valuable source of truth for project/source/cache behavior, but it is neither the Content Studio backend nor a required runtime dependency.
 
-Content Studio should integrate through the separate Studio backend, which adapts to ordinary OpenRune projects using supported project files, OpenRune/FileStore libraries, source conventions, and bounded Gradle operations. Avoid requiring Studio-specific OpenRune Server patches.
+The preferred model is:
 
-For the active integration and Tauri/web lifecycle design, use `docs/STUDIO_BACKEND_INTEGRATION.md`.
+```text
+OpenRune-owned source
+  -> Studio source-aware edit
+  -> OpenRune build
+  -> LIVE
+  -> SERVER derived from LIVE
+```
+
+For terrain/static-loc placement, Studio keeps portable semantic state and TypeScript encoders, then reuses OpenRune-FileStore `PackMaps + PackWorldMap` for OpenRune-project publication.
+
+No Studio-specific OpenRune Server patches are required.
+
+For the active design, use `docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md` and `docs/STUDIO_BACKEND_INTEGRATION.md`.

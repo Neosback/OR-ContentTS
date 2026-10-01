@@ -17,6 +17,7 @@ dependencies {
     implementation "io.ktor:ktor-server-core-jvm"
     implementation "io.ktor:ktor-server-netty-jvm"
     implementation "io.ktor:ktor-server-content-negotiation-jvm"
+    implementation "io.ktor:ktor-server-cors-jvm"
     implementation "io.ktor:ktor-server-status-pages-jvm"
     implementation "io.ktor:ktor-server-sse-jvm"
     implementation "io.ktor:ktor-serialization-jackson-jvm"
@@ -28,6 +29,15 @@ dependencies {
 
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
     testImplementation "io.ktor:ktor-server-test-host-jvm"
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes(
+            'Implementation-Title': 'OpenRune Content Studio Backend',
+            'Implementation-Version': project.version,
+        )
+    }
 }
 
 application {

@@ -9,12 +9,18 @@ import com.openrune.studio.service.gradle.GradleProjectService
 import com.openrune.studio.service.gradle.GradleTaskDiscoveryService
 import com.openrune.studio.service.project.ProjectIndexService
 import com.openrune.studio.service.project.ProjectSessionManager
+import com.openrune.studio.protocol.STUDIO_API_VERSION
+import com.openrune.studio.protocol.STUDIO_BACKEND_PROTOCOL_VERSION
+import com.openrune.studio.protocol.StudioBackendStatus
 import com.openrune.studio.protocol.StudioCapabilities
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.jackson.jackson
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
@@ -22,16 +28,15 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import io.ktor.server.sse.sse
+import java.util.UUID
 import kotlinx.coroutines.flow.first
 
-private const val API_VERSION = 1
 private val EVENT_JSON = ObjectMapper()
 
-data class StudioServiceStatus(
-    val name: String,
-    val apiVersion: Int,
-    val status: String,
-    val capabilities: List<String>,
+data class StudioServiceIdentity(
+    val backendInstanceId: String = UUID.randomUUID().toString(),
+    val backendVersion: String = studioBackendVersion(),
+    val backendBuild: String = studioBackendBuild(),
 )
 
 data class ProjectOpenRequest(val path: String = "")
@@ -45,9 +50,19 @@ fun Application.studioServiceModule(
     projectIndexes: ProjectIndexService = ProjectIndexService(),
     gradleProjects: GradleTaskDiscoveryService = GradleProjectService(),
     gradleOperations: GradleOperationService = DefaultGradleOperationService(),
+    identity: StudioServiceIdentity = StudioServiceIdentity(),
 ) {
     installApiErrors()
     installStudioServiceSecurity(security)
+
+    install(CORS) {
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Options)
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(StudioServiceSecurity.TOKEN_HEADER)
+        allowOrigins { origin -> security.acceptsOrigin(origin) }
+    }
 
     install(SSE)
 
@@ -61,9 +76,13 @@ fun Application.studioServiceModule(
         get("/api/v1/status") {
             call.respond(
                 HttpStatusCode.OK,
-                StudioServiceStatus(
+                StudioBackendStatus(
                     name = "OpenRune Content Studio Backend",
-                    apiVersion = API_VERSION,
+                    apiVersion = STUDIO_API_VERSION,
+                    protocolVersion = STUDIO_BACKEND_PROTOCOL_VERSION,
+                    backendInstanceId = identity.backendInstanceId,
+                    backendVersion = identity.backendVersion,
+                    backendBuild = identity.backendBuild,
                     status = "ready",
                     capabilities = listOf(StudioCapabilities.ProjectOpen.id),
                 ),
@@ -215,3 +234,16 @@ private fun requireCapability(capabilities: List<String>, capability: String) {
         )
     }
 }
+
+
+private fun studioBackendVersion(): String =
+    StudioServiceIdentity::class.java.`package`.implementationVersion
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: "dev"
+
+private fun studioBackendBuild(): String =
+    System.getenv("OPENRUNE_STUDIO_BUILD")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: studioBackendVersion()

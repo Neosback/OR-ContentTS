@@ -83,19 +83,30 @@ OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/refere
 
 The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend currently compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, and builds a runnable StudioService distribution. Packaging and startup/discovery contracts are the next integration boundary before the frontend depends on it at runtime.
 
-The backend is expected to own capabilities such as:
+The backend is intentionally narrow. Portable capabilities belong in framework-neutral TypeScript first, while OpenRune-owned source formats remain authoritative for OpenRune project publication.
 
-- project/source inspection and backend-backed project persistence
-- authoritative validation
-- OpenRune FileStore/cache inspection
-- source/content indexing and GameVal/RSCM resolution
-- bounded Gradle/build operations
-- later cache encoding, publication, and verification workflows
-- OpenRune project compatibility without requiring a custom OpenRune Server fork
+The backend is useful for:
 
-The frontend should continue to implement local/offline versions of its stable interfaces so the UI remains usable without the backend.
+- bounded Gradle/OpenRune build and test operations;
+- a bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication path for terrain/static-loc edits;
+- exact OpenRune FileStore/JVM parity and output verification;
+- optional `freshCache` / upstream build workflows;
+- JVM/compiler-aware analysis when a future feature actually needs it.
 
-See `docs/STUDIO_BACKEND_INTEGRATION.md` for the process lifecycle, web transport, Tauri sidecar, and connection-discovery model.
+The backend should not be required for:
+
+- OpenRune directory inspection;
+- cache loading/decoding;
+- map viewing/editing;
+- portable terrain/static-loc encoding;
+- RSCM/GameVal parsing;
+- TOML parsing/generation;
+- updating OpenRune-owned TOML/RSCM/pack source files;
+- normal Tauri filesystem reads/writes;
+- Studio project persistence;
+- region/package export.
+
+See `docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md` for the TypeScript-first map/cache/GameVal model and `docs/STUDIO_BACKEND_INTEGRATION.md` for the optional backend lifecycle/security model.
 
 ### Cache access
 
@@ -110,14 +121,14 @@ Cache Repository / map viewer / map editor
           /         \
 StaticRangeCacheSource   IndexedDbProfileCacheSource
           |
- future OpenRuneCacheSource
+ future filesystem-backed CacheSource adapters
 ```
 
 `client/src/cache/cache-source.ts` defines the shared loaded-cache contract and load options. `StaticRangeCacheSource` owns the Studio-served `/caches` source and preserves HTTP Range-capable loading through `CacheFiles`. `IndexedDbProfileCacheSource` adapts browser-imported cache files to the same contract.
 
 Persisted `server:<cache-name>` profile ids remain supported as a compatibility binding, but the prefix is resolved by the cache-source layer rather than by IndexedDB storage. `profile-cache-store.ts` only stores imported cache bytes.
 
-`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. A future backend-backed OpenRune cache adapter should implement `CacheSource` rather than adding transport-aware branches to Svelte screens or map/rendering code. The adapter talks to the separate Studio backend, which in turn inspects a compatible OpenRune project.
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. Future OpenRune-local adapters should implement `CacheSource` without adding platform branches to Svelte screens. Prefer browser File System Access or Tauri filesystem adapters when the platform can read the cache directly. A backend-backed cache adapter is optional diagnostic/parity infrastructure, not the default local path.
 
 ### World data
 
@@ -141,7 +152,7 @@ Spawn map-filtering utilities and spawn types are owned by the world layer. The 
 
 Cache-derived map locs are not WorldSource data; they remain decoded from the active cache. Zones/areas are also not modeled yet because there is no active zone domain model or consumer in the current Studio. Add them to `WorldSource` only when a concrete semantic model exists rather than baking backend transport shapes into the frontend contract.
 
-A future backend-backed OpenRune world adapter should implement `WorldSource` without requiring changes to Svelte viewer code or render-worker world-data contracts.
+A future OpenRune world adapter should implement `WorldSource` without requiring changes to Svelte viewer code or render-worker world-data contracts. Prefer direct project-file adapters (browser filesystem where available, Tauri filesystem on desktop). Backend delivery is optional when a backend-only operation already has the project open.
 
 ### Project persistence
 
@@ -151,7 +162,12 @@ Project persistence is framework-neutral:
 ProjectLifecycle
     -> ProjectStore
        -> IndexedDbProjectStore (local/offline)
-       -> OpenRuneProjectStore (future, via Studio backend)
+
+OpenRune checkout integration is separate:
+    -> ProjectFileSystem
+       -> browser import/download
+       -> browser File System Access (when available)
+       -> Tauri filesystem
 ```
 
 The portable project envelope is `openrune.project` v1. It contains stable project metadata, portable base-cache/source identity, and Edit Format v1 edit data. Renderer state, dock layout, and internal Undo/Redo history are not authoritative project content.
@@ -180,38 +196,42 @@ Project v1
 
 The Svelte launch workflow only orchestrates project selection, required-map loading, progress, and user-facing errors. It does not implement terrain/object mutation rules.
 
-## Backend transport and desktop process boundary
+## Platform filesystem and optional backend boundary
 
-Backend access must remain transport-neutral:
+Portable TypeScript services should depend on capability interfaces, not directly on Tauri or Ktor.
 
 ```text
 Svelte UI
    |
 framework-neutral domain services
+   +-- CacheSource / WorldSource
+   +-- ProjectStore
+   +-- ProjectFileSystem
+   +-- GameValRegistry
+   +-- MapCodec / WritableCacheTarget
    |
+platform adapters
+   +-- browser storage/import/download
+   +-- browser File System Access (progressive)
+   +-- Tauri dialog/filesystem
+   +-- optional StudioBackendClient
+```
+
+Tauri should read/write a user-selected OpenRune checkout directly through a scoped filesystem adapter. It should not start the Kotlin backend merely to open files.
+
+`StudioBackendClient` remains transport-neutral for backend-only operations:
+
+```text
 StudioBackendClient
    |
 BackendTransport
-   +-- HttpBackendTransport   (plain web / development)
-   +-- TauriBackendTransport  (desktop)
+   +-- HttpBackendTransport   (explicit web pairing)
+   +-- TauriBackendTransport  (lazy sidecar bridge)
 ```
 
-The browser build cannot start a local JVM/native service by itself. Web mode therefore connects to an already-running local Studio backend through an authenticated loopback transport.
+The backend sidecar should be lazy. Normal desktop startup, cache access, map editing, GameVal/RSCM inspection, and file saving do not require it.
 
-The Tauri shell may supervise a packaged backend sidecar. In desktop mode, Rust should own backend child-process lifecycle and privileged connection secrets, while the Svelte webview talks through a narrow Tauri transport/bridge. Tauri should not reimplement the Kotlin backend.
-
-The preferred desktop lifecycle is:
-
-```text
-Tauri launch
-  -> start packaged backend sidecar on an ephemeral loopback port
-  -> pass a per-launch token
-  -> receive a machine-readable ready handshake
-  -> expose backend capabilities through TauriBackendTransport
-  -> stop the child during app shutdown
-```
-
-The backend must remain optional for local/offline features. Backend connection failure should degrade backend-only capabilities rather than prevent the Studio shell from starting.
+Backend connection failure should disable only backend-only actions such as exact OpenRune Gradle builds or JVM/FileStore verification.
 
 ### OpenRune compatibility invariant
 
@@ -221,18 +241,18 @@ The backend may inspect compatible OpenRune checkouts, use separately available 
 
 If an integration capability would require changing OpenRune Server source, the capability must degrade/remain unavailable until it can be implemented externally.
 
-### Current backend launch gap
+### Backend launch contract
 
-The current backend is healthy but not yet packaged as a frontend runtime dependency.
+The launch contract is implemented and remains valid for lazy backend use:
 
-Before `StudioBackendClient` integration:
+- ephemeral-port startup (`port=0`);
+- parent-supplied per-launch token;
+- one machine-readable READY handshake;
+- loopback-only CORS/OPTIONS for explicit web pairing;
+- stable API/protocol/backend identity;
+- retained Host/Origin/token and bounded-operation protections.
 
-- support ephemeral-port startup (`port=0`);
-- allow Tauri/parent process to supply the per-launch token;
-- emit one machine-readable ready handshake instead of requiring human-log parsing;
-- add proper loopback-only CORS/OPTIONS behavior for plain-web authenticated requests;
-- expose stable API/protocol/backend identity through status;
-- retain current Host/Origin/token and bounded-operation protections.
+This contract no longer implies that the backend should start with the application.
 
 ## Validation
 
@@ -265,3 +285,56 @@ From `backend/`:
 ./gradlew backendDistribution --no-daemon
 ./gradlew validateBackend --no-daemon
 ```
+
+
+## Interface Editor metadata authority
+
+The Interface Editor has an explicit data-authority model. Full details live in
+`docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
+
+- cache index 3 is authoritative for decoded interface/component structure;
+- cache index 24 GameVals provide cache-matched interface/component names when available;
+- OpenRune `.data/gamevals/*.rscm` and source `gamevals.toml` are project-aware metadata/provenance supplied through the separate Studio backend;
+- project metadata must not silently override a browser-loaded cache unless the project/cache identities are known to match;
+- future backend enrichment belongs behind a framework-neutral `InterfaceMetadataSource`-style domain seam, not direct Svelte/Ktor/RSCM coupling;
+- the Interface Editor must remain usable with cache-only metadata when the backend is unavailable.
+
+The backend already indexes source GameVals and generated RSCM mappings. A future interface-oriented adapter should add bounded id-oriented lookup with provenance/conflict information, then merge it with cache GameVals under the authority rules above.
+
+
+## OpenRune map/cache ownership
+
+The detailed map/cache/RSCM design is defined in `docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md`.
+
+Key rules:
+
+- LIVE is the full/base generated cache;
+- SERVER is reseeded from LIVE, stripped of configured client-heavy indices, then augmented with server-specific data;
+- existing OpenRune TOML/GameVal/pack sources remain authoritative when present;
+- modern map-group file 0 is terrain and file 1 is static locs;
+- OpenRune map TOML covers NPC file 5, ground-Obj file 6, and area file 7;
+- Studio `map.objects` are static locs, not OpenRune ground `obj` spawns;
+- OpenRune-FileStore already provides `PackMaps` for raw terrain/loc payloads and RSPSi-style `.pack` files;
+- the current OpenRune Server build does not register `PackMaps`, so Studio should use a bounded external `PackMaps + PackWorldMap` publication operation rather than patching OpenRune Server;
+- terrain/static-loc codecs remain portable TypeScript so web/offline export still works;
+- RSCM/GameVal DAT/TOML parsing and validation should be pure TypeScript;
+- Tauri should access OpenRune source files directly through `ProjectFileSystem`;
+- backend OpenRune/Gradle execution is optional, explicit, and publication-focused.
+
+
+## Source-first OpenRune publication
+
+When an OpenRune project already has an authoritative source form, Studio writes that source instead of directly patching the generated cache.
+
+Examples:
+
+- definitions -> pack `configs/*.toml` -> `PackConfig`;
+- server metadata/shops -> `.data/raw-cache/server/**/*.toml` -> `PackServerConfig`;
+- GameVals -> module `gamevals.toml` / RSCM -> OpenRune GameVal pipeline;
+- NPC placement -> `.data/raw-cache/map/npcs/*.toml` -> map file 5;
+- ground-item placement -> `.data/raw-cache/map/objs/*.toml` -> map file 6;
+- areas -> `.data/raw-cache/map/area/*.toml` -> map file 7.
+
+Terrain/static-loc placement is the exception because OpenRune Server does not currently expose matching TOML source. Studio keeps portable semantic state, encodes raw map payloads in TypeScript, and may publish them through OpenRune-FileStore `PackMaps + PackWorldMap`. A subsequent normal OpenRune build carries the updated LIVE map data into SERVER.
+
+Do not make generic JS5/DAT2 writing the primary OpenRune publication path.

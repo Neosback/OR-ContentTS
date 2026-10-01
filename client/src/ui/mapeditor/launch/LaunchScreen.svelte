@@ -89,7 +89,7 @@
                 onDoubleClick={(x, y) => launch.onWorldMapDoubleClick(x, y)}
                 onRegionSelect={(_mapX, _mapY, regionId) => launch.selectRegionId(regionId)}
                 getPosition={() => ({ x: editor.camera.getPosX(), y: editor.camera.getPosZ() })}
-                loadMapImageUrl={(mapX, mapY) => editor.getMinimapImageUrl(mapX, mapY)}
+                loadMapImageUrl={(mapX, mapY) => editor.getMinimapPreviewImageUrl(mapX, mapY)}
             />
         {/if}
 
@@ -227,7 +227,7 @@
                             <div class="rounded-md border border-border bg-card p-2">
                                 <div class="flex items-start gap-2">
                                     <img
-                                        src={launch.mapEditor?.getMinimapImageUrl(save.mapX, save.mapY) ?? (save.imageUrl || fallbackPreviewDataUrl(`R${save.regionId}`))}
+                                        src={save.imageUrl || fallbackPreviewDataUrl(`R${save.regionId}`)}
                                         alt="{save.name} preview 64 by 64"
                                         width="48"
                                         height="48"
