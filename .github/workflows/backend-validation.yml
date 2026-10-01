@@ -1,0 +1,42 @@
+name: Backend validation
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            backend/*.gradle
+            backend/gradle.properties
+            backend/gradle/wrapper/gradle-wrapper.properties
+            backend/Protocol/*.gradle
+            backend/StudioService/*.gradle
+
+      - name: Validate backend
+        run: ./gradlew foundationGate --no-daemon
