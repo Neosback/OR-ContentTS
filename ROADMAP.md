@@ -64,7 +64,7 @@ Next:
 Goal: the frontend works fully offline, with every server dependency behind an interface the OpenRune server can implement later.
 
 - [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches and browser-imported IndexedDB profiles behind one contract; future OpenRune cache delivery implements the same interface.
-- [ ] Formalize `WorldSource`: spawn, zone and world definitions independent from the legacy game socket.
+- [x] Formalize `WorldSource`: framework-neutral world-data loading with bundled/offline NPC and ground-item/object spawn snapshots behind one contract; zones/areas extend the seam once a concrete domain model exists.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
 - [x] Move cache download ownership into the Studio; local bootstrap now writes directly to `client/caches`.
@@ -85,7 +85,7 @@ Goal: the frontend works fully offline, with every server dependency behind an i
 
 - [ ] OpenRune Studio server module on top of the OpenRune FileStore/domain layer.
 - [ ] Add an OpenRune-backed `CacheSource` serving versioned caches with Range support.
-- [ ] Implement `WorldSource` and project APIs.
+- [ ] Add an OpenRune-backed `WorldSource` and project APIs.
 - [ ] Accept edit batches, validate and save projects.
 - [ ] Explicit **Publish Cache** and **Build OpenRune Project** actions with structured results.
 - [ ] Golden-fixture tests running the same content through TypeScript and Kotlin decoders.
@@ -123,5 +123,5 @@ Next:
 ## Current caveats
 
 - The legacy TypeScript server has been removed. `Neosback/OpenRune-Server` is the only intended backend target.
-- NPC/object spawn snapshots currently bundled with the Studio keep offline viewing functional; authoritative/project-owned world content should still move behind `WorldSource`.
+- NPC and ground-item/object spawn snapshots are now consumed through `WorldSource`; authoritative/project-owned world content still needs an OpenRune-backed implementation.
 - The app builds for the site root with Vite. Any old deployment scripts that assume `/play` need to be treated as legacy.
