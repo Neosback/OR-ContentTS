@@ -54,7 +54,6 @@ Done:
 - [x] Removed retained legacy TSX and pruned direct React-only dependencies/tooling.
 
 Next:
-
 - [ ] Shops and world map as first-class dock panels.
 - [x] Shared command and keyboard-shortcut registry.
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
