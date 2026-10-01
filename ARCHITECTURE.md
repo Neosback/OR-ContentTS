@@ -81,7 +81,7 @@ The Content Studio backend is a **separate local service**, not OpenRune Server 
 
 OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/reference target. The backend may use OpenRune libraries and inspect a user's OpenRune project, but normal Content Studio development must not require Studio-specific modifications to OpenRune Server.
 
-The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository; `backend/` is now the canonical source. Packaging and startup/discovery contracts remain the next integration boundary before the frontend depends on it at runtime.
+The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend currently compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, and builds a runnable StudioService distribution. Packaging and startup/discovery contracts are the next integration boundary before the frontend depends on it at runtime.
 
 The backend is expected to own capabilities such as:
 
@@ -213,7 +213,30 @@ Tauri launch
 
 The backend must remain optional for local/offline features. Backend connection failure should degrade backend-only capabilities rather than prevent the Studio shell from starting.
 
+### OpenRune compatibility invariant
+
+OpenRune Server is never a required Studio extension point.
+
+The backend may inspect compatible OpenRune checkouts, use separately available OpenRune/FileStore libraries, read source/GameVals/cache outputs, and invoke existing allowlisted Gradle tasks. It must not require Studio-specific OpenRune Server endpoints, forks, hooks, accessors, or framework patches.
+
+If an integration capability would require changing OpenRune Server source, the capability must degrade/remain unavailable until it can be implemented externally.
+
+### Current backend launch gap
+
+The current backend is healthy but not yet packaged as a frontend runtime dependency.
+
+Before `StudioBackendClient` integration:
+
+- support ephemeral-port startup (`port=0`);
+- allow Tauri/parent process to supply the per-launch token;
+- emit one machine-readable ready handshake instead of requiring human-log parsing;
+- add proper loopback-only CORS/OPTIONS behavior for plain-web authenticated requests;
+- expose stable API/protocol/backend identity through status;
+- retain current Host/Origin/token and bounded-operation protections.
+
 ## Validation
+
+### Client
 
 Every pull request that changes the client must pass the clean, reproducible blocking gate:
 
@@ -227,3 +250,18 @@ npm run build
 ```
 
 The architecture gate scans the full active client source tree and package manifest so JSX/TSX and React-era dependencies cannot silently re-enter the Studio.
+
+
+### Backend
+
+Backend changes use `.github/workflows/backend-validation.yml`.
+
+The gate validates compile, Protocol tests, API/security tests, OpenRune inspection/indexing tests, Gradle/process-boundary tests, and the runnable StudioService distribution. The old monolithic `foundationGate` is no longer the canonical merge gate.
+
+From `backend/`:
+
+```bash
+./gradlew backendCheck --no-daemon
+./gradlew backendDistribution --no-daemon
+./gradlew validateBackend --no-daemon
+```
