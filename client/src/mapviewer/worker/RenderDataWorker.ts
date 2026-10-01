@@ -47,8 +47,8 @@ import { SpriteLoader } from "../../rs/sprite/SpriteLoader";
 import { TextureLoader } from "../../rs/texture/TextureLoader";
 import { Hasher } from "../../util/Hasher";
 import { LoadedCache } from "../Caches";
-import { NpcSpawn } from "../data/npc/NpcSpawn";
-import { ObjSpawn } from "../data/obj/ObjSpawn";
+import type { NpcSpawn } from "../../world/world-source";
+import type { ObjSpawn } from "../../world/world-source";
 import { MinimapData, loadMinimapBlob, minimapHdPixelsToBlob } from "./MinimapData";
 import { RenderDataLoader, renderDataLoaderSerializer } from "./RenderDataLoader";
 
