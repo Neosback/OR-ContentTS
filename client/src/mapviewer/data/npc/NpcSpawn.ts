@@ -2,6 +2,7 @@ import { CacheInfo } from "../../../rs/cache/CacheInfo";
 import type { NpcSpawn } from "../../../world/world-source";
 
 export type { NpcSpawn } from "../../../world/world-source";
+export { getMapNpcSpawns } from "../../../world/spawn-utils";
 import npcSpawns2004Url from "./npc-spawns-2004.json?url";
 import npcSpawns2009Url from "./npc-spawns-2009.json?url";
 import npcSpawnsOsrsUrl from "./npc-spawns-osrs.json?url";
@@ -32,15 +33,3 @@ export function fetchLegacyNpcSpawns(signal?: AbortSignal): Promise<NpcSpawn[]> 
     return fetchNpcSpawns(npcSpawns2004Url, signal);
 }
 
-export function getMapNpcSpawns(
-    spawns: NpcSpawn[],
-    maxLevel: number,
-    mapX: number,
-    mapY: number,
-): NpcSpawn[] {
-    return spawns.filter((obj) => {
-        const npcMapX = (obj.x / 64) | 0;
-        const npcMapY = (obj.y / 64) | 0;
-        return mapX === npcMapX && mapY === npcMapY && obj.level <= maxLevel;
-    });
-}
