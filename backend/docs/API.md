@@ -1,6 +1,6 @@
 # Local application API
 
-The API exposes OpenRune Server Studio's JVM/local capabilities to its UI or CLI without leaking internal OpenRune, Gradle, PSI, or filesystem objects.
+The API exposes OpenRune Content Studio Backend's JVM/local capabilities to its UI or CLI without leaking internal OpenRune, Gradle, PSI, or filesystem objects.
 
 The API is versioned under `/api/v1`.
 
