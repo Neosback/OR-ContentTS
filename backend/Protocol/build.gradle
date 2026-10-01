@@ -1,4 +1,4 @@
-description = 'OpenRune Server Studio neutral protocol'
+description = 'OpenRune Content Studio Backend neutral protocol'
 
 apply plugin: 'org.jetbrains.kotlin.jvm'
 
