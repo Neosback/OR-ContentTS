@@ -1,7 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** ProjectStore + ProjectLifecycle/replay + CacheSource; legacy TypeScript server removed
+**Current baseline:** ProjectStore + ProjectLifecycle/replay + CacheSource + WorldSource; legacy TypeScript server removed
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -220,6 +220,7 @@ These PRs establish the current baseline:
 | #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
 | #28 | Wired ProjectLifecycle into the Svelte map-editor workflow and added strict Edit Format v1 replay into live editor history |
 | #29 | Added framework-neutral `CacheSource`, static/Range and IndexedDB implementations, profile source resolution, and Cache Repository integration |
+| #30 | Added framework-neutral `WorldSource`, bundled/offline world data, viewer integration, and neutral spawn-domain ownership |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -361,18 +362,25 @@ The Cache Repository and active map/editor cache resolver consume these source s
 
 A future OpenRune implementation should implement the same `CacheSource` contract and serve versioned cache data with Range support without changing the map/editor UI.
 
-### C. WorldSource
+### C. WorldSource — completed
 
-Remove world/spawn/zone data from the legacy `/api/world` assumption.
+World data that is not authoritative cache-map content now sits behind `client/src/world/world-source.ts`.
 
-Define a source for:
+Current implementation:
 
-- NPC spawns
-- object/world definitions not coming directly from cache
-- zones/areas
-- future project-owned world content
+- `WorldSource` defines the framework-neutral load contract.
+- `BundledWorldSource` provides local/offline NPC and ground-item/object spawn snapshots.
+- `default-world-source.ts` centralizes runtime source selection.
+- `spawn-utils.ts` owns map-square filtering.
+- semantic `NpcSpawn` / `ObjSpawn` types live in the world layer.
+- the Map Viewer consumes `WorldSource` and passes the resulting arrays into the existing render-worker contract.
+- old `mapviewer/data/*Spawn.ts` modules are compatibility facades only.
 
-Provide a local implementation first, then an OpenRune implementation.
+Cache-derived map locs are intentionally not part of WorldSource.
+
+Zones/areas are intentionally not modeled yet because there is no concrete active zone model or consumer. Extend WorldSource when that semantic model exists rather than inventing a transport-shaped contract.
+
+The future OpenRune implementation should satisfy `WorldSource` without changing Svelte viewer code or render-worker initialization.
 
 ### D. OpenRune Studio backend
 
@@ -456,9 +464,9 @@ Start by reading:
 6. `client/src/mapeditor/editor-transaction.ts`
 7. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-The project lifecycle/replay and CacheSource slices are complete. The next backend-ready seam is **WorldSource**: move NPC spawn, zone/area, and other world/content data behind a framework-neutral source so offline bundled data and future OpenRune-backed data share one contract.
+The project lifecycle/replay, CacheSource, and WorldSource frontend seams are complete. The next integration slice is the **OpenRune Studio backend module**, starting with Kotlin parity for Project Format v1 and Edit Format v1 before adding OpenRune-backed `ProjectStore`, `CacheSource`, and `WorldSource` implementations.
 
-After WorldSource, continue with the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
+Keep the local implementations available so the Studio remains usable without OpenRune Server running.
 
 The key architectural requirement is simple:
 

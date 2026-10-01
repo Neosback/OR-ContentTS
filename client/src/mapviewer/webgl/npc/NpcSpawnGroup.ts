@@ -1,4 +1,4 @@
-import { NpcSpawn } from "../../data/npc/NpcSpawn";
+import type { NpcSpawn } from "../../../world/world-source";
 import { AnimationFrames } from "../AnimationFrames";
 
 export type NpcSpawnGroup = {
