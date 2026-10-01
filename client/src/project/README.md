@@ -1,6 +1,6 @@
 # Project edit contracts
 
-This directory contains framework-neutral project/persistence contracts used by the Studio and the future OpenRune backend.
+This directory contains framework-neutral project/persistence contracts used by the Studio. They are portable TypeScript contracts; optional backend workflows may consume them but do not own them.
 
 ## Edit Format v1
 
