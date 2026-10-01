@@ -265,3 +265,18 @@ From `backend/`:
 ./gradlew backendDistribution --no-daemon
 ./gradlew validateBackend --no-daemon
 ```
+
+
+## Interface Editor metadata authority
+
+The Interface Editor has an explicit data-authority model. Full details live in
+`docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
+
+- cache index 3 is authoritative for decoded interface/component structure;
+- cache index 24 GameVals provide cache-matched interface/component names when available;
+- OpenRune `.data/gamevals/*.rscm` and source `gamevals.toml` are project-aware metadata/provenance supplied through the separate Studio backend;
+- project metadata must not silently override a browser-loaded cache unless the project/cache identities are known to match;
+- future backend enrichment belongs behind a framework-neutral `InterfaceMetadataSource`-style domain seam, not direct Svelte/Ktor/RSCM coupling;
+- the Interface Editor must remain usable with cache-only metadata when the backend is unavailable.
+
+The backend already indexes source GameVals and generated RSCM mappings. A future interface-oriented adapter should add bounded id-oriented lookup with provenance/conflict information, then merge it with cache GameVals under the authority rules above.
