@@ -9,7 +9,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary, [ROADMAP.md](RO
 ## Packages
 
 - [`client/`](client/): the Studio frontend (Vite, Svelte 5, dockview-core, TypeScript, WebGL2 rendering).
-- [`Neosback/OpenRune-Server`](https://github.com/Neosback/OpenRune-Server): the companion OpenRune game/backend project. Studio backend integration targets its FileStore/domain and map/content model; it remains a separate repository rather than being vendored into the frontend.
+- [`Neosback/OpenRune-Server`](https://github.com/Neosback/OpenRune-Server): an external OpenRune compatibility/reference project. Content Studio should work with compatible OpenRune projects without requiring Studio-specific changes to this repository.
+- The separate Studio backend is currently being developed under the temporary `Neosback/rspsi` repository/name. It should not be vendored here until its permanent home and packaging are settled.
 
 ## Quick start
 
@@ -56,9 +57,13 @@ The committed `client/cache-target.json` controls the local development cache re
 
 The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` with HTTP Range support. The client streams only the cache ranges it needs and keeps imported/profile caches in browser storage.
 
-## OpenRune backend
+## Studio backend and OpenRune compatibility
 
-The legacy TypeScript game server has been removed from this repository. OpenRune Server is now the only intended server-side target. `ProjectStore`, project lifecycle/replay, `CacheSource`, and `WorldSource` are established local-first seams. The next integration work belongs in OpenRune Server, beginning with format parity and backend implementations of those interfaces rather than recreating server code here.
+The legacy TypeScript game server has been removed from this repository. Content Studio will use a **separate local Studio backend service** for project/source inspection, OpenRune FileStore/cache access, bounded build operations, and later publication workflows.
+
+OpenRune Server itself is a compatibility/reference target, not the repository where Content Studio should add backend endpoints or Studio-specific server changes. The separate backend should inspect and operate against an ordinary compatible OpenRune project.
+
+`ProjectStore`, project lifecycle/replay, `CacheSource`, and `WorldSource` remain local-first frontend seams. See [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the web/Tauri integration and backend lifecycle plan.
 
 ## Credits
 
