@@ -83,12 +83,13 @@ OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/refere
 
 The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend currently compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, and builds a runnable StudioService distribution. Packaging and startup/discovery contracts are the next integration boundary before the frontend depends on it at runtime.
 
-The backend is intentionally narrow. Portable capabilities belong in framework-neutral TypeScript first.
+The backend is intentionally narrow. Portable capabilities belong in framework-neutral TypeScript first, while OpenRune-owned source formats remain authoritative for OpenRune project publication.
 
 The backend is useful for:
 
 - bounded Gradle/OpenRune build and test operations;
-- exact OpenRune FileStore/JVM parity verification;
+- a bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication path for terrain/static-loc edits;
+- exact OpenRune FileStore/JVM parity and output verification;
 - optional `freshCache` / upstream build workflows;
 - JVM/compiler-aware analysis when a future feature actually needs it.
 
@@ -97,9 +98,10 @@ The backend should not be required for:
 - OpenRune directory inspection;
 - cache loading/decoding;
 - map viewing/editing;
-- terrain/static-loc encoding;
+- portable terrain/static-loc encoding;
 - RSCM/GameVal parsing;
 - TOML parsing/generation;
+- updating OpenRune-owned TOML/RSCM/pack source files;
 - normal Tauri filesystem reads/writes;
 - Studio project persistence;
 - region/package export.
@@ -306,10 +308,33 @@ The detailed map/cache/RSCM design is defined in `docs/OPENRUNE_MAP_CACHE_ARCHIT
 
 Key rules:
 
-- modern OpenRune map-group file 0 is terrain and file 1 is static locs;
-- OpenRune raw map TOML currently covers NPC file 5, ground-Obj file 6, and area file 7;
+- LIVE is the full/base generated cache;
+- SERVER is reseeded from LIVE, stripped of configured client-heavy indices, then augmented with server-specific data;
+- existing OpenRune TOML/GameVal/pack sources remain authoritative when present;
+- modern map-group file 0 is terrain and file 1 is static locs;
+- OpenRune map TOML covers NPC file 5, ground-Obj file 6, and area file 7;
 - Studio `map.objects` are static locs, not OpenRune ground `obj` spawns;
-- terrain/static-loc codecs should be pure TypeScript;
+- OpenRune-FileStore already provides `PackMaps` for raw terrain/loc payloads and RSPSi-style `.pack` files;
+- the current OpenRune Server build does not register `PackMaps`, so Studio should use a bounded external `PackMaps + PackWorldMap` publication operation rather than patching OpenRune Server;
+- terrain/static-loc codecs remain portable TypeScript so web/offline export still works;
 - RSCM/GameVal DAT/TOML parsing and validation should be pure TypeScript;
-- Tauri should access OpenRune files directly through `ProjectFileSystem`;
-- backend OpenRune/Gradle execution is optional and explicit.
+- Tauri should access OpenRune source files directly through `ProjectFileSystem`;
+- backend OpenRune/Gradle execution is optional, explicit, and publication-focused.
+
+
+## Source-first OpenRune publication
+
+When an OpenRune project already has an authoritative source form, Studio writes that source instead of directly patching the generated cache.
+
+Examples:
+
+- definitions -> pack `configs/*.toml` -> `PackConfig`;
+- server metadata/shops -> `.data/raw-cache/server/**/*.toml` -> `PackServerConfig`;
+- GameVals -> module `gamevals.toml` / RSCM -> OpenRune GameVal pipeline;
+- NPC placement -> `.data/raw-cache/map/npcs/*.toml` -> map file 5;
+- ground-item placement -> `.data/raw-cache/map/objs/*.toml` -> map file 6;
+- areas -> `.data/raw-cache/map/area/*.toml` -> map file 7.
+
+Terrain/static-loc placement is the exception because OpenRune Server does not currently expose matching TOML source. Studio keeps portable semantic state, encodes raw map payloads in TypeScript, and may publish them through OpenRune-FileStore `PackMaps + PackWorldMap`. A subsequent normal OpenRune build carries the updated LIVE map data into SERVER.
+
+Do not make generic JS5/DAT2 writing the primary OpenRune publication path.
