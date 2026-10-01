@@ -25,16 +25,27 @@
     const activeTool = $derived(editor.tool.current);
     const tooltipSide = $derived(vertical ? "right" : "bottom");
 
-    // A floating strip resizes to fit its orientation.
+    // A floating strip should hug its buttons instead of looking like an empty tool window.
+    // Dockview contributes an 18px drag titlebar; the panel itself has 6px padding on each side.
     $effect(() => {
         if (docked) return;
-        api.setSize(vertical ? { width: 64, height: 300 } : { width: 300, height: 96 });
+        const count = tools.length;
+        const buttonSize = 32;
+        const gap = 2;
+        const panelPadding = 12;
+        const floatingTitlebar = 18;
+        const stripLength = count * buttonSize + Math.max(0, count - 1) * gap + panelPadding;
+        api.setSize(
+            vertical
+                ? { width: 48, height: floatingTitlebar + stripLength }
+                : { width: stripLength, height: floatingTitlebar + buttonSize + panelPadding },
+        );
     });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="flex h-full min-h-0 flex-col bg-background/40 p-1"
+    class="flex h-full min-h-0 flex-col bg-card p-1.5"
     oncontextmenu={(event) => contextMenu.open(event, "Paint tools", workbench?.menuFor(PAINT_TOOLS_PANEL_ID) ?? [])}
 >
     <div class={cn("flex min-h-0 w-full gap-0.5 overflow-hidden", vertical ? "h-full flex-col items-center" : "flex-row flex-wrap items-center justify-center")}>
