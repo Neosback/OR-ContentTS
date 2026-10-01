@@ -7,6 +7,7 @@ import com.openrune.studio.service.project.ProjectSession
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.options
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -65,6 +66,81 @@ class StudioServiceServerTest {
 
         assertEquals(HttpStatusCode.Forbidden, response.status)
         assertTrue(response.body<String>().contains("\"code\":\"ORIGIN_NOT_ALLOWED\""))
+    }
+
+    @Test
+    fun browserPreflightAllowsLoopbackOriginAndStudioTokenHeader() = testApplication {
+        application {
+            studioServiceModule(security = TEST_SECURITY)
+        }
+
+        val response = client.options("/api/v1/status") {
+            loopbackHost()
+            header(HttpHeaders.Origin, "http://localhost:5173")
+            header(HttpHeaders.AccessControlRequestMethod, "GET")
+            header(HttpHeaders.AccessControlRequestHeaders, StudioServiceSecurity.TOKEN_HEADER)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(
+            "http://localhost:5173",
+            response.headers[HttpHeaders.AccessControlAllowOrigin],
+        )
+        assertTrue(
+            response.headers[HttpHeaders.AccessControlAllowMethods]
+                ?.contains("GET") == true,
+        )
+        assertTrue(
+            response.headers[HttpHeaders.AccessControlAllowHeaders]
+                ?.contains(StudioServiceSecurity.TOKEN_HEADER, ignoreCase = true) == true,
+        )
+    }
+
+    @Test
+    fun browserResponseAllowsLoopbackOriginWithoutWeakeningAuthentication() = testApplication {
+        application {
+            studioServiceModule(security = TEST_SECURITY)
+        }
+
+        val response = client.get("/api/v1/status") {
+            studioServiceAuth()
+            header(HttpHeaders.Origin, "http://127.0.0.1:5173")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(
+            "http://127.0.0.1:5173",
+            response.headers[HttpHeaders.AccessControlAllowOrigin],
+        )
+    }
+
+    @Test
+    fun statusExposesStableProtocolAndBackendIdentity() = testApplication {
+        val identity =
+            StudioServiceIdentity(
+                backendInstanceId = "backend-instance-test",
+                backendVersion = "1.2.3",
+                backendBuild = "build-test",
+            )
+
+        application {
+            studioServiceModule(
+                security = TEST_SECURITY,
+                identity = identity,
+            )
+        }
+
+        val response = client.get("/api/v1/status") {
+            studioServiceAuth()
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.body<String>()
+        assertTrue(body.contains("\"apiVersion\":1"))
+        assertTrue(body.contains("\"protocolVersion\":1"))
+        assertTrue(body.contains("\"backendInstanceId\":\"backend-instance-test\""))
+        assertTrue(body.contains("\"backendVersion\":\"1.2.3\""))
+        assertTrue(body.contains("\"backendBuild\":\"build-test\""))
     }
 
     @Test
