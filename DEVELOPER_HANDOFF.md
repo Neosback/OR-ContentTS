@@ -15,7 +15,7 @@ The legacy TypeScript `server/` has been removed from this repository.
 
 OpenRune Server is now an external compatibility/reference target. We may inspect it to understand FileStore, cache/build behavior, GameVals, project structure, and runtime semantics, but normal Content Studio development should not add Studio-specific endpoints or required patches to OpenRune Server.
 
-The separate backend is currently being developed under the temporary `Neosback/rspsi` repository/name. That name is not final. Do **not** copy or fork that backend into this repository while its permanent home, packaging, and startup contract are still being decided.
+The separate backend now lives under `backend/` in this repository. It was moved from the temporary `Neosback/rspsi` development repository. `backend/` is now the canonical source; do not dual-edit or re-import from the old repository. Packaging and the startup/discovery contract are still being finalized.
 
 The intended direction is:
 
@@ -393,25 +393,28 @@ The future backend-backed OpenRune adapter should satisfy `WorldSource` without 
 
 ### D. Separate Studio backend integration
 
-The frontend seams are stable enough for backend integration, but **wait until the separate backend is formally moved and its launch/package contract is settled** before copying or wiring backend implementation code into this repository.
+The backend move is now complete.
 
-Current temporary backend development source:
+Current backend source:
 
-- `Neosback/rspsi`
-- `Protocol`
-- `StudioService`
+- `backend/Protocol`
+- `backend/StudioService`
+- `backend/docs`
+- `backend/gradlew`
 
-The current backend already demonstrates loopback/token security, project sessions, OpenRune project inspection, FileStore cache inspection, Kotlin/source indexing, and bounded Gradle operations. Treat it as the single backend source while it is still being designed.
+The backend already demonstrates loopback/token security, project sessions, OpenRune project inspection, FileStore cache inspection, Kotlin/source indexing, and bounded Gradle operations.
 
-Once the backend move is complete:
+Before frontend runtime integration:
 
-1. add a framework-neutral `StudioBackendClient`;
-2. add `HttpBackendTransport` for web/development use;
-3. add a Tauri process supervisor and `TauriBackendTransport` for desktop;
-4. implement backend-backed `ProjectStore`, `CacheSource`, and `WorldSource` adapters;
-5. add Edit Format validation/publication workflows only when the backend exposes them;
-6. keep shared TypeScript/Kotlin parity fixtures;
-7. do not modify OpenRune Server merely to satisfy Studio integration.
+1. keep `backend/` passing its independent validation gate;
+2. finalize protocol versioning, sidecar packaging, and a machine-readable startup/ready handshake;
+3. add a framework-neutral `StudioBackendClient`;
+4. add `HttpBackendTransport` for web/development use;
+5. add a Tauri process supervisor and `TauriBackendTransport` for desktop;
+6. implement backend-backed `ProjectStore`, `CacheSource`, and `WorldSource` adapters;
+7. add Edit Format validation/publication workflows only when the backend exposes them;
+8. keep shared TypeScript/Kotlin parity fixtures;
+9. do not modify OpenRune Server merely to satisfy Studio integration.
 
 ## 9. Broader editor work
 
@@ -444,7 +447,7 @@ Do not recreate one here, and do not treat OpenRune Server as the Content Studio
 
 Backend implementation belongs in the separate Studio backend project. OpenRune Server is reference/compatibility input and an OpenRune project target that the backend should inspect through supported files, tasks, libraries, and capabilities.
 
-Until the backend is moved from its temporary `Neosback/rspsi` home, do not vendor or fork it into this repository.
+The backend is now canonical under `backend/`. Do not keep a second active backend implementation in the old `rspsi` repository.
 
 The Studio must continue to start and support local editing without either the backend or OpenRune Server running.
 
@@ -497,9 +500,9 @@ Start by reading:
 
 The project lifecycle/replay, CacheSource, and WorldSource frontend seams are complete.
 
-The next backend integration step is intentionally **blocked on the separate Studio backend being formally moved and its packaging/startup contract being finalized**. Until then, continue frontend/editor work or refine transport-neutral client contracts without copying the temporary backend into this repository.
+The backend has now been moved into `backend/`. The next backend integration gate is its packaging/startup contract, especially the ephemeral-port/per-launch-token ready handshake required by Tauri.
 
-When backend integration resumes, start with `docs/STUDIO_BACKEND_INTEGRATION.md` and implement the shared `StudioBackendClient`/transport boundary before backend-backed domain adapters.
+Until that contract is settled, frontend/editor work can continue independently. When runtime integration resumes, start with `docs/STUDIO_BACKEND_INTEGRATION.md` and implement the shared `StudioBackendClient`/transport boundary before backend-backed domain adapters.
 
 Keep all local implementations available so the Studio remains usable without the backend or OpenRune Server running.
 

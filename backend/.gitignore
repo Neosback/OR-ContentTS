@@ -1,0 +1,15 @@
+.gradle/
+.idea/
+bin/
+build/
+out/
+
+.settings/
+
+.classpath
+
+.project
+
+hs_err_*
+/Editor/plugins/
+.DS_Store

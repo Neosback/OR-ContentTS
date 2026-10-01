@@ -85,9 +85,10 @@ Goal: the frontend works fully offline, with every backend dependency behind an 
 
 The backend is a separate local service. OpenRune Server is a compatibility/reference target and should not require Studio-specific modifications.
 
-The current backend work lives temporarily in `Neosback/rspsi`; do not vendor it here until its permanent repository/name and packaging contract are settled.
+The backend now lives under `backend/` in this monorepo; the temporary `Neosback/rspsi` repository is no longer the active source.
 
-- [ ] Finalize the separate backend's permanent home, name, protocol versioning, and packaging.
+- [x] Move the Kotlin backend foundation into `backend/` with `Protocol`, `StudioService`, tests, Gradle wrapper, and retained research docs.
+- [ ] Finalize backend protocol versioning, sidecar packaging, and startup/discovery contract.
 - [ ] Add a framework-neutral `StudioBackendClient` and transport abstraction.
 - [ ] Add `HttpBackendTransport` for browser/development connections to an already-running local backend.
 - [ ] Add Tauri backend supervision and `TauriBackendTransport` so the desktop app can self-start a packaged backend sidecar.

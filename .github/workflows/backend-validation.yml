@@ -17,6 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -38,5 +39,39 @@ jobs:
             backend/Protocol/*.gradle
             backend/StudioService/*.gradle
 
-      - name: Validate backend
-        run: ./gradlew foundationGate --no-daemon
+      - name: Compile backend
+        timeout-minutes: 8
+        run: ./gradlew :Protocol:classes :StudioService:classes --no-daemon --stacktrace
+
+      - name: Test protocol
+        timeout-minutes: 5
+        run: ./gradlew :Protocol:test --no-daemon --stacktrace
+
+      - name: Test API and security
+        timeout-minutes: 5
+        run: |
+          ./gradlew :StudioService:test --no-daemon --stacktrace \
+            --tests com.openrune.studio.service.StudioServiceServerTest \
+            --tests com.openrune.studio.service.GradleOperationApiTest
+
+      - name: Test OpenRune inspection and indexing
+        timeout-minutes: 7
+        run: |
+          ./gradlew :StudioService:test --no-daemon --stacktrace \
+            --tests com.openrune.studio.service.cache.OpenRuneCacheReaderTest \
+            --tests com.openrune.studio.service.openrune.OpenRuneContentIndexerTest \
+            --tests com.openrune.studio.service.openrune.OpenRuneContentResolverTest \
+            --tests com.openrune.studio.service.openrune.OpenRuneKotlinSourceIndexerTest \
+            --tests com.openrune.studio.service.openrune.OpenRuneProjectInspectorTest \
+            --tests com.openrune.studio.service.project.ProjectIndexServiceTest
+
+      - name: Test Gradle process boundary
+        timeout-minutes: 7
+        run: |
+          ./gradlew :StudioService:test --no-daemon --stacktrace \
+            --tests com.openrune.studio.service.gradle.GradleOperationServiceTest \
+            --tests com.openrune.studio.service.gradle.GradleProjectServiceTest
+
+      - name: Build runnable distribution
+        timeout-minutes: 7
+        run: ./gradlew :StudioService:installDist --no-daemon --stacktrace
