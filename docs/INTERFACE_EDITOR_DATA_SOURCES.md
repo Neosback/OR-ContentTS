@@ -123,9 +123,9 @@ That constructor dependency is legacy/dead coupling at the moment. It can be rem
 
 It should not be expanded merely to make GameVals responsible for binary interface decoding.
 
-## OpenRune backend metadata
+## OpenRune project metadata
 
-The Studio backend already indexes two useful OpenRune project sources:
+Two OpenRune project sources are useful to the Interface Editor. The existing Studio backend already indexes them, but normal web/Tauri integration should also index them in portable TypeScript through the project-filesystem layer:
 
 ### 1. Source GameVals
 
@@ -181,15 +181,15 @@ The Interface Editor should distinguish four kinds of information.
 | --- | --- | --- |
 | Interface/component structure | selected cache index 3 | exact data being rendered |
 | Interface/component cache labels | selected cache index 24 GameVals | best match for the exact cache revision |
-| OpenRune project symbolic identity | RSCM / `gamevals.toml` through Studio backend | project-aware symbol mapping |
-| Source provenance/navigation | `gamevals.toml` + Kotlin source index | knows module/path/handlers/references |
+| OpenRune project symbolic identity | RSCM / `gamevals.toml` through TypeScript project index | project-aware symbol mapping |
+| Source provenance/navigation | `gamevals.toml` + portable source search; optional JVM analysis | knows module/path/references without making backend mandatory |
 
 ### Precedence rule
 
 For labels attached to the currently loaded cache:
 
 1. use cache GameVals when available;
-2. enrich with matching backend project symbols/provenance;
+2. enrich with matching OpenRune project symbols/provenance;
 3. fall back to numeric ids.
 
 Do not blindly let a connected OpenRune project rename the active cache's interfaces/components unless the mapping is known to refer to the same id/revision/content identity.
@@ -198,7 +198,7 @@ A project checkout and a browser-loaded cache can be out of sync.
 
 ## Recommended frontend seam
 
-Do not put backend/RSCM logic directly into Svelte panels.
+Do not put filesystem, backend, or RSCM parsing logic directly into Svelte panels.
 
 Introduce a framework-neutral metadata seam when implementation begins, for example:
 
@@ -233,39 +233,32 @@ Exact naming can change. Preserve the separation of concerns.
 Potential implementations:
 
 - `CacheGameValInterfaceMetadataSource`
-- `OpenRuneProjectInterfaceMetadataSource`
+- `OpenRuneProjectInterfaceMetadataSource` backed by the TypeScript GameVal/project index;
+- an optional JVM enrichment source if a future feature needs compiler-aware data;
 - a small composite source that merges them under the authority rules above.
 
 The Interface Editor should still work when only the cache-backed implementation is available.
 
-## Backend improvements that would help the Interface Editor
+## Portable project-index improvements
 
-The backend already has most of the raw information. The missing piece is a frontend-friendly query shape.
+The main missing piece is a frontend-friendly, id-oriented query shape in the TypeScript GameVal/project index.
 
 ### A. Add id-oriented GameVal lookup
 
-Today the backend's strongest resolver starts from a qualified symbol such as:
-
-```text
-content.rock
-```
-
 The Interface Editor normally starts from numeric cache identities.
 
-A useful backend capability would support bounded lookup by:
+The portable registry should support bounded lookup by:
 
 - namespace + id;
 - optionally namespace + name;
 - source type;
 - module.
 
-That avoids transferring/re-indexing the complete project GameVal set merely to label one editor panel.
-
-This should remain a neutral Studio-backend endpoint/service and must not require an OpenRune Server endpoint.
+This avoids requiring a backend connection merely to label one editor panel.
 
 ### B. Preserve provenance in lookup results
 
-For each match, return:
+For each match, retain:
 
 - numeric id;
 - namespace;
@@ -273,22 +266,21 @@ For each match, return:
 - source type;
 - source path;
 - module path;
-- whether the result came from source TOML or generated RSCM.
+- whether the result came from source TOML, generated RSCM, or loaded-cache GameVals.
 
-This enables UI actions such as:
+This enables:
 
-- show symbolic name;
-- show source badge;
-- jump to source;
-- show all aliases for one id;
-- detect conflicting symbols;
-- explain why a name was chosen.
+- symbolic labels;
+- source badges;
+- Open source;
+- Find references;
+- alias display;
+- conflict diagnostics;
+- explanation of why a name was chosen.
 
 ### C. Reconcile source TOML and generated RSCM
 
-The backend currently retains both forms as separate entries, which is good.
-
-Future resolution should not collapse them too early.
+Do not collapse source TOML and generated RSCM into one anonymous map too early.
 
 Useful states include:
 
@@ -298,20 +290,20 @@ Useful states include:
 - multiple symbols map to the same id;
 - one symbol maps to conflicting ids.
 
-Those states are valuable diagnostics for a content studio.
+Those are useful Content Studio diagnostics and can be derived in TypeScript.
 
-### D. Associate metadata with the opened project/cache identity
+### D. Associate metadata with project/cache identity
 
-When backend-backed cache access is implemented, the Studio can compare:
+When a local OpenRune checkout is connected through `ProjectFileSystem`, the Studio can compare:
 
-- opened project identity;
-- LIVE/SERVER cache identity;
+- project root identity/fingerprint;
+- LIVE/SERVER cache identity when available;
 - selected frontend cache identity;
-- project index fingerprint/generation.
+- project index generation/fingerprint.
 
 Only then should project symbols be treated as trusted enrichment for the active cache.
 
-Until that relationship exists, project metadata should be presented as project metadata, not silently treated as cache truth.
+The optional backend may provide additional FileStore/JVM verification, but project metadata should not require it.
 
 ## Interface Editor improvements enabled by this model
 
@@ -322,18 +314,19 @@ Until that relationship exists, project metadata should be presented as project 
 3. Keep component type visible as secondary information.
 4. Remove the unused `ComponentDecoder -> GameVals` constructor dependency if tests confirm it is dead.
 
-### After StudioBackendClient / BackendTransport
+### After ProjectFileSystem / GameValRegistry
 
-1. Add an `InterfaceMetadataSource` backend adapter.
+1. Add an `InterfaceMetadataSource` project adapter.
 2. Query project RSCM/TOML symbols for selected interfaces/components.
 3. Show provenance badges such as `cache`, `RSCM`, or `source`.
 4. Add "Open source" / "Find references" actions when source provenance exists.
 5. Surface symbol conflicts/stale generated mappings as diagnostics rather than guessing.
 6. Allow search by project symbol as well as numeric id/cache name.
+7. Add optional backend/JVM enrichment only if it provides analysis the portable source index cannot.
 
 ### Later editing/publish work
 
-If the Interface Editor becomes a source editor rather than only a cache/interface editor, edits should target authoritative project sources through the Studio backend.
+If the Interface Editor becomes a source editor rather than only a cache/interface editor, edits should target authoritative project sources through `ProjectFileSystem`.
 
 Do not directly rewrite generated RSCM as the default source-authoring workflow unless OpenRune defines that generated file as authoritative for the specific operation.
 
@@ -342,29 +335,31 @@ Preferred direction:
 ```text
 Interface Editor semantic change
     -> Studio domain contract
-    -> backend validation
-    -> authoritative project source/config
-    -> explicit OpenRune cache build
-    -> output verification
+    -> TypeScript validation
+    -> authoritative project source/config through ProjectFileSystem
+    -> optional explicit OpenRune backend build
+    -> optional output verification
 ```
 
 ## Non-goals
 
 - making GameVals responsible for decoding interface binary structure;
 - requiring RSCM files for offline/browser Interface Editor use;
-- making the frontend parse arbitrary OpenRune project files directly;
+- making Svelte components parse arbitrary OpenRune project files directly;
+- requiring the backend for ordinary RSCM/TOML project metadata;
 - modifying OpenRune Server to expose Interface Editor endpoints;
 - allowing project metadata from a mismatched checkout to silently override loaded-cache identities.
 
 ## Practical next implementation slice
 
-After the backend transport/client boundary exists, the recommended order is:
+The recommended order is:
 
 1. use existing cache GameVal child names locally in the component tree;
-2. define the framework-neutral `InterfaceMetadataSource` contract;
-3. add backend id-oriented GameVal lookup with provenance;
-4. implement `OpenRuneProjectInterfaceMetadataSource`;
+2. implement the shared TypeScript `GameValRegistry` / OpenRune project index;
+3. define the framework-neutral `InterfaceMetadataSource` contract;
+4. implement `OpenRuneProjectInterfaceMetadataSource` on top of the portable project index;
 5. merge cache and project metadata with explicit provenance and conflict handling;
-6. add source navigation/reference tooling.
+6. add source navigation/reference tooling;
+7. add optional JVM/backend enrichment only where it materially improves the result.
 
 This produces immediate UI value while preserving offline behavior and the zero-required-OpenRune-changes invariant.
