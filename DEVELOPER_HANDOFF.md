@@ -1,7 +1,7 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** Svelte frontend seams + in-repo Kotlin Studio backend + split backend CI; OpenRune Server remains external/reference-only
+**Current baseline:** Svelte frontend seams + in-repo Kotlin Studio backend + stable launch/connection contract + split backend CI; OpenRune Server remains external/reference-only
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
@@ -15,7 +15,7 @@ As of PR #34:
 - The inherited monolithic `foundationGate` has been replaced by explicit, diagnosable backend validation stages.
 - There are no required Content Studio changes in `Neosback/OpenRune-Server`.
 - OpenRune Server must remain an external compatibility/reference target. If a Studio feature would require patching OpenRune Server framework code, that feature must degrade/remain unavailable until it can be implemented externally.
-- Backend runtime integration with the frontend is not wired yet. The next backend slice is the launch/connection contract, then transport clients, then domain adapters.
+- Backend runtime integration with the frontend is not wired yet. The launch/connection contract is implemented; the next backend slice is `StudioBackendClient` + `BackendTransport`, then HTTP/Tauri transports and domain adapters.
 
 
 ## 1. Critical direction
@@ -246,6 +246,8 @@ These PRs establish the current baseline:
 | #31 | Reframed OpenRune Server as compatibility/reference only and documented separate backend + Tauri/web integration |
 | #33 | Added backend validation workflow |
 | #34 | Moved the Kotlin backend into `backend/`, made it canonical, replaced legacy `foundationGate`, split backend CI by subsystem, and validated the runnable distribution |
+| #35 | Updated the backend handoff/docs around the monorepo move and zero-required-OpenRune-changes invariant |
+| #36 | Added the backend launch/connection contract: ephemeral port, parent token, READY handshake, stable status identity, and loopback browser CORS/preflight |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -468,19 +470,18 @@ Current integration findings:
 - opening an OpenRune project is passive;
 - current source/content/cache inspection paths are read-only;
 - the only checkout-modifying behavior today is explicitly requested existing Gradle tasks, which may generate normal build outputs;
-- plain-web integration still needs proper CORS/preflight support for authenticated cross-origin localhost requests;
-- packaged Tauri should supervise the backend rather than reimplement it;
-- the current fixed/default launch assumptions should become an ephemeral-port, parent-supplied-token, machine-readable ready handshake.
+- plain-web integration now has loopback-only CORS/preflight support for authenticated localhost requests;
+- the backend supports an ephemeral port, parent-supplied token, one machine-readable READY record, and stable status identity;
+- packaged Tauri should supervise the backend rather than reimplement it.
 
 Next backend sequence:
 
-1. **Launch/connection contract:** support port `0`, parent-supplied token, stable protocol/backend identity, and one machine-readable ready message.
-2. **Web security/transport:** proper loopback-only CORS + OPTIONS/preflight behavior.
-3. **StudioBackendClient:** framework-neutral client + transport contract.
-4. **HttpBackendTransport:** browser/development connection to an already-running backend.
-5. **Tauri supervision:** Rust starts/stops the packaged backend, retains privileged token/process state, and exposes `TauriBackendTransport`.
-6. **Domain adapters:** backend-backed `ProjectStore`, `CacheSource`, and `WorldSource`.
-7. **Write/build/publish:** only after source authority, Edit Format validation, and output verification are explicit.
+1. **StudioBackendClient + BackendTransport:** framework-neutral client and transport contract.
+2. **HttpBackendTransport:** browser/development connection to an already-running backend.
+3. **Tauri supervision:** Rust starts/stops the packaged backend and retains privileged token/process state.
+4. **TauriBackendTransport:** bridge Svelte/domain services to the supervised backend without duplicating Kotlin business logic.
+5. **Domain adapters:** backend-backed `ProjectStore`, `CacheSource`, and `WorldSource`.
+6. **Write/build/publish:** only after source authority, Edit Format validation, and output verification are explicit.
 
 Do not modify OpenRune Server merely to satisfy Studio integration.
 
@@ -595,18 +596,17 @@ The project lifecycle/replay, CacheSource, and WorldSource frontend seams are co
 
 The backend is now moved, canonical, and fully validated under `backend/`.
 
-The **immediate backend integration PR** should implement the launch/connection contract:
+The backend launch/connection contract is implemented:
 
-- bind to an ephemeral port when requested (`port=0`);
-- accept a parent-supplied per-launch token;
-- emit one machine-readable ready handshake containing protocol version, endpoint/port, process/backend instance identity, and capabilities as appropriate;
-- never echo the supplied token in the ready payload;
-- add proper loopback-only browser CORS/preflight handling;
-- expose stable backend/API protocol identity through status;
-- retain Host/Origin/token protections;
-- remove/reframe inherited research that suggests required OpenRune Server source/runtime changes.
+- ephemeral `port=0` launch;
+- parent-supplied per-launch token;
+- one machine-readable READY handshake with protocol version, endpoint, PID, and backend instance identity;
+- no token in the READY payload;
+- loopback-only browser CORS/preflight;
+- stable backend/API protocol identity through status;
+- retained Host/Origin/token protections.
 
-After that, implement `StudioBackendClient` and transports before any backend-backed domain adapters.
+The **immediate backend integration PR after this baseline** should implement `StudioBackendClient` and the framework-neutral `BackendTransport` contract. Add concrete HTTP/Tauri transports before any backend-backed domain adapters.
 
 Frontend/editor work such as seamless multi-region editing can continue independently in separate PRs after the launch contract is stable.
 
