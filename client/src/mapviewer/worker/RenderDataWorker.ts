@@ -207,10 +207,31 @@ function clearCache(workerState: WorkerState): void {
     workerState.skeletalSeqLoader?.clearCache();
 }
 
+async function requireWorkerState(): Promise<WorkerState> {
+    const workerState = await workerStatePromise;
+    if (!workerState) {
+        throw new Error("Worker not initialized");
+    }
+    return workerState;
+}
+
+async function withTransientModelCaches<T>(
+    task: (workerState: WorkerState) => T | Promise<T>,
+): Promise<T> {
+    const workerState = await requireWorkerState();
+    try {
+        return await task(workerState);
+    } finally {
+        clearCache(workerState);
+    }
+}
+
 const worker = {
-    initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]) {
+    async initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): Promise<void> {
         console.log("init worker", cache.info);
-        workerStatePromise = initWorker(cache, objSpawns, npcSpawns);
+        const nextState = initWorker(cache, objSpawns, npcSpawns);
+        workerStatePromise = nextState;
+        await nextState;
     },
     initDataLoader<I, D>(dataLoader: RenderDataLoader<I, D>) {
         dataLoader.init();
@@ -222,31 +243,22 @@ const worker = {
         dataLoader: RenderDataLoader<I, D>,
         input: I,
     ): Promise<TransferDescriptor<D> | undefined> {
-        const workerState = await workerStatePromise;
-        if (!workerState) {
-            throw new Error("Worker not initialized");
-        }
-
-        const { data, transferables } = await dataLoader.load(workerState, input);
-
-        clearCache(workerState);
-
-        if (!data) {
-            return undefined;
-        }
-        return Transfer<D>(data, transferables);
+        return withTransientModelCaches(async (workerState) => {
+            const { data, transferables } = await dataLoader.load(workerState, input);
+            if (!data) {
+                return undefined;
+            }
+            return Transfer<D>(data, transferables);
+        });
     },
     async loadEditorMapData(
         mapX: number,
         mapY: number,
         smoothUnderlays: boolean,
     ): Promise<TransferDescriptor<EditorMapData | undefined>> {
-        const workerState = await workerStatePromise;
-        if (!workerState) {
-            throw new Error("Worker not initialized");
-        }
-
-        return loadEditorMapData(workerState, mapX, mapY, smoothUnderlays);
+        return withTransientModelCaches((workerState) =>
+            loadEditorMapData(workerState, mapX, mapY, smoothUnderlays),
+        );
     },
     async loadEditorMapTerrainData(
         mapX: number,
@@ -254,12 +266,9 @@ const worker = {
         heightMapTextureData: Float32Array,
         smoothUnderlays: boolean,
     ): Promise<EditorMapTerrainData | undefined> {
-        const workerState = await workerStatePromise;
-        if (!workerState) {
-            throw new Error("Worker not initialized");
-        }
-
-        return loadEditorMapTerrainData(workerState, mapX, mapY, heightMapTextureData, smoothUnderlays);
+        return withTransientModelCaches((workerState) =>
+            loadEditorMapTerrainData(workerState, mapX, mapY, heightMapTextureData, smoothUnderlays),
+        );
     },
     async loadEditorMapObjectData(
         mapX: number,
@@ -270,15 +279,12 @@ const worker = {
         chunkIds: number[],
         smoothUnderlays: boolean,
     ): Promise<TransferDescriptor<EditorMapObjectChunkData[]>> {
-        const workerState = await workerStatePromise;
-        if (!workerState) {
-            throw new Error("Worker not initialized");
-        }
-
-        return loadEditorMapObjectData(
-            workerState,
-            { mapX, mapY, borderSize, scene, sceneLocData, chunkIds },
-            smoothUnderlays,
+        return withTransientModelCaches((workerState) =>
+            loadEditorMapObjectData(
+                workerState,
+                { mapX, mapY, borderSize, scene, sceneLocData, chunkIds },
+                smoothUnderlays,
+            ),
         );
     },
     async loadTexture(
