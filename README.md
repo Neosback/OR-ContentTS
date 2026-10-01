@@ -63,7 +63,11 @@ The legacy TypeScript game server has been removed from this repository. Content
 
 OpenRune Server itself is a compatibility/reference target, not the repository where Content Studio should add backend endpoints or Studio-specific server changes. The backend under [`backend/`](backend/) should inspect and operate against an ordinary compatible OpenRune project.
 
-`ProjectStore`, project lifecycle/replay, `CacheSource`, and `WorldSource` remain local-first frontend seams. See [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the web/Tauri integration and backend lifecycle plan.
+**Content Studio requires zero Studio-specific OpenRune Server modifications.** Unsupported capabilities degrade rather than triggering an OpenRune Server fork, endpoint, hook, accessor, module, or framework patch.
+
+The moved backend is validated independently for compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging. `ProjectStore`, project lifecycle/replay, `CacheSource`, and `WorldSource` remain local-first frontend seams.
+
+See [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the web/Tauri integration and backend lifecycle plan.
 
 ## Credits
 
