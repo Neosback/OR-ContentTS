@@ -77,4 +77,4 @@ Operation snapshots expose lifecycle state, elapsed duration, exit status when a
 
 Only one Gradle operation may run against the same canonical checkout at a time, even when that checkout is opened through multiple Studio sessions. Recent snapshots remain session-scoped for lookup.
 
-The OpenRune server `run` task is still intentionally excluded from the allowlist. The lifecycle foundation is now suitable for adding that long-lived operation in a separate, focused change.
+The OpenRune server `run` task is intentionally excluded from the allowlist. Content Studio does not own OpenRune game-server lifecycle and does not need to launch or modify OpenRune Server for normal backend integration.

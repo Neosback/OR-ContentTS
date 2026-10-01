@@ -88,7 +88,9 @@ The backend is a separate local service. OpenRune Server is a compatibility/refe
 The backend now lives under `backend/` in this monorepo; the temporary `Neosback/rspsi` repository is no longer the active source.
 
 - [x] Move the Kotlin backend foundation into `backend/` with `Protocol`, `StudioService`, tests, Gradle wrapper, and retained research docs.
-- [ ] Finalize backend protocol versioning, sidecar packaging, and startup/discovery contract.
+- [x] Replace the inherited monolithic `foundationGate` with split backend CI covering compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging.
+- [ ] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
+- [ ] Finalize sidecar packaging after the launch contract is stable.
 - [ ] Add a framework-neutral `StudioBackendClient` and transport abstraction.
 - [ ] Add `HttpBackendTransport` for browser/development connections to an already-running local backend.
 - [ ] Add Tauri backend supervision and `TauriBackendTransport` so the desktop app can self-start a packaged backend sidecar.
@@ -99,7 +101,8 @@ The backend now lives under `backend/` in this monorepo; the temporary `Neosback
 - [ ] Add explicit **Publish Cache** and **Build OpenRune Project** actions with structured results and output verification.
 - [ ] Keep golden-fixture parity between TypeScript and the backend Kotlin protocol.
 - [ ] Keep local/offline implementations available when the backend is not connected.
-- [ ] Do not add Studio endpoints or required Content Studio patches to OpenRune Server.
+- [x] Establish the invariant that Content Studio requires no Studio-specific OpenRune Server endpoints, forks, accessors, hooks, modules, or framework patches.
+- [ ] Keep that invariant enforced as backend write/build/publish support expands.
 
 ## Phase 5: rendering and performance
 

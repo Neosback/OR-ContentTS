@@ -1,606 +1,129 @@
 # OpenRune Server Foundation Reference
 
-This document records the verified OpenRune Server architecture that OpenRune Studio depends on.
+This document records verified OpenRune Server architecture that is useful for **compatibility and inspection only**.
 
-Baseline inspected:
+It is not an implementation plan for modifying OpenRune Server.
 
-- upstream repository: `OpenRune/OpenRune-Server`;
-- upstream branch: `main`;
-- upstream commit: `6f7bd42d2cd613c01a351f25c227f6333c24cd62`;
-- verified: 2026-09-28.
+Baseline originally inspected:
 
-The purpose of this document is not to mirror every OpenRune implementation detail. It identifies the stable architectural seams Studio should integrate with, the areas that are intentionally derived/read-only, and the assumptions that still need verification before a live server agent is implemented.
+- upstream repository: `OpenRune/OpenRune-Server`
+- upstream branch: `main`
+- baseline commit: `6f7bd42d2cd613c01a351f25c227f6333c24cd62`
+- original verification date: 2026-09-28
 
-## Architectural summary
+OpenRune changes over time. The Studio backend must detect capabilities from the user's checkout instead of assuming this exact baseline.
 
-OpenRune Server is a Gradle multi-project Kotlin/JVM application with five major systems that matter to Studio:
+## Non-negotiable integration rule
 
-```text
-Gradle project / source tree
-        |
-        +-- content modules + pack modules
-        +-- GameVals / RSCM
-        +-- or-cache build tooling
-        |
-        v
-GameServer boot
-        |
-        +-- discover PluginModule classes
-        +-- discover external plugin modules
-        +-- build Guice injector
-        +-- load configuration
-        +-- initialize SERVER cache + LIVE JS5 provider
-        +-- decode map / queue static spawns
-        +-- start services
-        +-- discover and start PluginScript classes
-        +-- mark PluginScriptBootGate ready
-        |
-        v
-Running server
-        |
-        +-- Guice-owned services
-        +-- EventBus registrations
-        +-- EngineQueueCache
-        +-- CheatCommandMap
-        +-- built-in plugin scripts
-        +-- external plugin classloaders
-```
+OpenRune Content Studio requires **zero Studio-specific OpenRune Server source changes**.
 
-Studio should treat these as distinct integration domains:
+Do not:
 
-1. **project/source system**;
-2. **cache/build system**;
-3. **plugin/module system**;
-4. **event/runtime system**;
-5. **tooling system**.
+- add Studio HTTP/API endpoints to OpenRune Server;
+- require a custom OpenRune Server fork;
+- add required Studio accessors, hooks, modules, agents, or framework patches;
+- depend on private runtime internals as a required integration contract;
+- inject a Studio service into the OpenRune Server JVM;
+- make OpenRune Server source modification a prerequisite for editor functionality.
 
-StudioService owns project/source/cache/build knowledge. A future in-server Studio agent owns runtime knowledge.
+If a capability cannot be supported through external inspection, independently available libraries, project files, generated outputs, or existing project build interfaces, that capability must degrade/remain unavailable.
 
----
+## Why OpenRune is still important
 
-## 1. Server boot sequence
+OpenRune Server remains an important compatibility/reference target because its project structure establishes useful authorities for:
 
-The authoritative application entry point is `server/app/.../GameServer.kt`.
+1. project/source layout;
+2. GameVals and RSCM identities;
+3. content and pack modules;
+4. LIVE and SERVER cache outputs;
+5. FileStore/cache semantics;
+6. existing Gradle/cache build tasks;
+7. source-vs-generated-output authority.
 
-The verified boot sequence is:
+The Studio backend should adapt to these structures without requiring a patched OpenRune runtime.
+
+## Verified project/build model
+
+A compatible OpenRune checkout is a Gradle multi-project Kotlin/JVM project.
+
+Important areas commonly include:
 
 ```text
-ensureProperInstallation()
-        |
-        v
-loadModules()
-        |
-        +-- PluginModuleLoader.load(PluginModule)
-        +-- ExternalPluginLoader.loadModulesAtBoot()
-        |
-        v
-Guice.createInjector(
-    GameServerModule +
-    discovered plugin modules
-)
-        |
-        v
-loadConfig(injector)
-        |
-        v
-ServerCacheManager.init(revision)
-        |
-        +-- GameValProvider.load()
-        +-- open .data/cache/SERVER
-        +-- load .data/cache/LIVE through CacheJs5GroupProvider
-        +-- decode server-facing type tables
-        |
-        v
-loadMap(cache, injector)
-        |
-        +-- decode NPC/OBJ map spawns
-        +-- populate collision/static loc state
-        +-- queue delayed entity spawns
-        |
-        v
-startupGame()
-        |
-        +-- services start
-        +-- plugin scripts load in parallel
-        |
-        v
-loadScripts(injector)
-        |
-        +-- PluginScriptLoader.load(...)
-        +-- ExternalPluginLoader.loadScriptsAtBoot(...)
-        +-- ScriptContext.startup() for every script
-        +-- flush queued map entities
-        +-- PluginScriptBootGate.markReady()
-        |
-        v
-GameService.setup()
-        |
-        +-- await PluginScriptBootGate
-        +-- GameProcess.startup()
-        |
-        v
-server ready
+content/
+engine/
+server/
+or-cache/
+.data/
 ```
 
-### Studio implication
+The backend should detect these rather than hard-coding one repository revision.
 
-A runtime agent must not assume that:
+Useful capability evidence includes:
 
-- Guice availability means scripts have started;
-- caches being loaded means runtime handlers are registered;
-- network/game services being started means content boot is complete.
+- Gradle wrapper present;
+- `:or-cache:buildCache` available;
+- content modules present;
+- GameVal/RSCM resources present;
+- LIVE/SERVER cache outputs present;
+- supported OpenRune/FileStore formats available.
 
-The first reliable content-ready signal in the current architecture is the script boot gate becoming ready after plugin startup and delayed spawn flush.
+## Cache authority
 
-A future agent should therefore expose lifecycle state explicitly rather than a single Boolean `connected`.
+OpenRune distinguishes generated cache roles.
 
-Suggested neutral phases:
+### LIVE
 
-```text
-BOOTSTRAPPING
-INJECTOR_READY
-CACHE_READY
-MAP_READY
-SCRIPTS_LOADING
-CONTENT_READY
-RUNNING
-SHUTTING_DOWN
-```
-
-Studio should not invent those states from timing. The agent must map actual server lifecycle evidence into them.
-
----
-
-## 2. Guice and module system
-
-OpenRune uses Guice for application composition.
-
-The root injector is constructed from:
-
-```text
-GameServerModule
-+
-built-in PluginModule implementations
-+
-external plugin modules present at boot
-```
-
-`GameServerModule` installs the server's primary module groups. Plugin modules extend OpenRune's `PluginModule`, which itself extends Guice `AbstractModule`.
-
-Plugin modules can contribute:
-
-- singleton implementations;
-- providers;
-- base/interface implementations;
-- Guice multibindings.
-
-### Built-in modules
-
-Built-in plugin modules are discovered with `PluginClasspathScan` and `PluginModuleLoader`.
-
-`PluginClasspathScan` uses ClassGraph and scans:
-
-- `org.rsmod.api`;
-- `org.rsmod.content`;
-- selected resource roots.
-
-The scan is cached and shared between discovery consumers to avoid repeated full classpath scans.
-
-### External modules
-
-External plugin sources may also declare `PluginModule` classes.
-
-At **boot**, those modules are added to the same root injector as built-in modules.
-
-For a plugin **hot-loaded after boot**, the main injector already exists. OpenRune creates a child injector for that source when the source declares modules.
-
-Important limitation:
-
-> A hot-loaded plugin module can affect that source's own script instances through its child injector, but it cannot retroactively introduce bindings into the already-created root injector.
-
-### Studio implication
-
-The Studio agent should prefer using existing root services over introducing deep server-wide bindings at hot-load time.
-
-If Studio later requires a binding that must participate in the root injector, that integration needs either:
-
-- a boot-time agent module; or
-- an upstream-supported extension point.
-
-Do not assume a hot-loaded external module can mutate root dependency composition.
-
----
-
-## 3. Plugin discovery and script lifecycle
-
-OpenRune has two related plugin concepts:
-
-- `PluginModule`: dependency-injection contributions;
-- `PluginScript`: runtime content registration/startup behavior.
-
-A `PluginScript` implements:
-
-```kotlin
-fun ScriptContext.startup()
-```
-
-and may optionally implement:
-
-```kotlin
-fun ScriptContext.shutdown()
-```
-
-### Built-in scripts
-
-Built-in scripts are discovered through the shared ClassGraph scan, instantiated through Guice, then started with a shared `ScriptContext`.
-
-The loader excludes abstract classes and interfaces.
-
-### External plugins
-
-`ExternalPluginLoader` supports plugin sources from the configured plugins directory.
-
-A source may be:
-
-- a JAR; or
-- a directory of compiled class files.
-
-Every source requires a root `plugin.properties` containing:
-
-- `name`;
-- `description`;
-- `revision`;
-- `author`.
-
-External plugin enabled state is persisted in a properties file.
-
-### External classloaders
-
-Each external plugin source receives a dedicated `URLClassLoader`.
-
-At boot, a source's module and script passes intentionally reuse the same classloader so shared plugin types retain class identity.
-
-OpenRune tracks:
-
-- loaded source paths;
-- source classloaders;
-- loaded script instances;
-- enabled/disabled source state.
-
-After boot, OpenRune may close external URL classloaders to release JAR file locks. Already loaded classes retain identity, but lazy loading of previously untouched classes can become problematic.
-
-### Reload semantics
-
-Reloading an already-loaded source performs:
-
-1. `PluginScript.shutdown()` for tracked scripts;
-2. removal of EventBus handlers belonging to the source classloader;
-3. removal of cheat commands belonging to the source classloader;
-4. removal of engine-queue registrations associated with the classloader;
-5. closing the old classloader;
-6. creation of a fresh classloader;
-7. source re-scan;
-8. fresh script instantiation;
-9. `startup()` again.
-
-### Reload is not transactional
-
-OpenRune explicitly does **not** promise full rollback of arbitrary plugin side effects.
-
-Examples that are not automatically undone:
-
-- spawned entities;
-- mutated shared state;
-- arbitrary coroutines;
-- state stored outside tracked registries.
-
-A plugin that requires clean reload behavior must implement its own shutdown cleanup.
-
-### Studio implication
-
-A future Studio plugin manager can expose:
-
-```text
-source identity
-manifest
-enabled
-loaded
-classloader identity
-script classes
-module classes
-reload generation
-shutdown support
-runtime registration counts
-```
-
-But Studio must never label reload as a complete state rollback.
-
----
-
-## 4. Event system
-
-OpenRune's event core is intentionally small.
-
-There are three event categories:
-
-### Unbound events
-
-```kotlin
-interface UnboundEvent
-```
-
-A single event type can have multiple subscribers.
-
-Storage:
-
-```text
-Class<Event> -> List<handler>
-```
-
-### Keyed events
-
-```kotlin
-interface KeyedEvent {
-    val id: Long
-}
-```
-
-Storage:
-
-```text
-Class<Event> -> key -> handler
-```
-
-Only one keyed handler may occupy the same type/key combination through the normal subscription path.
-
-### Suspend events
-
-```kotlin
-interface SuspendEvent<R> {
-    val id: Long
-}
-```
-
-Storage is likewise keyed by event class and long ID, with a suspend receiver/action.
-
-### EventBus
-
-The public `EventBus` exposes:
-
-- publish operations;
-- subscription operations;
-- keyed containment checks;
-- classloader-based removal.
-
-The underlying maps are:
-
-- `UnboundEventMap`;
-- `KeyedEventMap`;
-- `SuspendEventMap`.
-
-The map storage itself is intentionally not a broad public introspection API. Some backing collections are internal/private implementation details.
-
-### External plugin unload integration
-
-Event handlers are removed by comparing the handler lambda/method-reference classloader with the unloading plugin's classloader.
-
-That classloader identity is therefore part of OpenRune's current runtime ownership model.
-
-### Studio implication
-
-A live agent should initially use public EventBus behavior and explicit OpenRune accessors.
-
-If the agent needs a complete registration inventory, preferred order is:
-
-1. supported public API;
-2. small upstream accessor contributed to OpenRune;
-3. narrowly scoped reflection;
-4. bytecode instrumentation only when observation cannot otherwise be achieved safely.
-
-Do not make private EventMap field layouts part of the Studio protocol.
-
----
-
-## 5. ScriptContext and adjacent runtime registries
-
-Current `ScriptContext` provides scripts with:
-
-- `EventBus`;
-- `CheatCommandMap`;
-- `EngineQueueCache`.
-
-These are important because external unload already treats them as tracked runtime registrations.
-
-### CheatCommandMap
-
-Commands are mutable runtime registrations and retain classloader ownership metadata through their handlers.
-
-### EngineQueueCache
-
-The queue cache tracks default and labelled script availability. It also records classloader ownership for external plugin cleanup.
-
-### Studio implication
-
-These registries are better runtime evidence than static source analysis.
-
-A future runtime snapshot can report:
-
-```text
-plugin script loaded
-event registrations active
-cheat commands active
-engine queue bindings active
-```
-
-StudioService can then compare those facts against source-index expectations.
-
----
-
-## 6. Cache architecture
-
-OpenRune distinguishes at least two generated cache roles that Studio must keep separate:
-
-### LIVE cache
-
-Path:
+Typical path:
 
 ```text
 .data/cache/LIVE
 ```
 
-This is the client/live cache build output.
+LIVE is generally the client/render/export cache output.
 
-It is also used by `CacheJs5GroupProvider` while the server cache manager initializes.
+### SERVER
 
-### SERVER cache
-
-Path:
+Typical path:
 
 ```text
 .data/cache/SERVER
 ```
 
-This is a server-oriented generated cache that is intentionally stripped/packed differently from the live cache.
+SERVER contains server-oriented generated definitions/data.
 
-`ServerCacheManager` opens SERVER and decodes server-facing data including:
+Studio must not treat LIVE and SERVER as interchangeable.
 
-- NPCs;
-- objects/locs;
-- items;
-- inventories;
-- sequences;
-- varbits/varps;
-- structs;
-- DB rows/tables;
-- interfaces;
-- stats;
-- projectile types;
-- hit splats;
-- BAS;
-- walk triggers;
-- server var types;
-- params;
-- hunt modes;
-- additional server-oriented definitions.
+Generated caches are outputs, not automatically authoritative editable source.
 
-Published lookup tables are exposed as read-only views after decoder population.
+## Source and publication authority
 
-### ServerCacheManager initialization
+Where an authoritative project source exists, Studio should preserve that authority.
 
-Verified high-level order:
+Examples include:
+
+- Kotlin content source;
+- GameVal TOML/source declarations;
+- RSCM-generated identities;
+- dedicated content pack modules;
+- project configuration used by existing build tasks.
+
+Preferred lifecycle:
 
 ```text
-GameValProvider.load()
-        |
-        v
-open SERVER cache
-        |
-        +-- load LIVE through CacheJs5GroupProvider
-        +-- decode fonts
-        +-- decode server definition tables
-        +-- adopt read-only views
-        +-- derive transmit varps
-        +-- load DB master-row indexes
+Studio semantic edit
+  -> versioned Studio edit/project contract
+  -> backend validation
+  -> explicit user-owned source/config update
+  -> existing OpenRune build task
+  -> output verification
+  -> explicit publish/deploy
 ```
 
-### Studio implication
+Do not silently mutate generated cache outputs as a substitute for source publication.
 
-StudioService may inspect LIVE or SERVER through FileStore, but it should not pretend they are interchangeable.
+## GameVals and RSCM
 
-For browser/editor workflows:
-
-- LIVE is generally the client/render/export authority;
-- SERVER contains server-oriented packed definitions and generated server data;
-- source files and pack definitions remain the publication authority where available.
-
-Generated caches should not be silently edited as substitutes for source publication.
-
----
-
-## 7. Cache build and pack system
-
-The `or-cache` module is the OpenRune cache-build application.
-
-Important Gradle tasks include:
-
-```text
-:or-cache:buildCache
-:or-cache:freshCache
-:or-cache:cleanCs2
-:or-cache:mergePluginGamevals
-```
-
-### Content pack isolation
-
-A particularly important architectural rule is visible in `or-cache/build.gradle.kts`:
-
-> only dedicated content `pack` submodules are placed on the cache-build classpath.
-
-This prevents the cache builder from needing the entire game-script dependency graph.
-
-Pack modules can contribute things such as:
-
-- configuration sources;
-- models;
-- sprites;
-- DB tables;
-- cache tasks;
-- CS2 scripts/symbols.
-
-### PluginPacks
-
-`PluginPacks` discovers pack implementations with ClassGraph.
-
-Pack data is composed into the cache build.
-
-CS2 overrides can combine:
-
-- generated GameVal symbols;
-- pack script sources;
-- pack symbol files.
-
-### Cache build flow
-
-The verified build path is approximately:
-
-```text
-GameValProvider.load()
-        |
-        v
-PluginPacks.discover()
-        |
-        v
-packs.validate()
-        |
-        +-- build CS2 overrides
-        +-- assemble pack tasks
-        |
-        v
-build LIVE cache
-        |
-        v
-build SERVER cache
-        |
-        v
-dump generated server metadata/GameVals
-        |
-        v
-generate server table/enum code
-```
-
-The cache tool uses incremental state and output verification.
-
-### Fresh install
-
-`freshCache` is materially more destructive/bootstrap-oriented than an incremental build.
-
-Studio must never run it automatically when a project is opened.
-
----
-
-## 8. GameVals and RSCM
-
-GameVals are a core identity layer in OpenRune.
+GameVals form an important identity layer.
 
 Examples:
 
@@ -612,441 +135,136 @@ dbtable.mining_rocks
 stat.mining
 ```
 
-OpenRune supports multiple RSCM namespaces and validates prefixes.
+The backend should preserve provenance between:
 
-The runtime `RSCM` helper resolves symbolic names through the loaded constant provider and caches resolutions.
+- symbolic name;
+- namespace;
+- numeric id;
+- authoritative source declaration;
+- generated RSCM output;
+- cache/runtime representation when available.
 
-### Plugin-local GameVals
+The current backend already indexes GameVal/RSCM-aware content without changing the checkout.
 
-Content modules may contain:
+## Content/pack isolation
 
-```text
-src/main/resources/gamevals.toml
-```
+OpenRune's cache/build design separates content pack inputs from the entire runtime dependency graph.
 
-`PluginGamevalMerger` merges those declarations into:
+That is useful for Studio because it means publication can target project-owned content/config/build inputs rather than embedding the game server inside Studio.
 
-```text
-.data/gamevals/<namespace>.rscm
-```
+The backend may discover and invoke existing explicitly allowlisted build tasks, but must not expose arbitrary Gradle or shell execution.
 
-The merger:
+## Existing build interface
 
-- validates namespaces against known RSCM types;
-- preserves existing generated keys;
-- appends new valid integer mappings.
-
-### Studio implication
-
-Studio should retain provenance:
+Known useful Gradle tasks may include:
 
 ```text
-symbol
-namespace
-numeric id
-authoritative module TOML
-generated RSCM path
-runtime resolution state
+assemble
+test
+:or-cache:buildCache
 ```
 
-Generated `.rscm` files are derived outputs when an authoritative plugin TOML entry exists.
+The current Studio backend intentionally exposes only bounded operation IDs mapped to allowlisted tasks.
 
-Studio's current content index correctly treats TOML/RSCM as source/derived inputs rather than replacing them with a parallel proprietary source format.
+Opening a project never runs Gradle automatically.
 
----
+Build/task discovery and execution must remain explicit user actions.
 
-## 9. Map and spawn loading
+## Separate tooling precedent
 
-During server boot, OpenRune decodes the map after cache initialization and before plugin-script startup completes.
+OpenRune already demonstrates that developer tooling can be a **separate local process** consuming project/cache outputs without becoming part of the game server.
 
-NPC and ground-object spawns are queued through delayed repositories.
-
-The queued map entities are flushed only after script startup so content handlers exist before those entities become visible to players.
-
-### Studio implication
-
-The eventual runtime agent should distinguish:
-
-- cache/map definitions;
-- decoded static map state;
-- queued spawn state;
-- live repository/entity state.
-
-Static project/cache inspection is not the same thing as the running server world state.
-
----
-
-## 10. Services and game thread
-
-The server has an explicit service lifecycle.
-
-`GameBootstrap` starts configured services and owns shutdown coordination.
-
-`GameService` runs the game process on a dedicated single-thread executor named `game` and targets a 600 ms game tick.
-
-`GameService.setup()` waits for `PluginScriptBootGate` before starting the game process.
-
-### Studio implication
-
-Any future agent operation that reads or mutates live game state must define its threading model.
-
-StudioService's HTTP request thread must never be assumed safe for direct mutation of game-thread-owned state.
-
-Initial live-agent capabilities should therefore be read-only and snapshot-oriented until a supported game-thread scheduling mechanism is explicitly identified and tested.
-
----
-
-## 11. OpenRune tooling
-
-OpenRune includes tooling beyond the game server.
-
-One especially relevant example is `:tools:osrs-mcp`, a local stdio MCP server that already exposes:
-
-- wiki search/page access;
-- GameVal search/reload;
-- decoded LIVE/SERVER cache search/reload.
-
-It is explicitly a local developer tool and the game server does not depend on it.
-
-### Studio implication
-
-This confirms a useful OpenRune design pattern:
-
-> developer tooling may be a separate local process consuming the same project/cache outputs without becoming part of the game server.
-
-That aligns directly with the StudioService architecture.
-
-We should reuse concepts and source authorities from OpenRune tooling, but Studio does not need to wrap MCP internally. StudioService's versioned HTTP/WebSocket protocol serves a different purpose.
-
----
-
-## 12. Studio integration model
-
-The target architecture should remain:
+That design pattern aligns with Content Studio's architecture:
 
 ```text
-Browser Studio
-      |
-      | versioned HTTP / WebSocket
-      v
-Kotlin StudioService
-      |
-      +-- project inspection
-      +-- FileStore
-      +-- GameVals/RSCM
-      +-- Kotlin PSI/source graph
-      +-- Gradle/cache builds
-      +-- filesystem watching
-      |
-      | future local runtime protocol
-      v
-OpenRune Studio Agent
-      |
-      +-- lifecycle state
-      +-- loaded plugin/script identity
-      +-- active runtime registrations
-      +-- selected public Guice/runtime services
-      +-- runtime diagnostics/tracing
-      v
-OpenRune Server JVM
+Content Studio frontend
+        |
+StudioBackendClient
+        |
+local Studio Backend
+        |
+compatible OpenRune checkout
 ```
 
-### StudioService responsibilities
+No in-server Studio agent is required.
 
-StudioService remains authoritative for:
+## Current backend behavior
 
-- project/source facts;
-- static source graph;
-- generated output provenance;
-- cache/build tooling;
-- source editing/publication;
-- filesystem state.
+The in-repo backend under `backend/` currently supports:
 
-### Agent responsibilities
+- passive project inspection;
+- opaque project sessions;
+- source/content indexing;
+- GameVal/RSCM-aware inspection;
+- LIVE/SERVER FileStore inspection;
+- bounded Gradle task discovery;
+- allowlisted asynchronous Gradle operations;
+- operation status/log/cancellation events;
+- loopback Host/Origin/token security.
 
-The Agent should be authoritative only for facts that exist because a server is currently running:
+Current file-facing inspection paths are read-only.
 
-- server lifecycle;
-- actual loaded scripts;
-- external plugin status/classloaders;
-- active runtime registrations;
-- runtime cache/service state;
-- runtime traces;
-- reload results.
+The only checkout-modifying behavior today is explicit invocation of existing Gradle tasks, which may create normal generated/build outputs.
 
-The agent should not become a second source indexer or cache builder.
+## Capability degradation
 
----
+OpenRune versions and project layouts can differ.
 
-## 13. Recommended first live-agent shape
+The backend should therefore return capabilities based on evidence from the opened project.
 
-Do not begin with bytecode instrumentation.
-
-A minimal agent should first prove a stable neutral contract using supported OpenRune mechanisms.
-
-Suggested first capabilities:
+Examples:
 
 ```text
-runtime.identity
-runtime.lifecycle
-runtime.plugins
-runtime.scripts
-runtime.capabilities
+project.inspect
+content.index
+content.resolve
+source.index
+cache.read
+gradle.tasks
+gradle.operations
 ```
 
-Potential first snapshot:
+The frontend must consume capabilities instead of assuming every OpenRune checkout supports every feature.
 
-```json
-{
-  "lifecycle": "CONTENT_READY",
-  "jvm": "...",
-  "serverRevision": 240,
-  "scripts": [
-    {
-      "className": "org.rsmod.content.skills.mining.scripts.Mining",
-      "source": "built-in"
-    }
-  ],
-  "externalPlugins": [
-    {
-      "id": "example",
-      "enabled": true,
-      "loaded": true
-    }
-  ]
-}
-```
+Missing capability is not a reason to patch OpenRune Server.
 
-The exact transport should be local and authenticated/scoped before mutation capabilities are introduced.
+## Runtime introspection
 
----
+Deep live-server introspection is **not** part of the current required architecture.
 
-## 14. Reflection policy
+Do not add an in-server agent, reflection bridge, bytecode agent, or OpenRune source patch merely to expose runtime state.
 
-Reflection is useful, but it should be a fallback adapter technique.
+If future product requirements genuinely need live runtime facts, first design an external, optional, versioned compatibility mechanism that preserves the zero-OpenRune-modification rule.
 
-Use order:
+Static project inspection and editor functionality must remain useful without a running OpenRune Server process.
 
-1. public OpenRune API;
-2. dependency-injected service;
-3. upstream-friendly accessor added to OpenRune;
-4. narrow reflection against a version-checked field/method;
-5. bytecode instrumentation when observation cannot be achieved safely otherwise.
+## Current integration priorities
 
-Every reflection adapter should have:
+The next backend work is not OpenRune runtime modification.
 
-- an explicit OpenRune compatibility check;
-- graceful capability degradation;
-- a focused test;
-- no reflective implementation detail leaking into browser DTOs.
+Priorities are:
 
-Do not build generic "dump every field" endpoints.
+1. backend launch contract with ephemeral port support;
+2. parent-supplied per-launch token;
+3. machine-readable ready handshake;
+4. stable backend/protocol identity;
+5. loopback-only CORS/preflight for browser transport;
+6. `StudioBackendClient`;
+7. web and Tauri transports;
+8. backend-backed domain adapters;
+9. explicit source-authority/write/build/publish workflows.
 
----
+## Confidence boundary
 
-## 15. Byte Buddy assessment
+We have enough verified OpenRune architectural knowledge to:
 
-Byte Buddy can be valuable later, especially for a live content debugger, but it is not required for the core Studio foundation.
+- recognize compatible project structures;
+- inspect source and generated outputs;
+- use FileStore/cache semantics;
+- index GameVals/content;
+- discover existing build capabilities;
+- invoke bounded existing build operations.
 
-OpenRune Server currently does not use Byte Buddy.
+We do **not** need complete OpenRune runtime internals to proceed with Content Studio.
 
-### Where Byte Buddy could provide unique value
-
-Potential future uses include:
-
-- method entry/exit tracing without modifying upstream source;
-- tracing `EventBus.publish` dispatch;
-- tracing selected plugin-script methods;
-- recording handler execution latency;
-- correlating a runtime interaction with the actual implementation method reached;
-- instrumenting dynamically loaded external plugin classes;
-- attaching diagnostic metadata to runtime flows.
-
-This could eventually support a Studio trace such as:
-
-```text
-Loc interaction
-  -> EventBus publish
-  -> registered content.rock handler
-  -> Mining.attempt
-  -> Mining.mine
-  -> XP/product result
-```
-
-### Why Byte Buddy should not be foundational
-
-Bytecode instrumentation adds substantial complexity:
-
-- Java-agent or attach lifecycle;
-- retransformation support;
-- classloader-specific instrumentation;
-- external plugin reload interaction;
-- Kotlin-generated lambda/suspend state-machine classes;
-- performance overhead;
-- instrumentation ordering;
-- JDK attach/security restrictions;
-- compatibility testing across OpenRune/JDK versions.
-
-A class may also be loaded before instrumentation is installed, requiring retransformation or earlier agent startup.
-
-### Recommended phase
-
-Byte Buddy belongs in an optional **runtime tracing/instrumentation phase** after:
-
-1. public/runtime registry inspection works;
-2. Studio has stable runtime DTOs;
-3. plugin reload ownership is understood;
-4. thread-safety boundaries are documented;
-5. we have an explicit trace feature that requires instrumentation.
-
-Do not introduce Byte Buddy merely to enumerate plugins, bindings, or EventBus state.
-
----
-
-## 16. Known unknowns before a live agent
-
-We now understand the architectural foundation, but these points still require deliberate verification before promising them as Studio capabilities.
-
-### Runtime registration enumeration
-
-We know how handlers are stored and removed, but there is no verified public API for enumerating every event registration with content-friendly metadata.
-
-Need to decide between:
-
-- upstream accessor;
-- reflection adapter;
-- instrumentation.
-
-### Handler key semantics
-
-OpenRune has many event classes and helper DSLs. We still need a verified mapping from specific handler DSLs such as `onOpContentLoc1` to:
-
-- concrete event class;
-- key packing;
-- content/GameVal interpretation.
-
-Static PSI currently preserves the registration call and string arguments, which is safe. Runtime parity requires exact event-key understanding.
-
-### Main injector visibility
-
-The agent can receive bound services when instantiated through Guice, but direct access to root injector internals should not be assumed until explicitly tested in OpenRune's composition.
-
-### Game-thread scheduling
-
-Read-only service snapshots may be safe for some immutable/read-only structures. Live world mutations require a verified scheduling/queue mechanism onto the game thread.
-
-### External plugin reload + agent instrumentation
-
-If the agent later instruments external plugin classes, retransformation and classloader disposal/reload behavior must be tested explicitly.
-
-### Runtime cache rebuild/reload
-
-The server's normal boot cache manager is clear. Safe live cache replacement/reinitialization semantics are not yet a Studio capability and should not be inferred from build tooling.
-
-### Service lifecycle hooks
-
-Before the agent runs its own listener/socket inside the server JVM, identify the correct service lifecycle integration so startup and shutdown are deterministic.
-
----
-
-## 17. Core foundation priorities for Studio
-
-Before building a broad source browser or runtime debugger, Studio should establish these foundations in order.
-
-### A. Neutral protocol/core contracts
-
-Define stable DTOs for:
-
-- project capabilities;
-- content symbols;
-- source facts;
-- runtime identity;
-- runtime lifecycle;
-- plugin/script identity;
-- diagnostics.
-
-### B. Static project graph
-
-Already underway:
-
-- project discovery;
-- FileStore inspection;
-- GameVal/RSCM indexing;
-- Kotlin PSI structural indexing;
-- content symbol -> source resolution.
-
-### C. Runtime plugin/event foundation
-
-Next runtime milestone:
-
-- minimal OpenRune agent;
-- lifecycle snapshot;
-- loaded plugin/script inventory;
-- capability discovery;
-- no mutation;
-- no Byte Buddy.
-
-### D. Cache/build foundation
-
-Then complete:
-
-- explicit Gradle task discovery;
-- `buildCache` operation lifecycle;
-- output fingerprints;
-- generated output verification;
-- source authority/provenance;
-- no direct generated-cache fallback publication.
-
-### E. Event/content runtime graph
-
-After runtime identity is stable:
-
-- runtime handler inventory;
-- static-vs-runtime parity;
-- selected-symbol runtime status;
-- plugin reload diagnostics.
-
-### F. Optional instrumentation
-
-Only after the above:
-
-- Byte Buddy/runtime traces;
-- timing/profiling;
-- method-level flow capture.
-
----
-
-## 18. Non-goals
-
-The JVM foundation does not own unrelated editor/rendering systems or arbitrary desktop UI state.
-
-Static project inspection must remain useful without a running server.
-
-The Agent should stay narrow: runtime identity, lifecycle, plugins/scripts, supported event registration facts, cache/runtime state, and diagnostics. It must not become a second server framework or an unrestricted remote-control surface.
-
----
-
-## 19. Confidence statement
-
-At this baseline we have a **verified architectural understanding** of:
-
-- server boot ordering;
-- Guice module composition;
-- built-in plugin discovery;
-- external plugin loading/reloading;
-- classloader ownership;
-- script lifecycle;
-- EventBus categories/storage model;
-- external registration cleanup;
-- cache roles;
-- ServerCacheManager initialization;
-- cache build tasks;
-- plugin pack isolation;
-- GameVal/RSCM merge/resolution;
-- map load timing;
-- game service boot gating;
-- local MCP tooling role.
-
-We do **not** yet claim complete runtime introspection knowledge.
-
-The open questions in section 16 must be resolved as focused research/implementation slices rather than hidden behind generic reflection.
+When compatibility uncertainty appears, prefer capability detection and graceful degradation over upstream modification.
