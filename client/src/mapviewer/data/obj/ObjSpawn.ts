@@ -1,12 +1,7 @@
+import type { ObjSpawn } from "../../../world/world-source";
 import objSpawnsUrl from "./obj-spawns.json?url";
 
-export interface ObjSpawn {
-    id: number;
-    count: number;
-    x: number;
-    y: number;
-    plane: number;
-}
+export type { ObjSpawn } from "../../../world/world-source";
 
 export async function fetchObjSpawns(signal?: AbortSignal): Promise<ObjSpawn[]> {
     const response = await fetch(objSpawnsUrl, { signal });
