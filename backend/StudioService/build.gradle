@@ -1,4 +1,4 @@
-description = 'OpenRune Server Studio service'
+description = 'OpenRune Content Studio Backend service'
 
 apply plugin: 'application'
 apply plugin: 'org.jetbrains.kotlin.jvm'
