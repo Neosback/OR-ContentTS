@@ -1,6 +1,6 @@
 # OpenRune Server integration
 
-OpenRune Server Studio should understand an opened OpenRune project deeply enough to help develop and operate it without taking ownership away from the project.
+OpenRune Content Studio Backend should understand an opened OpenRune project deeply enough to help develop and operate it without taking ownership away from the project.
 
 ## Project inspection
 
