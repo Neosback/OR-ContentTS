@@ -24,7 +24,7 @@
     import { getMapRenderWorkerPool } from "../../mapviewer/map-render-worker-pool";
     import { MapViewer } from "../../mapviewer/MapViewer";
     import { getAvailableRenderers } from "../../mapviewer/MapViewerRenderers";
-    import { bundledWorldSource } from "../../world/bundled-world-source";
+    import { defaultWorldSource } from "../../world/default-world-source";
     import MapViewerContainer from "./MapViewerContainer.svelte";
     import { MapViewerUiState } from "./map-viewer-state.svelte";
 
@@ -79,7 +79,7 @@
         loadingLabel = "Loading world data...";
         loadingProgress = 70;
 
-        const worldData = await bundledWorldSource.loadWorld(
+        const worldData = await defaultWorldSource.loadWorld(
             { cacheInfo: resolvedCache.info },
             { signal: controller.signal },
         );
