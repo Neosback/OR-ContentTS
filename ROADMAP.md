@@ -55,9 +55,6 @@ Done:
 
 Next:
 
-- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
-- [ ] Add a framework-neutral Interface metadata source and backend adapter after StudioBackendClient/BackendTransport exist.
-- [ ] Add backend id-oriented GameVal/RSCM lookup with provenance and conflict diagnostics for interface/project metadata.
 - [ ] Shops and world map as first-class dock panels.
 - [x] Shared command and keyboard-shortcut registry.
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
@@ -129,6 +126,10 @@ Done:
 - [x] Document Interface Editor cache/GameVal/RSCM data authority and backend enrichment path.
 
 Next:
+
+- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
+- [ ] Add a framework-neutral Interface metadata source and backend adapter after StudioBackendClient/BackendTransport exist.
+- [ ] Add backend id-oriented GameVal/RSCM lookup with provenance and conflict diagnostics for interface/project metadata.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
 - [ ] Model and animation viewer.
