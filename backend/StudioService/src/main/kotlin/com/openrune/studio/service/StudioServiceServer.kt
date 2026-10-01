@@ -53,6 +53,7 @@ fun Application.studioServiceModule(
     identity: StudioServiceIdentity = StudioServiceIdentity(),
 ) {
     installApiErrors()
+    installStudioServiceSecurity(security)
 
     install(CORS) {
         allowMethod(HttpMethod.Get)
@@ -62,8 +63,6 @@ fun Application.studioServiceModule(
         allowHeader(StudioServiceSecurity.TOKEN_HEADER)
         allowOrigins { origin -> security.acceptsOrigin(origin) }
     }
-
-    installStudioServiceSecurity(security)
 
     install(SSE)
 
