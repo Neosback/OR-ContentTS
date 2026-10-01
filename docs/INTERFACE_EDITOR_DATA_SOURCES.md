@@ -326,7 +326,7 @@ The optional backend may provide additional FileStore/JVM verification, but proj
 
 ### Later editing/publish work
 
-If the Interface Editor becomes a source editor rather than only a cache/interface editor, edits should target authoritative project sources through `ProjectFileSystem`.
+If the Interface Editor becomes a source editor rather than only a cache/interface editor, edits should target authoritative OpenRune interface/pack/GameVal sources through `ProjectFileSystem` and let OpenRune's existing packers produce LIVE/SERVER outputs.
 
 Do not directly rewrite generated RSCM as the default source-authoring workflow unless OpenRune defines that generated file as authoritative for the specific operation.
 
@@ -336,8 +336,10 @@ Preferred direction:
 Interface Editor semantic change
     -> Studio domain contract
     -> TypeScript validation
-    -> authoritative project source/config through ProjectFileSystem
-    -> optional explicit OpenRune backend build
+    -> authoritative OpenRune interface/pack/GameVal source through ProjectFileSystem
+    -> explicit OpenRune build when publication is requested
+    -> generated LIVE
+    -> derived SERVER when relevant
     -> optional output verification
 ```
 
