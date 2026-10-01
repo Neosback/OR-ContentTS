@@ -75,23 +75,73 @@ Derived metadata such as affected maps and tile counts is validated against the 
 
 The frontend is designed to work offline today. Server-backed behavior must sit behind explicit interfaces so local implementations can be replaced without rewriting the UI.
 
-### Target backend
+### Studio backend and OpenRune compatibility
 
-The target backend is **OpenRune Server** (`Neosback/OpenRune-Server`), using its FileStore/domain and map/content layers for cache and project operations.
+The Content Studio backend is a **separate local service**, not OpenRune Server itself.
 
-The legacy TypeScript game server has been removed from this repository. Local cache bootstrap is owned by the Studio itself, and bundled spawn data keeps the current viewer/editor independent of a game server. Do not recreate a second backend in this repository.
+OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/reference target. The backend may use OpenRune libraries and inspect a user's OpenRune project, but normal Content Studio development must not require Studio-specific modifications to OpenRune Server.
 
-The OpenRune backend will eventually own:
+The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend currently compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, and builds a runnable StudioService distribution. Packaging and startup/discovery contracts are the next integration boundary before the frontend depends on it at runtime.
 
-- project persistence and project lifecycle operations
+The backend is expected to own capabilities such as:
+
+- project/source inspection and backend-backed project persistence
 - authoritative validation
-- cache encoding and publishing
-- world/content sources
-- OpenRune project/build integration
-- serving versioned cache data with Range support
-- accepting versioned Studio edit batches such as Edit Format v1
+- OpenRune FileStore/cache inspection
+- source/content indexing and GameVal/RSCM resolution
+- bounded Gradle/build operations
+- later cache encoding, publication, and verification workflows
+- OpenRune project compatibility without requiring a custom OpenRune Server fork
 
-The frontend should continue to implement local/offline versions of these interfaces first so the UI remains usable without a running OpenRune server.
+The frontend should continue to implement local/offline versions of its stable interfaces so the UI remains usable without the backend.
+
+See `docs/STUDIO_BACKEND_INTEGRATION.md` for the process lifecycle, web transport, Tauri sidecar, and connection-discovery model.
+
+### Cache access
+
+Cache acquisition is framework-neutral and sits behind `CacheSource`:
+
+```text
+Cache Repository / map viewer / map editor
+              |
+     profile source resolution
+              |
+          CacheSource
+          /         \
+StaticRangeCacheSource   IndexedDbProfileCacheSource
+          |
+ future OpenRuneCacheSource
+```
+
+`client/src/cache/cache-source.ts` defines the shared loaded-cache contract and load options. `StaticRangeCacheSource` owns the Studio-served `/caches` source and preserves HTTP Range-capable loading through `CacheFiles`. `IndexedDbProfileCacheSource` adapts browser-imported cache files to the same contract.
+
+Persisted `server:<cache-name>` profile ids remain supported as a compatibility binding, but the prefix is resolved by the cache-source layer rather than by IndexedDB storage. `profile-cache-store.ts` only stores imported cache bytes.
+
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. A future backend-backed OpenRune cache adapter should implement `CacheSource` rather than adding transport-aware branches to Svelte screens or map/rendering code. The adapter talks to the separate Studio backend, which in turn inspects a compatible OpenRune project.
+
+### World data
+
+World/content data that is not authoritative cache-map content sits behind `WorldSource`:
+
+```text
+Map Viewer
+    |
+defaultWorldSource
+    |
+WorldSource
+    |
+BundledWorldSource (local/offline)
+    |
+future OpenRuneWorldSource
+```
+
+`client/src/world/world-source.ts` owns the semantic world-data contract used by rendering today: NPC spawns and ground-item/object spawns. `BundledWorldSource` loads the existing Studio-bundled snapshots, while `default-world-source.ts` centralizes runtime source selection so Svelte does not choose transports or data files directly.
+
+Spawn map-filtering utilities and spawn types are owned by the world layer. The old `mapviewer/data/npc/NpcSpawn.ts` and `mapviewer/data/obj/ObjSpawn.ts` modules remain compatibility facades only. Render workers consume neutral world types/utilities directly.
+
+Cache-derived map locs are not WorldSource data; they remain decoded from the active cache. Zones/areas are also not modeled yet because there is no active zone domain model or consumer in the current Studio. Add them to `WorldSource` only when a concrete semantic model exists rather than baking backend transport shapes into the frontend contract.
+
+A future backend-backed OpenRune world adapter should implement `WorldSource` without requiring changes to Svelte viewer code or render-worker world-data contracts.
 
 ### Project persistence
 
@@ -101,7 +151,7 @@ Project persistence is framework-neutral:
 ProjectLifecycle
     -> ProjectStore
        -> IndexedDbProjectStore (local/offline)
-       -> OpenRuneProjectStore (future)
+       -> OpenRuneProjectStore (future, via Studio backend)
 ```
 
 The portable project envelope is `openrune.project` v1. It contains stable project metadata, portable base-cache/source identity, and Edit Format v1 edit data. Renderer state, dock layout, and internal Undo/Redo history are not authoritative project content.
@@ -130,7 +180,63 @@ Project v1
 
 The Svelte launch workflow only orchestrates project selection, required-map loading, progress, and user-facing errors. It does not implement terrain/object mutation rules.
 
+## Backend transport and desktop process boundary
+
+Backend access must remain transport-neutral:
+
+```text
+Svelte UI
+   |
+framework-neutral domain services
+   |
+StudioBackendClient
+   |
+BackendTransport
+   +-- HttpBackendTransport   (plain web / development)
+   +-- TauriBackendTransport  (desktop)
+```
+
+The browser build cannot start a local JVM/native service by itself. Web mode therefore connects to an already-running local Studio backend through an authenticated loopback transport.
+
+The Tauri shell may supervise a packaged backend sidecar. In desktop mode, Rust should own backend child-process lifecycle and privileged connection secrets, while the Svelte webview talks through a narrow Tauri transport/bridge. Tauri should not reimplement the Kotlin backend.
+
+The preferred desktop lifecycle is:
+
+```text
+Tauri launch
+  -> start packaged backend sidecar on an ephemeral loopback port
+  -> pass a per-launch token
+  -> receive a machine-readable ready handshake
+  -> expose backend capabilities through TauriBackendTransport
+  -> stop the child during app shutdown
+```
+
+The backend must remain optional for local/offline features. Backend connection failure should degrade backend-only capabilities rather than prevent the Studio shell from starting.
+
+### OpenRune compatibility invariant
+
+OpenRune Server is never a required Studio extension point.
+
+The backend may inspect compatible OpenRune checkouts, use separately available OpenRune/FileStore libraries, read source/GameVals/cache outputs, and invoke existing allowlisted Gradle tasks. It must not require Studio-specific OpenRune Server endpoints, forks, hooks, accessors, or framework patches.
+
+If an integration capability would require changing OpenRune Server source, the capability must degrade/remain unavailable until it can be implemented externally.
+
+### Current backend launch gap
+
+The current backend is healthy but not yet packaged as a frontend runtime dependency.
+
+Before `StudioBackendClient` integration:
+
+- support ephemeral-port startup (`port=0`);
+- allow Tauri/parent process to supply the per-launch token;
+- emit one machine-readable ready handshake instead of requiring human-log parsing;
+- add proper loopback-only CORS/OPTIONS behavior for plain-web authenticated requests;
+- expose stable API/protocol/backend identity through status;
+- retain current Host/Origin/token and bounded-operation protections.
+
 ## Validation
+
+### Client
 
 Every pull request that changes the client must pass the clean, reproducible blocking gate:
 
@@ -144,3 +250,18 @@ npm run build
 ```
 
 The architecture gate scans the full active client source tree and package manifest so JSX/TSX and React-era dependencies cannot silently re-enter the Studio.
+
+
+### Backend
+
+Backend changes use `.github/workflows/backend-validation.yml`.
+
+The gate validates compile, Protocol tests, API/security tests, OpenRune inspection/indexing tests, Gradle/process-boundary tests, and the runnable StudioService distribution. The old monolithic `foundationGate` is no longer the canonical merge gate.
+
+From `backend/`:
+
+```bash
+./gradlew backendCheck --no-daemon
+./gradlew backendDistribution --no-daemon
+./gradlew validateBackend --no-daemon
+```

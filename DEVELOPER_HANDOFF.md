@@ -1,19 +1,34 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** ProjectStore + Studio-owned cache bootstrap; legacy TypeScript server removed
+**Current baseline:** Svelte frontend seams + in-repo Kotlin Studio backend + split backend CI; OpenRune Server remains external/reference-only
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
+### Current repository status
+
+As of PR #34:
+
+- `backend/` is the canonical Studio backend source.
+- The temporary `Neosback/rspsi` repository is migration history only.
+- Backend compilation, protocol tests, API/security tests, OpenRune inspection/indexing tests, Gradle/process tests, and runnable distribution packaging are all green in CI.
+- The inherited monolithic `foundationGate` has been replaced by explicit, diagnosable backend validation stages.
+- There are no required Content Studio changes in `Neosback/OpenRune-Server`.
+- OpenRune Server must remain an external compatibility/reference target. If a Studio feature would require patching OpenRune Server framework code, that feature must degrade/remain unavailable until it can be implemented externally.
+- Backend runtime integration with the frontend is not wired yet. The next backend slice is the launch/connection contract, then transport clients, then domain adapters.
+
+
 ## 1. Critical direction
 
-### The target backend is OpenRune
+### The backend is separate from OpenRune Server
 
-New Studio backend work must target the **OpenRune server** and its FileStore/domain model.
+New Content Studio backend work belongs in a **separate Studio backend service**, not in `Neosback/OpenRune-Server`.
 
 The legacy TypeScript `server/` has been removed from this repository.
 
-The only intended backend target is `Neosback/OpenRune-Server`. Local Studio cache bootstrap lives under `client/scripts/ensure-cache.ts`, and current spawn snapshots are bundled in the client, so no compatibility server is required to run the editor.
+OpenRune Server is now an external compatibility/reference target. We may inspect it to understand FileStore, cache/build behavior, GameVals, project structure, and runtime semantics, but normal Content Studio development should not add Studio-specific endpoints or required patches to OpenRune Server.
+
+The separate backend now lives under `backend/` in this repository. It was moved from the temporary `Neosback/rspsi` development repository in PR #34. `backend/` is the canonical source; do not dual-edit or re-import from the old repository. Its current codebase is validated and healthy. Packaging plus the startup/discovery contract are the next backend integration boundary.
 
 The intended direction is:
 
@@ -22,14 +37,20 @@ Svelte Studio UI
     |
 framework-neutral TypeScript
     |
-local/offline service interfaces
+ProjectStore / CacheSource / WorldSource / future services
     |
-OpenRune Studio backend
+StudioBackendClient
     |
-OpenRune FileStore + domain/content model
+BackendTransport
+    |
+separate Studio Backend Service
+    |
+user's compatible OpenRune project
 ```
 
-Local implementations come first so the Studio remains useful without a running OpenRune server. OpenRune implementations replace those local services later without rewriting the UI.
+Local implementations remain first-class so the Studio stays useful without the backend running. Backend-backed implementations should replace only the relevant service adapters, not rewrite the UI.
+
+For the detailed web/Tauri process model, read `docs/STUDIO_BACKEND_INTEGRATION.md`.
 
 ## 2. Current architecture
 
@@ -83,7 +104,8 @@ UI / keybinding / tool
              -> Undo / Redo history
                 -> Edit Format v1
                    -> local persistence
-                      -> OpenRune backend
+                      -> separate Studio backend
+                         -> compatible OpenRune project
 ```
 
 ### Shared commands
@@ -197,7 +219,7 @@ Do not silently add incompatible fields to v1. If a future mutation family canno
 The golden fixture should eventually be consumed by both:
 
 - TypeScript tests
-- Kotlin/OpenRune backend tests
+- Kotlin Studio-backend tests
 
 Both implementations should decode the same fixture into equivalent semantic edits.
 
@@ -214,23 +236,30 @@ These PRs establish the current baseline:
 | #21 | Expanded commands into tools, keybindings, menus, and layout actions |
 | #22 | Added universal named edit transactions |
 | #23 | Added Edit Format v1, strict codec/schema, and golden parity fixture |
-| #24 | Made OpenRune the explicit backend target and added this developer handoff |
+| #24 | Recorded the then-current OpenRune backend direction and added this developer handoff; the backend direction is now superseded by the separate Studio backend model |
 | #25 | Added Project Format v1, framework-neutral `ProjectStore`, and local IndexedDB persistence |
 | #26 | Removed the legacy TypeScript server, moved cache bootstrap into Studio, and reviewed OpenRune Server integration |
 | #27 | Added framework-neutral `ProjectLifecycle` with dirty-state and applied-history persistence semantics |
 | #28 | Wired ProjectLifecycle into the Svelte map-editor workflow and added strict Edit Format v1 replay into live editor history |
+| #29 | Added framework-neutral `CacheSource`, static/Range and IndexedDB implementations, profile source resolution, and Cache Repository integration |
+| #30 | Added framework-neutral `WorldSource`, bundled/offline world data, viewer integration, and neutral spawn-domain ownership |
+| #31 | Reframed OpenRune Server as compatibility/reference only and documented separate backend + Tauri/web integration |
+| #33 | Added backend validation workflow |
+| #34 | Moved the Kotlin backend into `backend/`, made it canonical, replaced legacy `foundationGate`, split backend CI by subsystem, and validated the runnable distribution |
 
 Do not reintroduce systems replaced by these PRs.
 
 ## 6. Current validation baseline
 
+### Client validation
+
 The complete client gate remains the merge requirement:
 
 - clean `npm ci`
-- Svelte-only client architecture boundary: **531 files scanned**
-- Svelte check: **0 errors**
+- Svelte-only client architecture boundary: pass
+- Svelte check: pass
 - TypeScript: pass
-- Vitest: **11 files / 42 tests**
+- Vitest: pass, including cache-source, project, editor, and UI coverage
 - Vite production build: pass
 
 Run from `client/`:
@@ -251,6 +280,35 @@ npm run build
 ```
 
 A PR is not ready to merge if any blocking gate is red.
+
+### Backend validation
+
+Backend changes are validated independently from `backend/`.
+
+The current GitHub Actions gate proves:
+
+- backend compile
+- `Protocol` tests
+- API/security tests
+- OpenRune inspection/indexing tests
+- Gradle/process-boundary tests
+- runnable `StudioService` distribution
+
+Relevant workflow:
+
+- `.github/workflows/backend-validation.yml`
+
+Useful Gradle tasks:
+
+```bash
+cd backend
+./gradlew backendCheck --no-daemon
+./gradlew backendDistribution --no-daemon
+./gradlew validateBackend --no-daemon
+```
+
+Do **not** use the removed `foundationGate` as the canonical validation command.
+
 
 ## 7. Recommended next work
 
@@ -312,7 +370,7 @@ Recommended acceptance criteria:
 7. Unsupported project/edit versions fail with actionable errors.
 8. Corrupt project records do not crash project listing.
 9. Tests cover create/load/save/delete/import/export.
-10. The storage implementation is replaceable by an OpenRune-backed implementation later.
+10. The storage implementation is replaceable by a Studio-backend-backed implementation later.
 
 Use an IndexedDB test implementation or a focused test dependency if browser IndexedDB is not available in the existing Vitest environment. Do not weaken tests just to avoid a small dev-only dependency.
 
@@ -342,40 +400,89 @@ After local project persistence, continue in roughly this order:
 
 `client/src/ui/mapeditor/project-session.svelte.ts` is intentionally thin. It binds the framework-neutral lifecycle to Svelte reactivity, editor history, and local project operations. The setup screen now supports New/Open/Import and the editor title bar supports Save/Save As/Export/Close. Dirty project transitions and browser exit are guarded.
 
-Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content. Publish/build remain unavailable until the OpenRune backend implementation exists.
+Undo/Redo entries after the current history cursor are intentionally excluded from persisted project content. Publish/build remain unavailable until the separate Studio backend exposes those capabilities.
 
-### B. CacheSource
+### B. CacheSource — completed
 
-Formalize cache access behind a source interface.
+Cache acquisition now sits behind `client/src/cache/cache-source.ts`.
 
-Current static/range-backed cache loading should become the local implementation.
+Current implementations:
 
-The future OpenRune implementation should be able to serve versioned cache data with Range support without changing map/editor UI code.
+- `StaticRangeCacheSource` for Studio-owned `/caches` data served with Range support
+- `IndexedDbProfileCacheSource` for cache folders imported into browser storage
+- `profile-cache-source.ts` for profile-to-source resolution and compatibility with existing `server:<cache-name>` profile ids
 
-### C. WorldSource
+The Cache Repository and active map/editor cache resolver consume these source seams rather than selecting transport/storage implementations themselves. `profile-cache-store.ts` is storage-only and no longer owns cache loading.
 
-Remove world/spawn/zone data from the legacy `/api/world` assumption.
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing callers, but generic cache acquisition belongs in the cache-source layer.
 
-Define a source for:
+A future backend-backed OpenRune adapter should implement the same `CacheSource` contract without changing the map/editor UI. The adapter talks to the separate Studio backend, not directly to a custom OpenRune Server endpoint.
 
-- NPC spawns
-- object/world definitions not coming directly from cache
-- zones/areas
-- future project-owned world content
+### C. WorldSource — completed
 
-Provide a local implementation first, then an OpenRune implementation.
+World data that is not authoritative cache-map content now sits behind `client/src/world/world-source.ts`.
 
-### D. OpenRune Studio backend
+Current implementation:
 
-Only after the frontend seams are stable:
+- `WorldSource` defines the framework-neutral load contract.
+- `BundledWorldSource` provides local/offline NPC and ground-item/object spawn snapshots.
+- `default-world-source.ts` centralizes runtime source selection.
+- `spawn-utils.ts` owns map-square filtering.
+- semantic `NpcSpawn` / `ObjSpawn` types live in the world layer.
+- the Map Viewer consumes `WorldSource` and passes the resulting arrays into the existing render-worker contract.
+- old `mapviewer/data/*Spawn.ts` modules are compatibility facades only.
 
-- implement project APIs on OpenRune
-- consume/validate Edit Format batches
-- integrate the OpenRune FileStore/domain model
-- encode/save project changes
-- publish caches
-- build OpenRune projects
-- run the shared golden fixtures in Kotlin
+Cache-derived map locs are intentionally not part of WorldSource.
+
+Zones/areas are intentionally not modeled yet because there is no concrete active zone model or consumer. Extend WorldSource when that semantic model exists rather than inventing a transport-shaped contract.
+
+The future backend-backed OpenRune adapter should satisfy `WorldSource` without changing Svelte viewer code or render-worker initialization.
+
+### D. Separate Studio backend integration
+
+The backend move is complete and validated.
+
+Current backend source:
+
+- `backend/Protocol`
+- `backend/StudioService`
+- `backend/docs`
+- `backend/gradlew`
+
+Current backend capabilities:
+
+- Ktor loopback HTTP service
+- per-session token authentication
+- Host/Origin checks
+- opaque opened-project sessions
+- passive OpenRune project inspection
+- OpenRune FileStore LIVE/SERVER cache inspection
+- GameVal/RSCM-aware content indexing
+- Kotlin source indexing
+- bounded Gradle task discovery
+- allowlisted asynchronous Gradle operations with status, logs, cancellation, and SSE
+- no arbitrary shell-execution API
+
+Current integration findings:
+
+- opening an OpenRune project is passive;
+- current source/content/cache inspection paths are read-only;
+- the only checkout-modifying behavior today is explicitly requested existing Gradle tasks, which may generate normal build outputs;
+- plain-web integration still needs proper CORS/preflight support for authenticated cross-origin localhost requests;
+- packaged Tauri should supervise the backend rather than reimplement it;
+- the current fixed/default launch assumptions should become an ephemeral-port, parent-supplied-token, machine-readable ready handshake.
+
+Next backend sequence:
+
+1. **Launch/connection contract:** support port `0`, parent-supplied token, stable protocol/backend identity, and one machine-readable ready message.
+2. **Web security/transport:** proper loopback-only CORS + OPTIONS/preflight behavior.
+3. **StudioBackendClient:** framework-neutral client + transport contract.
+4. **HttpBackendTransport:** browser/development connection to an already-running backend.
+5. **Tauri supervision:** Rust starts/stops the packaged backend, retains privileged token/process state, and exposes `TauriBackendTransport`.
+6. **Domain adapters:** backend-backed `ProjectStore`, `CacheSource`, and `WorldSource`.
+7. **Write/build/publish:** only after source authority, Edit Format validation, and output verification are explicit.
+
+Do not modify OpenRune Server merely to satisfy Studio integration.
 
 ## 9. Broader editor work
 
@@ -404,9 +511,42 @@ Do not create isolated per-panel save systems.
 
 There is no game server in this repository anymore.
 
-Do not recreate one here. New server-side work belongs in `Neosback/OpenRune-Server` and should be reached through stable Studio interfaces such as `ProjectStore`, `CacheSource`, `WorldSource`, and the future OpenRune Studio service client.
+Do not recreate one here, and do not treat OpenRune Server as the Content Studio backend.
 
-The Studio must continue to start and support local editing without OpenRune Server running.
+### Absolute OpenRune compatibility rule
+
+Content Studio must require **zero Studio-specific changes to OpenRune Server**.
+
+Allowed:
+
+- passively inspect a user-selected compatible OpenRune checkout;
+- use independently available OpenRune/FileStore libraries;
+- read source, GameVals/RSCM data, and generated cache outputs;
+- invoke existing allowlisted Gradle tasks on explicit user action;
+- later update explicit user-owned content/config through Studio-owned write/publish workflows.
+
+Not allowed:
+
+- adding Studio HTTP/API endpoints to OpenRune Server;
+- requiring a custom OpenRune Server fork;
+- adding required accessors/hooks/modules to OpenRune Server for Studio;
+- silently patching OpenRune framework/source code;
+- exposing arbitrary Gradle/shell execution;
+- treating generated cache mutation as a silent substitute for authoritative source updates.
+
+If a capability cannot be supported without an OpenRune Server source change, degrade or disable that capability until it can be implemented externally.
+
+The backend is canonical under `backend/`. Do not keep a second active backend implementation in the old `rspsi` repository.
+
+The Studio must continue to start and support local editing without either the backend or OpenRune Server running.
+
+### Tauri and web
+
+Tauri should supervise a packaged backend sidecar and keep privileged process/token state in Rust when practical. The Svelte app should use a `TauriBackendTransport`, not spawn processes itself.
+
+Plain web mode cannot self-start a local JVM/native backend. Web uses `HttpBackendTransport` to connect to an already-running authenticated loopback backend or a future installed local helper.
+
+Do not duplicate backend business logic in Rust. Tauri is the lifecycle/transport bridge.
 
 ## 11. Development conventions
 
@@ -439,18 +579,39 @@ When replacing an implementation:
 
 Start by reading:
 
-1. `ARCHITECTURE.md`
-2. `ROADMAP.md`
-3. `client/src/project/README.md`
-4. `client/src/project/edit-format-v1.ts`
-5. `client/src/project/edit-format-v1.schema.json`
-6. `client/src/mapeditor/editor-transaction.ts`
-7. `client/src/mapeditor/commands/editor-command-registry.ts`
+1. `DEVELOPER_HANDOFF.md`
+2. `ARCHITECTURE.md`
+3. `ROADMAP.md`
+4. `docs/STUDIO_BACKEND_INTEGRATION.md`
+5. `backend/README.md`
+6. `backend/docs/API.md`
+7. `client/src/project/README.md`
+8. `client/src/project/edit-format-v1.ts`
+9. `client/src/project/edit-format-v1.schema.json`
+10. `client/src/mapeditor/editor-transaction.ts`
+11. `client/src/mapeditor/commands/editor-command-registry.ts`
 
-The project lifecycle/replay slice is complete. The next backend-ready seam is **CacheSource**: formalize current local/static cache access behind a framework-neutral source interface so a future OpenRune implementation can serve versioned cache data with Range support without rewriting the map/editor UI.
+The project lifecycle/replay, CacheSource, and WorldSource frontend seams are complete.
 
-After CacheSource, continue with **WorldSource**, then the OpenRune Studio backend module and Kotlin Project/Edit Format parity tests.
+The backend is now moved, canonical, and fully validated under `backend/`.
+
+The **immediate backend integration PR** should implement the launch/connection contract:
+
+- bind to an ephemeral port when requested (`port=0`);
+- accept a parent-supplied per-launch token;
+- emit one machine-readable ready handshake containing protocol version, endpoint/port, process/backend instance identity, and capabilities as appropriate;
+- never echo the supplied token in the ready payload;
+- add proper loopback-only browser CORS/preflight handling;
+- expose stable backend/API protocol identity through status;
+- retain Host/Origin/token protections;
+- remove/reframe inherited research that suggests required OpenRune Server source/runtime changes.
+
+After that, implement `StudioBackendClient` and transports before any backend-backed domain adapters.
+
+Frontend/editor work such as seamless multi-region editing can continue independently in separate PRs after the launch contract is stable.
+
+Keep all local implementations available so the Studio remains usable without the backend or OpenRune Server running.
 
 The key architectural requirement is simple:
 
-> OpenRune is the target backend. Local browser services are temporary implementations of stable interfaces. The legacy TypeScript server is not the architecture to extend.
+> Content Studio owns the UI and stable frontend service interfaces. The separate Studio backend owns local native/JVM capabilities. OpenRune Server is a compatibility/reference target, not the backend we modify.

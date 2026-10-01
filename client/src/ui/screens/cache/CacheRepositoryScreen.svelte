@@ -7,6 +7,13 @@
     import Plus from "@lucide/svelte/icons/plus";
     import Server from "@lucide/svelte/icons/server";
 
+    import {
+        hasResolvedProfileCache,
+        loadResolvedProfileCache,
+        SERVER_PROFILE_PREFIX,
+        serverProfileId,
+    } from "../../../cache/profile-cache-source";
+    import { staticRangeCacheSource } from "../../../cache/static-range-cache-source";
     import { clearRuntimeLoadedCache, setRuntimeLoadedCache } from "../../../lib/active-cache-runtime";
     import {
         getActiveProfileIdAsync,
@@ -17,13 +24,8 @@
     } from "../../../lib/local-cache-profiles";
     import {
         deleteProfileCache,
-        hasProfileCache,
-        loadProfileCache,
         saveProfileCacheFiles,
-        SERVER_PROFILE_PREFIX,
-        serverProfileId,
     } from "../../../lib/profile-cache-store";
-    import { fetchCacheInfos } from "../../../mapviewer/Caches";
     import type { CacheInfo } from "../../../rs/cache/CacheInfo";
     import ConfirmationDialog from "../../components/confirmation/ConfirmationDialog.svelte";
     import { errorMessage, notifyError, notifySuccess } from "../../lib/notify";
@@ -54,8 +56,8 @@
 
     onMount(() => {
         let cancelled = false;
-        // Caches the dev server serves at /caches (server/caches); none when deployed statically.
-        fetchCacheInfos()
+        // Studio-owned caches served from /caches with Range support.
+        staticRangeCacheSource.listCaches()
             .then((list) => {
                 if (!cancelled) serverCaches = Array.isArray(list) ? list : [];
             })
@@ -78,7 +80,7 @@
     $effect(() => {
         const list = profiles;
         let cancelled = false;
-        void Promise.all(list.map(async (p) => [p.id, await hasProfileCache(p.id)] as const)).then((entries) => {
+        void Promise.all(list.map(async (p) => [p.id, await hasResolvedProfileCache(p)] as const)).then((entries) => {
             if (!cancelled) savedMap = { ...savedMap, ...Object.fromEntries(entries) };
         });
         return () => {
@@ -124,15 +126,15 @@
         await setActiveProfileIdAsync(id);
         const profile = list.find((x) => x.id === id);
         if (!profile) return;
-        if (await hasProfileCache(id)) {
-            try {
-                clearRuntimeLoadedCache();
-                const loaded = await loadProfileCache($state.snapshot(profile) as LocalCacheProfile);
-                setRuntimeLoadedCache(profile.id, loaded);
-            } catch (error) {
-                notifyError(errorMessage(error));
-                return;
-            }
+        try {
+            clearRuntimeLoadedCache();
+            const loaded = await loadResolvedProfileCache(
+                $state.snapshot(profile) as LocalCacheProfile,
+            );
+            setRuntimeLoadedCache(profile.id, loaded);
+        } catch (error) {
+            notifyError(errorMessage(error));
+            return;
         }
         notifySuccess(`Ready: "${profile.name}". Open Map to use this cache.`);
     }
@@ -158,7 +160,7 @@
                 ...profiles,
                 {
                     id,
-                    name: `${info.name} (dev server)`,
+                    name: `${info.name} (local)`,
                     revision: String(info.revision),
                     locationNotes: `Streams from /caches/${info.name}`,
                 },
@@ -209,7 +211,9 @@
                 try {
                     autoloadProgress = 40;
                     clearRuntimeLoadedCache();
-                    const loaded = await loadProfileCache($state.snapshot(profile) as LocalCacheProfile);
+                    const loaded = await loadResolvedProfileCache(
+                        $state.snapshot(profile) as LocalCacheProfile,
+                    );
                     autoloadProgress = 85;
                     setRuntimeLoadedCache(profile.id, loaded);
                     autoloadProgress = 100;
@@ -290,10 +294,10 @@
         <section class="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 class="flex items-center gap-2 text-sm font-semibold">
                 <Server class="size-4" />
-                Dev server caches
+                Studio local caches
             </h2>
             <p class="mt-1 text-sm text-muted-foreground">
-                Served from <code class="font-mono text-xs">server/caches</code>. These stream directly; nothing is copied into browser storage.
+                Served from <code class="font-mono text-xs">client/caches</code> through <code class="font-mono text-xs">/caches</code> with Range support. These stream directly; nothing is copied into browser storage.
             </p>
             <div class="mt-3 space-y-2">
                 {#each serverCaches as info (info.name)}
@@ -373,7 +377,7 @@
                                             <span class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">rev {p.revision}</span>
                                         {/if}
                                         {#if p.id.startsWith(SERVER_PROFILE_PREFIX)}
-                                            <span class="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-300">Dev server</span>
+                                            <span class="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-300">Local source</span>
                                         {:else if saved}
                                             <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs text-emerald-300">Saved in browser</span>
                                         {:else}

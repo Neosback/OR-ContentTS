@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 /**
- * Reverse proxy for the remote cache server (`/api/cache-proxy/*`). It replaces the Next route
- * handler: the target comes from the `x-cache-type` header, then the `cache-type` cookie, then
+ * Vite reverse proxy for remote cache-server APIs still used by Interface Workbench tooling.
+ * The target comes from the `x-cache-type` header, then the `cache-type` cookie, then
  * `API_PROXY_DESTINATION`, then localhost:8090.
  */
 
