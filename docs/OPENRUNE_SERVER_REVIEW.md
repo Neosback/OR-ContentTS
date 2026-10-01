@@ -1,12 +1,14 @@
-# OpenRune Server review for Content Studio integration
+# OpenRune Server reference review for Content Studio compatibility
 
 Repository reviewed: `Neosback/OpenRune-Server`
 
+> **Direction update:** this document records useful OpenRune technical findings, but OpenRune Server is no longer the repository where Content Studio backend features should be implemented. The Studio backend is a separate local service. See `STUDIO_BACKEND_INTEGRATION.md`.
+
 ## Executive summary
 
-OpenRune Server is the correct backend target for Content Studio. It already contains the domain pieces the Studio should build on rather than duplicate: a modular RSMod-derived engine, OpenRune FileStore/cache support, map decoding, collision/world construction, content modules, and cache pack/build tooling.
+OpenRune Server remains an important **compatibility and reference target** for Content Studio. It contains the project/domain pieces the separate Studio backend needs to understand: a modular RSMod-derived engine, OpenRune FileStore/cache support, map decoding, collision/world construction, content modules, GameVals, and cache pack/build tooling.
 
-The important gap is that OpenRune Server is currently a game server, not yet a Studio service. There is no dedicated Studio HTTP/API module in the reviewed tree. Integration should therefore add a narrow Studio-facing module instead of coupling the Svelte application directly to game bootstrap internals.
+Content Studio should attempt to operate against an ordinary compatible OpenRune project without requiring Studio-specific changes to OpenRune Server. The separate Studio backend should adapt to OpenRune project structure, supported libraries, source files, Gradle tasks, and generated outputs rather than adding a Studio HTTP service inside the game server.
 
 ## Relevant architecture
 
@@ -54,33 +56,34 @@ Useful existing types include:
 
 ## Gaps to close before direct Studio persistence
 
-### 1. No Studio transport/API surface yet
+### 1. Studio transport belongs outside OpenRune Server
 
-The reviewed server modules are game-service/engine oriented. I did not find a dedicated Studio HTTP service or project API.
+The reviewed server modules are game-service/engine oriented. That is now treated as the desired separation, not a gap to fill inside OpenRune Server.
 
 Recommended direction:
 
 ```text
 Content Studio
-  -> OpenRuneStudioClient
-     -> OpenRune Studio API/module
-        -> Project service
-        -> FileStore/cache service
-        -> world/content service
+  -> StudioBackendClient
+     -> separate Studio Backend Service
+        -> project/source services
+        -> FileStore/cache services
+        -> bounded Gradle/build services
+        -> compatible OpenRune project
 ```
 
-Do not expose arbitrary server internals or filesystem paths directly.
+Do not expose arbitrary server internals or filesystem paths directly, and do not add Studio-only HTTP endpoints to OpenRune Server as the default integration strategy.
 
-### 2. Project Format/Edit Format parity does not exist yet
+### 2. Project Format/Edit Format parity belongs in the Studio backend
 
-The frontend now has:
+The frontend has:
 
 - `openrune.project` v1
 - `openrune.edit-batch` v1
 - strict TypeScript decoders
 - golden fixtures
 
-OpenRune should add Kotlin DTO/codec validation and consume the exact same golden fixtures before accepting writes.
+The separate Kotlin Studio backend should consume the same golden fixtures and keep protocol parity before accepting writes. This parity should not require OpenRune Server to own the Studio contract.
 
 ### 3. Terrain write path needs a semantic encoder
 
@@ -112,18 +115,19 @@ This preserves Undo/Redo semantics on the frontend and keeps production cache ch
 
 ## Recommended integration order
 
-1. Finish the local frontend `ProjectLifecycle` service.
-2. Add Kotlin parity tests for Project Format v1 and Edit Format v1 in OpenRune Server.
-3. Add an OpenRune Studio module with loopback-safe project/cache endpoints.
-4. Implement an `OpenRuneProjectStore` adapter in the frontend.
-5. Add `CacheSource` and `WorldSource` implementations backed by OpenRune.
-6. Add semantic terrain + loc application/encoding on the backend.
-7. Add validate/build/publish operations.
-8. Only then make OpenRune-backed projects the default workflow.
+1. Keep the completed local frontend `ProjectLifecycle`, `ProjectStore`, `CacheSource`, and `WorldSource` seams stable.
+2. Finalize and move the separate Studio backend currently developed under the temporary `Neosback/rspsi` home.
+3. Keep Kotlin parity tests for Project Format v1 and Edit Format v1 in that backend.
+4. Add a framework-neutral `StudioBackendClient` plus web/Tauri transports in Content Studio.
+5. Implement an `OpenRuneProjectStore` adapter through the Studio backend.
+6. Add backend-backed OpenRune `CacheSource` and `WorldSource` adapters.
+7. Add semantic terrain + loc application/encoding in the Studio backend using supported OpenRune/FileStore semantics.
+8. Add explicit validate/build/publish operations.
+9. Keep OpenRune Server changes optional and upstream-friendly rather than required for Studio compatibility.
 
 ## Security boundary
 
-A Studio backend will eventually read/write projects and build caches, so it should not accept arbitrary filesystem paths from browser requests.
+The separate Studio backend will read/write projects and run bounded build operations, so it should not expose arbitrary filesystem access after a project session is opened.
 
 At minimum:
 
@@ -136,4 +140,8 @@ At minimum:
 
 ## Conclusion
 
-OpenRune Server already has the right engine and FileStore foundation. The work should focus on a small Studio service layer and missing semantic map encoders, not on porting the removed TypeScript server or duplicating OpenRune's game/content systems inside Content Studio.
+OpenRune Server remains a valuable source of truth for OpenRune project/cache/content behavior, but it is **not** the Content Studio backend implementation target.
+
+Content Studio should integrate through the separate Studio backend, which adapts to ordinary OpenRune projects using supported project files, OpenRune/FileStore libraries, source conventions, and bounded Gradle operations. Avoid requiring Studio-specific OpenRune Server patches.
+
+For the active integration and Tauri/web lifecycle design, use `docs/STUDIO_BACKEND_INTEGRATION.md`.
