@@ -33,9 +33,11 @@ Neutral contracts shared by Studio components and runtime integrations.
 
 ## Project authority
 
-The opened OpenRune Server checkout remains authoritative.
+The opened OpenRune-compatible checkout remains authoritative for its project/source content.
 
 Studio reads project structure and source directly from the checkout. Generated LIVE and SERVER caches are treated as build outputs. Studio does not replace OpenRune's Gradle build, source layout, GameVals, or cache tooling.
+
+**Content Studio requires zero Studio-specific OpenRune Server modifications.** The backend must not add or depend on custom OpenRune HTTP endpoints, forks, accessors, hooks, modules, or framework patches. If a capability cannot be implemented externally, it must degrade/remain unavailable.
 
 Gradle is never executed merely because a project is opened. Task discovery and execution are explicit project-scoped operations. Execution is limited to the `assemble`, `test`, and `cache-build` operation IDs; callers cannot provide arbitrary Gradle tasks or arguments.
 
@@ -73,8 +75,12 @@ The service binds to loopback and requires an OpenRune Studio session token.
 ## Build and test
 
 ```bash
-./gradlew foundationGate
+./gradlew backendCheck --no-daemon
+./gradlew backendDistribution --no-daemon
+./gradlew validateBackend --no-daemon
 ```
+
+GitHub CI additionally splits validation into compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process-boundary, and runnable-distribution stages for faster diagnosis.
 
 Run StudioService directly with:
 
