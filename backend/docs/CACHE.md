@@ -1,6 +1,6 @@
 # Generated cache handling
 
-OpenRune Server Studio is not a general cache or map editor.
+OpenRune Content Studio Backend is not a general cache or map editor.
 
 Cache support exists to inspect and verify outputs produced by an OpenRune Server project.
 
