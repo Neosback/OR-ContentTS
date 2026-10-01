@@ -39,10 +39,8 @@ export class RenderDataWorkerPool {
         readonly size: number,
     ) {}
 
-    initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): void {
-        for (const worker of this.workers) {
-            worker.init.then((w) => w.initCache(cache, objSpawns, npcSpawns));
-        }
+    initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): Promise<void> {
+        return this.runAll((w) => w.initCache(cache, objSpawns, npcSpawns));
     }
 
     async runAll(task: (w: RenderDataWorkerThread) => any): Promise<void> {

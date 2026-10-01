@@ -582,49 +582,69 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     }
 
     override async queueLoadMap(mapX: number, mapY: number): Promise<void> {
-        // Map builds need the shaders/textures created by init(); a worker can finish before that.
-        await this.initialized;
         const generation = this.mapManager.generation;
-        const mapData = await this.host.workerPool.queueLoadEditorMapData(
-            mapX,
-            mapY,
-            this.host.terrainSmoothingEnabled,
-        );
-        // Maps were cleared (region change, smoothing toggle) while the worker ran.
-        if (generation !== this.mapManager.generation) return;
-        if (
-            !mapData ||
-            !this.sceneUniformBuffer ||
-            !this.textureArray ||
-            !this.textureMaterials ||
-            !this.terrainProgram ||
-            !this.objectProgram ||
-            !this.objectProgramAlpha
-        ) {
-            this.mapManager.addInvalidMap(mapX, mapY);
-            return;
-        }
+        const mapId = (mapX << 8) + mapY;
+        try {
+            // GPU map builders need the renderer resources created by init().
+            await this.initialized;
+            if (
+                generation !== this.mapManager.generation ||
+                !this.mapManager.loadingMapIds.has(mapId)
+            ) {
+                return;
+            }
 
-        const builder = new EditorMapSquareBuilder(
-            this.app,
-            mapData,
-            this.sceneUniformBuffer,
-            this.textureArray,
-            this.textureMaterials,
-            this.terrainProgram,
-            this.objectProgram,
-            this.objectProgramAlpha,
-            this.host.seqTypeLoader,
-            Math.floor(performance.now() * 0.001 / CLIENT_TICK_SEC),
-            (mapSquare) => {
-                // Worker builds tile meshes only for vertex generation; the live `Scene` on the main thread never
-                // received `tileModel` until an edit ran `updateAffectedTiles`. Build CPU meshes up front so
-                // overlay flood / footprint highlights work before the first paint.
-                this.host.sceneBuilder.addTileModels(mapSquare.scene, this.host.terrainSmoothingEnabled);
-                mapSquare.scene.setTileMinLevels();
-            },
-        );
-        this.pendingMapBuilds.push({ mapId: (mapX << 8) + mapY, generation, builder });
+            const mapData = await this.host.workerPool.queueLoadEditorMapData(
+                mapX,
+                mapY,
+                this.host.terrainSmoothingEnabled,
+            );
+            // Maps were cleared (region change, smoothing toggle) while the worker ran.
+            if (
+                generation !== this.mapManager.generation ||
+                !this.mapManager.loadingMapIds.has(mapId)
+            ) {
+                return;
+            }
+            if (
+                !mapData ||
+                !this.sceneUniformBuffer ||
+                !this.textureArray ||
+                !this.textureMaterials ||
+                !this.terrainProgram ||
+                !this.objectProgram ||
+                !this.objectProgramAlpha
+            ) {
+                this.mapManager.addInvalidMap(mapX, mapY);
+                return;
+            }
+
+            const builder = new EditorMapSquareBuilder(
+                this.app,
+                mapData,
+                this.sceneUniformBuffer,
+                this.textureArray,
+                this.textureMaterials,
+                this.terrainProgram,
+                this.objectProgram,
+                this.objectProgramAlpha,
+                this.host.seqTypeLoader,
+                Math.floor(performance.now() * 0.001 / CLIENT_TICK_SEC),
+                (mapSquare) => {
+                    // Worker builds tile meshes only for vertex generation; the live `Scene` on the main thread never
+                    // received `tileModel` until an edit ran `updateAffectedTiles`. Build CPU meshes up front so
+                    // overlay flood / footprint highlights work before the first paint.
+                    this.host.sceneBuilder.addTileModels(mapSquare.scene, this.host.terrainSmoothingEnabled);
+                    mapSquare.scene.setTileMinLevels();
+                },
+            );
+            this.pendingMapBuilds.push({ mapId, generation, builder });
+        } catch (error) {
+            if (generation === this.mapManager.generation) {
+                this.mapManager.addInvalidMap(mapX, mapY);
+            }
+            console.error(`Failed loading editor map ${mapX},${mapY}`, error);
+        }
     }
 
     /**
@@ -3434,6 +3454,22 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
     override async cleanUp(): Promise<void> {
         super.cleanUp();
+
+        for (const job of this.pendingMapBuilds) {
+            job.builder.cancel();
+        }
+        this.pendingMapBuilds.length = 0;
+        this.updatedTerrainMapIds.clear();
+        this.updatedObjectChunksByMapId.clear();
+        this.loadingObjectChunksByMapId.clear();
+        this.affectedTilesMap.clear();
+        this.heightChangedTilesMap.clear();
+        this.wireframeLineCache.clear();
+        this.wireframeTriCache.clear();
+        this.wireframeRefMemo.clear();
+        this.textureIds.length = 0;
+        this.textureIndexMap.clear();
+        this.loadedTextureIds.clear();
 
         // Uniforms
         this.sceneUniformBuffer?.delete();

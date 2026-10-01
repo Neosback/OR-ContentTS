@@ -142,6 +142,8 @@ const DEFAULT_RENDER_DISTANCE = 128;
 
 /** Minimap texture refresh after painting; debounced so rapid strokes don’t queue dozens of renders. */
 const MINIMAP_REFRESH_DEBOUNCE_MS = 450;
+const MAX_MINIMAP_PIXEL_CACHE_ENTRIES = 16;
+const MAX_MINIMAP_IMAGE_CACHE_ENTRIES = 64;
 
 const WORKBENCH_PLUGINS_STORAGE_KEY = "map-editor-workbench-plugins-v2";
 const MAP_EDITOR_DOCK_PANEL_RESTORE_KEY = "map-editor-dock-panel-restore-v1";
@@ -160,6 +162,7 @@ export class MapEditor {
     camera: Camera = new Camera(3242, -26, 3202, -245, 1862);
 
     renderer: MapEditorRenderer;
+    readonly ready: Promise<void>;
 
     /**
      * RuneLite-style injectable API: loaders, cache, scene, camera, map manager.
@@ -1325,7 +1328,7 @@ export class MapEditor {
             (window as unknown as { __mapEditor?: MapEditor }).__mapEditor = this;
         }
         this.renderer = new WebGLMapEditorRenderer(this.pluginHost);
-        this.initCache(cache);
+        this.ready = this.initCache(cache);
         this.loadWorkbenchPluginStateFromStorage();
         this.loadKeybindOverridesFromStorage();
         this.loadDockPanelRestoreFromStorage();
@@ -1333,11 +1336,11 @@ export class MapEditor {
         this.ensureBrushTypePluginEnabled();
     }
 
-    initCache(cache: LoadedCache): void {
+    initCache(cache: LoadedCache): Promise<void> {
         this.loadedCache = cache;
         this.cacheSystem = CacheSystem.fromFiles(cache.type, cache.files);
         this.loaderFactory = getCacheLoaderFactory(cache.info, this.cacheSystem);
-        this.workerPool.initCache(cache, [], []);
+        const workerReady = this.workerPool.initCache(cache, [], []);
 
         this.textureLoader = this.loaderFactory.getTextureLoader();
         this.seqTypeLoader = this.loaderFactory.getSeqTypeLoader();
@@ -1385,6 +1388,9 @@ export class MapEditor {
             this.locModelLoader,
             cache.xteas
         );
+
+        this.renderer.initCache();
+        return workerReady;
     }
 
     getSearchParams(): Record<string, string> {
@@ -1899,6 +1905,24 @@ export class MapEditor {
         return this.minimapImageUrls.get(mapId);
     }
 
+    /**
+     * Minimap preview for setup/world-map UI. Unlike getMinimapImageUrl(), this never
+     * streams a full editable map square merely because a thumbnail became visible.
+     */
+    getMinimapPreviewImageUrl(mapX: number, mapY: number): string | undefined {
+        if (mapX < 0 || mapY < 0 || mapX >= MapManager.MAX_MAP_X || mapY >= MapManager.MAX_MAP_Y) {
+            return undefined;
+        }
+        const mapId = getMapSquareId(mapX, mapY);
+        const loaded = this.renderer.mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
+        if (loaded) {
+            void this.queueLiveMinimapImage(mapX, mapY);
+        } else {
+            void this.queueMinimapImage(mapX, mapY);
+        }
+        return this.minimapImageUrls.get(mapId);
+    }
+
     /** Debounced: bust minimap blobs near the camera after terrain / overlay edits. */
     /**
      * A map square finished streaming in. Only its own minimap can be stale (a cache render made
@@ -2103,7 +2127,7 @@ export class MapEditor {
                     const patchResult = await this.workerPool.queueEditorLiveMinimap(
                         transferLiveMinimapWorkerRequest(patchReq),
                     );
-                    this.minimapPixelCache.set(mapId, new Int32Array(patchResult.pixelCache));
+                    this.setMinimapPixelCache(mapId, new Int32Array(patchResult.pixelCache));
                     this.setMinimapBlobUrl(mapX, mapY, await mainThreadBlobUrl(patchResult.minimapBlob));
                     this.minimapDirtyByMapId.delete(mapId);
                 } catch {
@@ -2138,7 +2162,7 @@ export class MapEditor {
         const result = await this.workerPool.queueEditorLiveMinimap(
             transferLiveMinimapWorkerRequest(fullReq),
         );
-        this.minimapPixelCache.set(mapId, new Int32Array(result.pixelCache));
+        this.setMinimapPixelCache(mapId, new Int32Array(result.pixelCache));
         this.setMinimapBlobUrl(mapX, mapY, await mainThreadBlobUrl(result.minimapBlob));
     }
 
@@ -2156,8 +2180,52 @@ export class MapEditor {
         const prev = this.minimapImageUrls.get(mapId);
         if (prev) {
             this.scheduleRevokeMinimapBlobUrl(prev);
+            this.minimapImageUrls.delete(mapId);
         }
         this.minimapImageUrls.set(mapId, blobUrl);
+
+        while (this.minimapImageUrls.size > MAX_MINIMAP_IMAGE_CACHE_ENTRIES) {
+            const oldest = this.minimapImageUrls.entries().next().value as [number, string] | undefined;
+            if (!oldest) break;
+            this.minimapImageUrls.delete(oldest[0]);
+            this.scheduleRevokeMinimapBlobUrl(oldest[1]);
+            this.minimapPixelCache.delete(oldest[0]);
+            this.minimapDirtyByMapId.delete(oldest[0]);
+        }
+    }
+
+    private setMinimapPixelCache(mapId: number, pixels: Int32Array): void {
+        this.minimapPixelCache.delete(mapId);
+        this.minimapPixelCache.set(mapId, pixels);
+        while (this.minimapPixelCache.size > MAX_MINIMAP_PIXEL_CACHE_ENTRIES) {
+            const oldestMapId = this.minimapPixelCache.keys().next().value as number | undefined;
+            if (oldestMapId === undefined) break;
+            this.minimapPixelCache.delete(oldestMapId);
+            this.minimapDirtyByMapId.delete(oldestMapId);
+        }
+    }
+
+    dispose(): void {
+        if (this.minimapEditRefreshTimer !== null) {
+            window.clearTimeout(this.minimapEditRefreshTimer);
+            this.minimapEditRefreshTimer = null;
+        }
+        for (const url of this.minimapImageUrls.values()) {
+            URL.revokeObjectURL(url);
+        }
+        this.minimapImageUrls.clear();
+        this.loadingMinimapImageIds.clear();
+        this.minimapPixelCache.clear();
+        this.minimapDirtyByMapId.clear();
+        this.locModelLoader?.clearCache();
+        this.seqFrameLoader?.clearCache();
+
+        if (import.meta.env.DEV && typeof window !== "undefined") {
+            const devWindow = window as unknown as { __mapEditor?: MapEditor };
+            if (devWindow.__mapEditor === this) {
+                delete devWindow.__mapEditor;
+            }
+        }
     }
 
     private async queueMinimapImage(mapX: number, mapY: number): Promise<void> {
