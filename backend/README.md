@@ -20,6 +20,8 @@ It provides a structured view of an OpenRune project and exposes project-aware t
 - Stream operation status and bounded log tails over Server-Sent Events and cancel active operations.
 - Maintain project-scoped index snapshots and refresh them when project inputs change.
 - Expose the functionality through a loopback-only, token-protected HTTP API.
+- Launch on an ephemeral port when requested and emit a machine-readable READY handshake for a supervising parent process.
+- Support loopback-only browser CORS/preflight without weakening Host, Origin, or token protections.
 
 ## Modules
 
@@ -67,6 +69,35 @@ GET  /api/v1/project/{projectId}/cache/server/inspect
 
 The service binds to loopback and requires an OpenRune Studio session token.
 
+`GET /api/v1/status` exposes stable API/protocol identity, the per-process backend instance ID, backend version/build information, readiness state, and process-level capabilities.
+
+## Launch contract
+
+The packaged backend accepts:
+
+```text
+--host 127.0.0.1
+--port 0
+--token <parent-supplied-secret>
+```
+
+`--port 0` requests an available ephemeral port. After the server is successfully bound, stdout receives exactly one machine-readable READY record:
+
+```json
+{
+  "protocolVersion": 1,
+  "backendInstanceId": "generated-instance-id",
+  "endpoint": "http://127.0.0.1:43127",
+  "pid": 12345
+}
+```
+
+The token is never included in the READY payload. A parent process such as Tauri should retain the token it supplied and consume this JSON record to discover the actual endpoint.
+
+For manual/development use, the existing `OPENRUNE_STUDIO_HOST`, `OPENRUNE_STUDIO_PORT`, and `OPENRUNE_STUDIO_TOKEN` environment variables remain supported. If no token is supplied, the backend generates one and prints that fallback secret to stderr for the operator.
+
+Browser requests from loopback origins receive CORS support, including authenticated custom-header preflight. Non-loopback Host/Origin values remain rejected.
+
 ## Requirements
 
 - Java 21
@@ -85,8 +116,10 @@ GitHub CI additionally splits validation into compile, protocol, API/security, O
 Run StudioService directly with:
 
 ```bash
-./gradlew :StudioService:run
+./gradlew :StudioService:run --args='--host 127.0.0.1 --port 0 --token development-token-at-least-24-characters'
 ```
+
+The fixed development default remains `127.0.0.1:8765` when no host/port arguments or environment overrides are supplied.
 
 ## Documentation
 

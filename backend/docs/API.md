@@ -9,10 +9,71 @@ The API is versioned under `/api/v1`.
 - bind `127.0.0.1` by default;
 - require a per-launch token;
 - reject non-loopback Host headers and browser Origins;
+- answer browser CORS/OPTIONS preflight only for accepted loopback Origins and the bounded Studio token header;
 - accept an arbitrary filesystem path only when explicitly opening a project;
 - use an opaque project ID for later operations;
 - reject resolved paths that escape the opened project root;
 - never expose arbitrary shell execution.
+
+
+## Process launch and discovery
+
+The backend accepts bounded launch inputs:
+
+```text
+--host 127.0.0.1
+--port 0
+--token <parent-supplied-secret>
+```
+
+Only loopback bind hosts are accepted. Port `0` requests an available ephemeral port.
+
+After the HTTP listener is bound, stdout receives one JSON READY record:
+
+```json
+{
+  "protocolVersion": 1,
+  "backendInstanceId": "generated-instance-id",
+  "endpoint": "http://127.0.0.1:43127",
+  "pid": 12345
+}
+```
+
+The token is intentionally omitted. A supervising process already owns the supplied secret and must not recover it by scraping logs.
+
+When no explicit token is supplied, the development fallback still generates one. That fallback secret is written to stderr, not to the READY payload.
+
+## Status identity
+
+Authenticated `GET /api/v1/status` returns stable connection identity suitable for compatibility checks:
+
+```json
+{
+  "name": "OpenRune Content Studio Backend",
+  "apiVersion": 1,
+  "protocolVersion": 1,
+  "backendInstanceId": "generated-instance-id",
+  "backendVersion": "0.1.0",
+  "backendBuild": "0.1.0",
+  "status": "ready",
+  "capabilities": ["project.open"]
+}
+```
+
+`backendInstanceId` remains stable for the life of one backend process. Packaged distributions expose the Gradle project version; development/test classpaths may report `dev` unless a build identifier is supplied.
+
+## Browser CORS
+
+Loopback browser origins such as `http://localhost:<port>` and `http://127.0.0.1:<port>` are accepted.
+
+Preflight permits the methods used by the API plus:
+
+```text
+Content-Type
+X-OpenRune-Studio-Token
+```
+
+Preflight does not require the session token because the browser is asking permission to send it. Host and Origin validation still apply before preflight is answered, and every normal `/api/v1/*` request still requires the token.
 
 ## Current resources
 

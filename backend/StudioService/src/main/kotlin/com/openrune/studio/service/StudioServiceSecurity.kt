@@ -1,11 +1,13 @@
 package com.openrune.studio.service
 
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
 import io.ktor.server.request.header
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import java.net.URI
 import java.security.MessageDigest
@@ -99,6 +101,13 @@ private val StudioServiceSecurityPlugin =
                     status = HttpStatusCode.Forbidden,
                     message = "Studio service accepts loopback browser origins only.",
                 )
+            }
+
+            val isCorsPreflight =
+                call.request.httpMethod == HttpMethod.Options &&
+                    call.request.header(HttpHeaders.AccessControlRequestMethod) != null
+            if (isCorsPreflight) {
+                return@onCall
             }
 
             if (!security.acceptsToken(call.request.header(StudioServiceSecurity.TOKEN_HEADER))) {

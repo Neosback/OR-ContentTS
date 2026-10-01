@@ -95,6 +95,10 @@ The backend under `backend/` already provides a useful foundation:
 - bounded Gradle task discovery
 - bounded Gradle operation lifecycle with cancellation/status/events
 - no arbitrary shell execution API
+- ephemeral-port launch support with parent-supplied token input
+- one machine-readable READY handshake after the listener is bound
+- stable API/protocol/backend-process identity through `/api/v1/status`
+- loopback-only browser CORS and OPTIONS/preflight handling
 
 `backend/` is now the single source of truth.
 
@@ -107,7 +111,7 @@ The moved backend is validated in CI across:
 - Gradle/process-boundary tests;
 - runnable StudioService distribution packaging.
 
-The old monolithic `foundationGate` is retired as the canonical merge gate. Packaging and launch/discovery contracts are the next runtime-integration boundary.
+The old monolithic `foundationGate` is retired as the canonical merge gate. The launch/discovery contract is now implemented; frontend client/transport integration is the next runtime boundary.
 
 ## Frontend boundary
 
@@ -242,7 +246,7 @@ The developer explicitly runs the backend service and the Vite Studio.
 
 The frontend connects through `HttpBackendTransport` to a configured loopback endpoint/token.
 
-The current backend Origin checks are not enough by themselves for real browser use. The service must add proper loopback-only CORS and `OPTIONS` preflight handling for the authenticated custom-header requests used by the browser transport.
+The backend now provides loopback-only CORS and `OPTIONS` preflight handling for authenticated custom-header requests. Normal API calls still require the session token, and non-loopback Host/Origin values remain rejected.
 
 ### Installed local backend helper
 
@@ -258,11 +262,9 @@ Do not create an unauthenticated localhost control endpoint merely to avoid pair
 
 ## Connection discovery contract
 
-The next backend implementation slice is the launch/connection contract.
+The backend launch/connection contract is now established.
 
-Before desktop/frontend runtime integration, the backend should settle a small startup/discovery contract.
-
-Recommended backend launch inputs:
+Supported backend launch inputs:
 
 ```text
 --host 127.0.0.1
@@ -270,7 +272,7 @@ Recommended backend launch inputs:
 --token <ephemeral-secret>
 ```
 
-Recommended ready handshake, emitted once through stdout or another parent-owned channel:
+The ready handshake is emitted once through stdout after the HTTP listener is bound:
 
 ```json
 {
@@ -283,7 +285,7 @@ Recommended ready handshake, emitted once through stdout or another parent-owned
 
 The supplied token must **not** be echoed in the ready payload. The parent already owns it.
 
-The backend should not require the frontend to scrape human-readable log output to discover its port.
+The backend does not require the frontend to scrape human-readable log output to discover its port.
 
 For web/manual operation, an owner-readable session descriptor is acceptable, but the browser cannot read arbitrary local files directly. Desktop Tauri should prefer an inherited/stdio handshake.
 
@@ -343,11 +345,11 @@ Now that the backend has moved into the monorepo:
 2. keep backend-facing TypeScript interfaces transport-neutral;
 3. do not modify OpenRune Server for Studio integration;
 4. validate `backend/` independently in CI;
-5. implement the launch/connection contract: port `0`, parent-supplied token, machine-readable ready handshake, stable status/protocol identity, and loopback CORS/preflight;
-6. finalize backend sidecar packaging after that contract is stable;
-7. add a framework-neutral `StudioBackendClient`;
-8. add HTTP transport for browser/development use;
-9. add a Tauri transport/process supervisor for desktop;
+5. keep the implemented launch/connection contract stable: port `0`, parent-supplied token, machine-readable ready handshake, stable status/protocol identity, and loopback CORS/preflight;
+6. add a framework-neutral `StudioBackendClient` and `BackendTransport` contract;
+7. add `HttpBackendTransport` for browser/development use;
+8. finalize backend sidecar packaging and add the Tauri process supervisor;
+9. add `TauriBackendTransport`;
 10. implement `OpenRuneProjectStore`, `OpenRuneCacheSource`, and `OpenRuneWorldSource` against that client as backend capabilities become available;
 11. add build/publish workflows only after source authority and output verification are explicit.
 

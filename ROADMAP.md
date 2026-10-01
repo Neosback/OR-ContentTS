@@ -89,12 +89,12 @@ The backend now lives under `backend/` in this monorepo; the temporary `Neosback
 
 - [x] Move the Kotlin backend foundation into `backend/` with `Protocol`, `StudioService`, tests, Gradle wrapper, and retained research docs.
 - [x] Replace the inherited monolithic `foundationGate` with split backend CI covering compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging.
-- [ ] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
-- [ ] Finalize sidecar packaging after the launch contract is stable.
+- [x] Finalize the backend launch/connection contract: `port=0`, parent-supplied token, machine-readable ready handshake, stable protocol/backend identity, and loopback-only browser CORS/preflight.
 - [ ] Add a framework-neutral `StudioBackendClient` and transport abstraction.
+- [ ] Finalize sidecar packaging after the launch contract remains stable through client integration.
 - [ ] Add `HttpBackendTransport` for browser/development connections to an already-running local backend.
 - [ ] Add Tauri backend supervision and `TauriBackendTransport` so the desktop app can self-start a packaged backend sidecar.
-- [ ] Define an ephemeral-port/per-launch-token ready handshake that Tauri can consume without scraping logs.
+- [x] Define an ephemeral-port/per-launch-token ready handshake that Tauri can consume without scraping logs.
 - [ ] Add an OpenRune-project `ProjectStore` adapter through the Studio backend.
 - [ ] Add backend-backed OpenRune `CacheSource` and `WorldSource` adapters.
 - [ ] Accept edit batches, validate and save/publish through the separate backend.
