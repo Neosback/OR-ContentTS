@@ -52,6 +52,7 @@ jobs:
         run: |
           ./gradlew :StudioService:test --no-daemon --stacktrace \
             --tests com.openrune.studio.service.StudioServiceServerTest \
+            --tests com.openrune.studio.service.StudioServiceLaunchTest \
             --tests com.openrune.studio.service.GradleOperationApiTest
 
       - name: Test OpenRune inspection and indexing
