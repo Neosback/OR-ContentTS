@@ -31,13 +31,9 @@ export abstract class MapEditorRenderer<T extends MapSquare = MapSquare> extends
     }
 
     initCache(): void {
-        this.mapManager.init(this.host.mapFileIndex,false);
-        this.mapManager.update(
-            this.host.camera,
-            this.stats.frameCount,
-            this.host.renderDistance,
-            this.host.unloadDistance,
-        );
+        // Initialize cache validity without streaming the default camera location.
+        // Region/project launch owns the first explicit map requests.
+        this.mapManager.init(this.host.mapFileIndex, false);
     }
 
 
