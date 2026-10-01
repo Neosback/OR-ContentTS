@@ -9,8 +9,8 @@ import { EditorMapObjectChunkData } from "../../mapeditor/webgl/loader/EditorMap
 import type { SceneData } from "../../mapeditor/webgl/loader/EditorMapData";
 import type { SceneLocData } from "../../mapeditor/webgl/sceneLocData";
 import { LoadedCache } from "../Caches";
-import { NpcSpawn } from "../data/npc/NpcSpawn";
-import { ObjSpawn } from "../data/obj/ObjSpawn";
+import type { NpcSpawn } from "../../world/world-source";
+import type { ObjSpawn } from "../../world/world-source";
 import { MinimapData } from "./MinimapData";
 import { RenderDataLoader } from "./RenderDataLoader";
 import { RenderDataWorker } from "./RenderDataWorker";
