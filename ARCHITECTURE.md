@@ -81,7 +81,7 @@ The Content Studio backend is a **separate local service**, not OpenRune Server 
 
 OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/reference target. The backend may use OpenRune libraries and inspect a user's OpenRune project, but normal Content Studio development must not require Studio-specific modifications to OpenRune Server.
 
-The separate backend is currently being developed under the temporary `Neosback/rspsi` repository/name. Until that backend is formally moved and its packaging/startup contract is stable, this repository should consume it only as an architectural reference rather than copying it and creating a second source of truth.
+The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository; `backend/` is now the canonical source. Packaging and startup/discovery contracts remain the next integration boundary before the frontend depends on it at runtime.
 
 The backend is expected to own capabilities such as:
 

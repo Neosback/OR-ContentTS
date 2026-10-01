@@ -4,13 +4,14 @@
 
 OpenRune Content Studio will use a **separate local Studio backend service** for capabilities that a browser alone cannot safely or practically provide.
 
-That backend is currently being developed separately. Its temporary development home is:
+The backend now lives in this repository under:
 
-- `Neosback/rspsi`
-- current modules: `Protocol` and `StudioService`
-- the repository/module names are temporary and are **not** the final product name
+- `backend/Protocol`
+- `backend/StudioService`
 
-Do not copy or fork that backend into this repository while its permanent home and packaging are still being decided. When the backend is formally moved, Content Studio should integrate with the moved service rather than maintain a duplicate implementation.
+It was moved from the temporary `Neosback/rspsi` development repository. The monorepo `backend/` directory is now the canonical source. Do not dual-edit or re-import from `rspsi`; treat the old repository as historical reference only.
+
+The Gradle root is named `OpenRuneContentStudioBackend`. Kotlin package/API identifiers remain stable during the move so repository relocation is not mixed with a protocol/package rename.
 
 ## OpenRune Server relationship
 
@@ -56,7 +57,7 @@ The backend may use OpenRune libraries and may inspect an OpenRune Server projec
 
 ## Current backend baseline
 
-The temporary backend in `Neosback/rspsi` already demonstrates a useful foundation:
+The backend under `backend/` already provides a useful foundation:
 
 - neutral `Protocol` module
 - Kotlin/JVM service
@@ -72,7 +73,7 @@ The temporary backend in `Neosback/rspsi` already demonstrates a useful foundati
 - bounded Gradle operation lifecycle with cancellation/status/events
 - no arbitrary shell execution API
 
-This is mature enough to guide Content Studio integration design, but it should remain single-source until its permanent repository, name, packaging, and launch contract are settled.
+`backend/` is now the single source of truth. Packaging and launch/discovery contracts are still being finalized before the frontend begins depending on the service at runtime.
 
 ## Frontend boundary
 
@@ -297,13 +298,13 @@ Backend availability should unlock capabilities, not make the entire application
 
 ## Near-term integration sequence
 
-Until the separate backend is formally moved and its launch contract is stable:
+Now that the backend has moved into the monorepo:
 
 1. keep Content Studio local/offline services working;
 2. keep backend-facing TypeScript interfaces transport-neutral;
 3. do not modify OpenRune Server for Studio integration;
-4. treat `Neosback/rspsi` as the temporary backend development source, not as a dependency to vendor;
-5. settle backend packaging, protocol versioning, and startup handshake;
+4. validate `backend/` independently in CI;
+5. settle backend packaging, protocol versioning, and the machine-readable startup handshake;
 6. add a framework-neutral `StudioBackendClient`;
 7. add HTTP transport for browser/development use;
 8. add a Tauri transport/process supervisor for desktop;

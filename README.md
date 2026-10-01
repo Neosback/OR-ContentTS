@@ -9,8 +9,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the runtime boundary, [ROADMAP.md](RO
 ## Packages
 
 - [`client/`](client/): the Studio frontend (Vite, Svelte 5, dockview-core, TypeScript, WebGL2 rendering).
-- [`Neosback/OpenRune-Server`](https://github.com/Neosback/OpenRune-Server): an external OpenRune compatibility/reference project. Content Studio should work with compatible OpenRune projects without requiring Studio-specific changes to this repository.
-- The separate Studio backend is currently being developed under the temporary `Neosback/rspsi` repository/name. It should not be vendored here until its permanent home and packaging are settled.
+- [`backend/`](backend/): the local Kotlin/JVM Studio backend (`Protocol` + `StudioService`) moved from the temporary `Neosback/rspsi` development repository.
+- [`Neosback/OpenRune-Server`](https://github.com/Neosback/OpenRune-Server): an external OpenRune compatibility/reference project. Content Studio should work with compatible OpenRune projects without requiring Studio-specific changes to that repository.
 
 ## Quick start
 
@@ -61,7 +61,7 @@ The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` w
 
 The legacy TypeScript game server has been removed from this repository. Content Studio will use a **separate local Studio backend service** for project/source inspection, OpenRune FileStore/cache access, bounded build operations, and later publication workflows.
 
-OpenRune Server itself is a compatibility/reference target, not the repository where Content Studio should add backend endpoints or Studio-specific server changes. The separate backend should inspect and operate against an ordinary compatible OpenRune project.
+OpenRune Server itself is a compatibility/reference target, not the repository where Content Studio should add backend endpoints or Studio-specific server changes. The backend under [`backend/`](backend/) should inspect and operate against an ordinary compatible OpenRune project.
 
 `ProjectStore`, project lifecycle/replay, `CacheSource`, and `WorldSource` remain local-first frontend seams. See [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the web/Tauri integration and backend lifecycle plan.
 

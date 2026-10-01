@@ -116,7 +116,7 @@ This preserves Undo/Redo semantics on the frontend and keeps production cache ch
 ## Recommended integration order
 
 1. Keep the completed local frontend `ProjectLifecycle`, `ProjectStore`, `CacheSource`, and `WorldSource` seams stable.
-2. Finalize and move the separate Studio backend currently developed under the temporary `Neosback/rspsi` home.
+2. Keep the moved backend under `backend/` as the canonical source and finalize its packaging/startup contract.
 3. Keep Kotlin parity tests for Project Format v1 and Edit Format v1 in that backend.
 4. Add a framework-neutral `StudioBackendClient` plus web/Tauri transports in Content Studio.
 5. Implement an `OpenRuneProjectStore` adapter through the Studio backend.

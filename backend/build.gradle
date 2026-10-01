@@ -1,0 +1,41 @@
+plugins {
+    id 'java-library'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.20' apply false
+}
+
+wrapper {
+    gradleVersion = '8.14.3'
+}
+
+group = 'com.openrune.studio'
+version = '0.1.0'
+
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url = uri('https://raw.githubusercontent.com/OpenRune/hosting/main') }
+    }
+}
+
+subprojects {
+    apply plugin: 'java-library'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+}
+
+tasks.register('foundationGate') {
+    description = 'Runs the deterministic OpenRune Server Studio foundation checks.'
+    group = 'verification'
+    dependsOn ':Protocol:check', ':StudioService:check'
+}

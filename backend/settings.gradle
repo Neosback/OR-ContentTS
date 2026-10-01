@@ -1,0 +1,4 @@
+rootProject.name = 'OpenRuneContentStudioBackend'
+
+include ':Protocol'
+include ':StudioService'
