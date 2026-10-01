@@ -8,8 +8,8 @@ export interface ObjSpawn {
     plane: number;
 }
 
-export async function fetchObjSpawns(): Promise<ObjSpawn[]> {
-    const response = await fetch(objSpawnsUrl);
+export async function fetchObjSpawns(signal?: AbortSignal): Promise<ObjSpawn[]> {
+    const response = await fetch(objSpawnsUrl, { signal });
     return await response.json();
 }
 
