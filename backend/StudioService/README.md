@@ -2,7 +2,15 @@
 
 `StudioService` is the Kotlin/JVM application service for OpenRune Content Studio Backend.
 
-It provides the local project-aware backend used to inspect and work with an OpenRune Server checkout.
+It provides optional local JVM/OpenRune capabilities for Content Studio. Ordinary project filesystem access, cache editing, and GameVal/RSCM parsing should remain available without this service.
+
+## Runtime policy
+
+StudioService is not an application-start dependency.
+
+Web users connect to it only when they explicitly want a backend-only capability. Tauri may package/supervise it, but should launch it lazily for operations such as exact OpenRune Gradle builds, tests, or FileStore/JVM verification.
+
+Direct Tauri filesystem access and portable TypeScript domain logic remain the preferred path for normal project work.
 
 ## Responsibilities
 

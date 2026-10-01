@@ -6,6 +6,32 @@ OpenRune Content Studio Backend is the local JVM/backend service for **OpenRune 
 
 It provides a structured view of an OpenRune project and exposes project-aware tooling through a local Kotlin/JVM service.
 
+## Role in the TypeScript-first Studio architecture
+
+This service is **optional at runtime**. It is not the normal transport for cache files, RSCM/TOML, or a Tauri-selected OpenRune checkout.
+
+Portable Studio behavior belongs in TypeScript first. In particular, the frontend/Tauri application should be able to:
+
+- inspect an OpenRune directory through `ProjectFileSystem`;
+- parse/index GameVals and RSCM;
+- read/write project source files;
+- load and edit caches;
+- encode map terrain/static loc data;
+- export region/packages/cache patches;
+
+without starting StudioService.
+
+StudioService remains valuable for operations that genuinely use the OpenRune/JVM environment:
+
+- allowlisted Gradle build/test/cache-build execution;
+- OpenRune FileStore/JVM parity and output verification;
+- optional compiler/PSI-aware source analysis;
+- diagnostic comparison with upstream OpenRune behavior.
+
+Tauri should start/connect to the service lazily when one of those capabilities is requested.
+
+See `../docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md` for the ownership matrix.
+
 ## Current capabilities
 
 - Open and validate an OpenRune Server project.
