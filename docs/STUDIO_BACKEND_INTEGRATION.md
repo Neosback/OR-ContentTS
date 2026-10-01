@@ -53,7 +53,30 @@ Studio Backend Service
 User's OpenRune project checkout
 ```
 
-The backend may use OpenRune libraries and may inspect an OpenRune Server project, but Content Studio should attempt to work with an ordinary compatible OpenRune project **without requiring modifications to OpenRune Server itself**.
+The backend may use independently available OpenRune libraries and inspect an OpenRune-compatible project, but Content Studio must work **without requiring Studio-specific modifications to OpenRune Server itself**.
+
+### Hard compatibility invariant
+
+Content Studio requires zero Studio-specific OpenRune Server changes.
+
+The backend may:
+
+- passively inspect a user-selected compatible checkout;
+- read source, GameVals/RSCM data, and generated cache outputs;
+- use independently available OpenRune/FileStore libraries;
+- invoke existing allowlisted Gradle tasks on explicit user action;
+- later update explicit user-owned content/config through Studio-owned write/publish workflows.
+
+The backend must not:
+
+- add Studio HTTP/API endpoints to OpenRune Server;
+- require a custom OpenRune Server fork;
+- require upstream accessors/hooks/modules solely for Studio;
+- patch OpenRune framework/source code;
+- install an in-server Studio agent;
+- expose arbitrary Gradle/shell execution.
+
+If a capability cannot be implemented externally, that capability degrades/remains unavailable until a compatible external approach exists.
 
 ## Current backend baseline
 
@@ -73,7 +96,18 @@ The backend under `backend/` already provides a useful foundation:
 - bounded Gradle operation lifecycle with cancellation/status/events
 - no arbitrary shell execution API
 
-`backend/` is now the single source of truth. Packaging and launch/discovery contracts are still being finalized before the frontend begins depending on the service at runtime.
+`backend/` is now the single source of truth.
+
+The moved backend is validated in CI across:
+
+- compile;
+- Protocol tests;
+- API/security tests;
+- OpenRune inspection/indexing tests;
+- Gradle/process-boundary tests;
+- runnable StudioService distribution packaging.
+
+The old monolithic `foundationGate` is retired as the canonical merge gate. Packaging and launch/discovery contracts are the next runtime-integration boundary.
 
 ## Frontend boundary
 
@@ -206,7 +240,9 @@ Possible launch experiences:
 
 The developer explicitly runs the backend service and the Vite Studio.
 
-The frontend connects to a configured loopback endpoint/token.
+The frontend connects through `HttpBackendTransport` to a configured loopback endpoint/token.
+
+The current backend Origin checks are not enough by themselves for real browser use. The service must add proper loopback-only CORS and `OPTIONS` preflight handling for the authenticated custom-header requests used by the browser transport.
 
 ### Installed local backend helper
 
@@ -222,7 +258,9 @@ Do not create an unauthenticated localhost control endpoint merely to avoid pair
 
 ## Connection discovery contract
 
-Before desktop integration is implemented, the backend should settle a small startup/discovery contract.
+The next backend implementation slice is the launch/connection contract.
+
+Before desktop/frontend runtime integration, the backend should settle a small startup/discovery contract.
 
 Recommended backend launch inputs:
 
@@ -232,17 +270,18 @@ Recommended backend launch inputs:
 --token <ephemeral-secret>
 ```
 
-Recommended ready handshake, emitted through stdout or another parent-owned channel:
+Recommended ready handshake, emitted once through stdout or another parent-owned channel:
 
 ```json
 {
   "protocolVersion": 1,
+  "backendInstanceId": "generated-instance-id",
   "endpoint": "http://127.0.0.1:43127",
   "pid": 12345
 }
 ```
 
-The token does not need to be echoed if the parent process supplied it.
+The supplied token must **not** be echoed in the ready payload. The parent already owns it.
 
 The backend should not require the frontend to scrape human-readable log output to discover its port.
 
@@ -304,12 +343,13 @@ Now that the backend has moved into the monorepo:
 2. keep backend-facing TypeScript interfaces transport-neutral;
 3. do not modify OpenRune Server for Studio integration;
 4. validate `backend/` independently in CI;
-5. settle backend packaging, protocol versioning, and the machine-readable startup handshake;
-6. add a framework-neutral `StudioBackendClient`;
-7. add HTTP transport for browser/development use;
-8. add a Tauri transport/process supervisor for desktop;
-9. implement `OpenRuneProjectStore`, `OpenRuneCacheSource`, and `OpenRuneWorldSource` against that client as backend capabilities become available;
-10. add build/publish workflows only after source authority and output verification are explicit.
+5. implement the launch/connection contract: port `0`, parent-supplied token, machine-readable ready handshake, stable status/protocol identity, and loopback CORS/preflight;
+6. finalize backend sidecar packaging after that contract is stable;
+7. add a framework-neutral `StudioBackendClient`;
+8. add HTTP transport for browser/development use;
+9. add a Tauri transport/process supervisor for desktop;
+10. implement `OpenRuneProjectStore`, `OpenRuneCacheSource`, and `OpenRuneWorldSource` against that client as backend capabilities become available;
+11. add build/publish workflows only after source authority and output verification are explicit.
 
 ## Non-goals
 
