@@ -1,35 +1,8 @@
-import { CacheInfo } from "../../../rs/cache/CacheInfo";
-import type { NpcSpawn } from "../../../world/world-source";
-
 export type { NpcSpawn } from "../../../world/world-source";
 export { getMapNpcSpawns } from "../../../world/spawn-utils";
-import npcSpawns2004Url from "./npc-spawns-2004.json?url";
-import npcSpawns2009Url from "./npc-spawns-2009.json?url";
-import npcSpawnsOsrsUrl from "./npc-spawns-osrs.json?url";
-
-export function getNpcSpawnsUrl(cacheInfo: CacheInfo): string {
-    if (cacheInfo.game === "oldschool") {
-        return npcSpawnsOsrsUrl;
-    } else if (cacheInfo.revision > 474) {
-        return npcSpawns2009Url;
-    } else {
-        return npcSpawns2004Url;
-    }
-}
-
-export async function fetchNpcSpawns(
-    url: string,
-    signal?: AbortSignal,
-): Promise<NpcSpawn[]> {
-    const response = await fetch(url, { signal });
-    return await response.json();
-}
-
-export function fetchOsrsNpcSpawns(signal?: AbortSignal): Promise<NpcSpawn[]> {
-    return fetchNpcSpawns(npcSpawnsOsrsUrl, signal);
-}
-
-export function fetchLegacyNpcSpawns(signal?: AbortSignal): Promise<NpcSpawn[]> {
-    return fetchNpcSpawns(npcSpawns2004Url, signal);
-}
-
+export {
+    fetchLegacyNpcSpawns,
+    fetchNpcSpawns,
+    fetchOsrsNpcSpawns,
+    getNpcSpawnsUrl,
+} from "../../../world/bundled-spawn-data";
