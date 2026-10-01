@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CacheInfo } from "../rs/cache/CacheInfo";
-import type { NpcSpawn } from "../mapviewer/data/npc/NpcSpawn";
-import type { ObjSpawn } from "../mapviewer/data/obj/ObjSpawn";
+import type { NpcSpawn, ObjSpawn } from "./world-source";
 import { BundledWorldSource } from "./bundled-world-source";
 
 const cacheInfo: CacheInfo = {
