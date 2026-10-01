@@ -1,15 +1,10 @@
 import { CacheInfo } from "../../../rs/cache/CacheInfo";
+import type { NpcSpawn } from "../../../world/world-source";
+
+export type { NpcSpawn } from "../../../world/world-source";
 import npcSpawns2004Url from "./npc-spawns-2004.json?url";
 import npcSpawns2009Url from "./npc-spawns-2009.json?url";
 import npcSpawnsOsrsUrl from "./npc-spawns-osrs.json?url";
-
-export interface NpcSpawn {
-    id: number;
-    name?: string;
-    x: number;
-    y: number;
-    level: number;
-}
 
 export function getNpcSpawnsUrl(cacheInfo: CacheInfo): string {
     if (cacheInfo.game === "oldschool") {
