@@ -84,9 +84,7 @@ Run StudioService directly with:
 
 ## Documentation
 
-- `docs/ARCHITECTURE.md`
 - `docs/API.md`
 - `docs/OPENRUNE.md`
 - `docs/CACHE.md`
 - `docs/OPENRUNE_SERVER_FOUNDATION.md`
-- `docs/ROADMAP.md`
