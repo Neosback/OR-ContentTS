@@ -17,6 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -38,5 +39,18 @@ jobs:
             backend/Protocol/*.gradle
             backend/StudioService/*.gradle
 
-      - name: Validate backend
-        run: ./gradlew foundationGate --no-daemon
+      - name: Compile backend
+        timeout-minutes: 8
+        run: ./gradlew :Protocol:classes :StudioService:classes --no-daemon --stacktrace
+
+      - name: Test protocol
+        timeout-minutes: 5
+        run: ./gradlew :Protocol:test --no-daemon --stacktrace
+
+      - name: Test StudioService
+        timeout-minutes: 10
+        run: ./gradlew :StudioService:test --no-daemon --stacktrace
+
+      - name: Build runnable distribution
+        timeout-minutes: 7
+        run: ./gradlew :StudioService:installDist --no-daemon --stacktrace
