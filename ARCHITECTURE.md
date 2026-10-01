@@ -115,6 +115,30 @@ Persisted `server:<cache-name>` profile ids remain supported as a compatibility 
 
 `client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. Future OpenRune cache delivery should implement `CacheSource` rather than adding backend-aware branches to Svelte screens or map/rendering code.
 
+### World data
+
+World/content data that is not authoritative cache-map content sits behind `WorldSource`:
+
+```text
+Map Viewer
+    |
+defaultWorldSource
+    |
+WorldSource
+    |
+BundledWorldSource (local/offline)
+    |
+future OpenRuneWorldSource
+```
+
+`client/src/world/world-source.ts` owns the semantic world-data contract used by rendering today: NPC spawns and ground-item/object spawns. `BundledWorldSource` loads the existing Studio-bundled snapshots, while `default-world-source.ts` centralizes runtime source selection so Svelte does not choose transports or data files directly.
+
+Spawn map-filtering utilities and spawn types are owned by the world layer. The old `mapviewer/data/npc/NpcSpawn.ts` and `mapviewer/data/obj/ObjSpawn.ts` modules remain compatibility facades only. Render workers consume neutral world types/utilities directly.
+
+Cache-derived map locs are not WorldSource data; they remain decoded from the active cache. Zones/areas are also not modeled yet because there is no active zone domain model or consumer in the current Studio. Add them to `WorldSource` only when a concrete semantic model exists rather than baking backend transport shapes into the frontend contract.
+
+Future OpenRune world delivery should implement `WorldSource` without requiring changes to Svelte viewer code or render-worker world-data contracts.
+
 ### Project persistence
 
 Project persistence is framework-neutral:
