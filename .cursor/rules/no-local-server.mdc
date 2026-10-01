@@ -1,13 +1,16 @@
 ---
-description: Do not start local game servers or use Cursor browser for playtesting
+description: Keep game-server and Studio-backend lifecycle explicit during development
 alwaysApply: true
 ---
 
 # Local Runtime
 
-- Do **not** start the companion OpenRune Server repository unless the user explicitly asks.
+- Do **not** start or modify the OpenRune Server repository as part of normal Content Studio development unless the user explicitly asks.
+- OpenRune Server is a compatibility/reference target, not the Content Studio backend implementation.
+- Do **not** start the separate Studio backend service unless the user explicitly asks for a runtime/integration test.
 - Do **not** start the Studio Vite dev server unless the user explicitly asks.
-- The Studio repository no longer contains a game server.
+- The Studio repository does not contain a game server.
+- The Studio backend is being developed separately and should be integrated through stable protocol/client boundaries when it is formally moved.
 - Prefer validation, unit tests, production builds, and GitHub Actions for routine verification.
 - Use an external browser for gameplay/editor verification unless the user explicitly requests IDE/browser automation.
-- Deploying when explicitly requested is separate from starting a local game server.
+- Deploying or testing a packaged Tauri sidecar when explicitly requested is separate from starting a game server.
