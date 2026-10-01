@@ -18,7 +18,17 @@ Research for this model was checked against OpenRune Server `main` at commit:
 625fe96abf802bc932d18e66832ed6ce90b60a0a
 ```
 
-and against the current OpenRune-FileStore cache tooling used by OpenRune Server.
+and OpenRune-FileStore `main` at commit:
+
+```text
+46e2be195489a288a0607b565e20811f26e81f62
+```
+
+Content Studio documentation work in this revision started from `main` at:
+
+```text
+4d116f2b41f3301bcfb11209cff3364659799c6c
+```
 
 OpenRune Server remains an external compatibility target. Content Studio must require **zero Studio-specific OpenRune Server changes**.
 
