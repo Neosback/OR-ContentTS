@@ -54,6 +54,10 @@ Done:
 - [x] Removed retained legacy TSX and pruned direct React-only dependencies/tooling.
 
 Next:
+
+- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
+- [ ] Add a framework-neutral Interface metadata source and backend adapter after StudioBackendClient/BackendTransport exist.
+- [ ] Add backend id-oriented GameVal/RSCM lookup with provenance and conflict diagnostics for interface/project metadata.
 - [ ] Shops and world map as first-class dock panels.
 - [x] Shared command and keyboard-shortcut registry.
 - [ ] Bring remaining editor chrome fully onto Studio theme tokens.
@@ -122,6 +126,7 @@ Done:
 - [x] CS1 simulation.
 - [x] CS2 manual execution.
 - [x] Inventory/gameval simulation.
+- [x] Document Interface Editor cache/GameVal/RSCM data authority and backend enrichment path.
 
 Next:
 
