@@ -122,8 +122,13 @@ Done:
 - [x] CS1 simulation.
 - [x] CS2 manual execution.
 - [x] Inventory/gameval simulation.
+- [x] Document Interface Editor cache/GameVal/RSCM data authority and backend enrichment path.
 
 Next:
+
+- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
+- [ ] Add a framework-neutral Interface metadata source and backend adapter after StudioBackendClient/BackendTransport exist.
+- [ ] Add backend id-oriented GameVal/RSCM lookup with provenance and conflict diagnostics for interface/project metadata.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
 - [ ] Model and animation viewer.

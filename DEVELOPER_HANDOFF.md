@@ -584,13 +584,14 @@ Start by reading:
 2. `ARCHITECTURE.md`
 3. `ROADMAP.md`
 4. `docs/STUDIO_BACKEND_INTEGRATION.md`
-5. `backend/README.md`
-6. `backend/docs/API.md`
-7. `client/src/project/README.md`
-8. `client/src/project/edit-format-v1.ts`
-9. `client/src/project/edit-format-v1.schema.json`
-10. `client/src/mapeditor/editor-transaction.ts`
-11. `client/src/mapeditor/commands/editor-command-registry.ts`
+5. `docs/INTERFACE_EDITOR_DATA_SOURCES.md`
+6. `backend/README.md`
+7. `backend/docs/API.md`
+8. `client/src/project/README.md`
+9. `client/src/project/edit-format-v1.ts`
+10. `client/src/project/edit-format-v1.schema.json`
+11. `client/src/mapeditor/editor-transaction.ts`
+12. `client/src/mapeditor/commands/editor-command-registry.ts`
 
 The project lifecycle/replay, CacheSource, and WorldSource frontend seams are complete.
 
@@ -615,3 +616,18 @@ Keep all local implementations available so the Studio remains usable without th
 The key architectural requirement is simple:
 
 > Content Studio owns the UI and stable frontend service interfaces. The separate Studio backend owns local native/JVM capabilities. OpenRune Server is a compatibility/reference target, not the backend we modify.
+
+
+### Interface Editor metadata note
+
+The Interface Editor's current GameVal/RSCM direction is documented in
+`docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
+
+Important points:
+
+- decoded interface structure remains cache-index-3 authoritative;
+- cache index 24 GameVals currently supply friendly interface names and can also supply component names that the tree does not yet expose;
+- the Studio backend already indexes OpenRune source `gamevals.toml` and generated `.rscm` mappings;
+- backend project metadata should enrich cache metadata with symbolic identity, module/source provenance, references, and diagnostics;
+- do not parse arbitrary OpenRune project files directly in Svelte and do not require OpenRune Server changes;
+- do not let a mismatched project checkout silently override names/ids from the selected cache.
