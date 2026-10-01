@@ -1,6 +1,19 @@
 import type { CacheInfo } from "../rs/cache/CacheInfo";
-import type { NpcSpawn } from "../mapviewer/data/npc/NpcSpawn";
-import type { ObjSpawn } from "../mapviewer/data/obj/ObjSpawn";
+export interface NpcSpawn {
+    id: number;
+    name?: string;
+    x: number;
+    y: number;
+    level: number;
+}
+
+export interface ObjSpawn {
+    id: number;
+    count: number;
+    x: number;
+    y: number;
+    plane: number;
+}
 
 export type WorldSourceContext = {
     cacheInfo: CacheInfo;
