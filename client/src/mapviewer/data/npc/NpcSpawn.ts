@@ -21,17 +21,20 @@ export function getNpcSpawnsUrl(cacheInfo: CacheInfo): string {
     }
 }
 
-export async function fetchNpcSpawns(url: string): Promise<NpcSpawn[]> {
-    const response = await fetch(url);
+export async function fetchNpcSpawns(
+    url: string,
+    signal?: AbortSignal,
+): Promise<NpcSpawn[]> {
+    const response = await fetch(url, { signal });
     return await response.json();
 }
 
-export function fetchOsrsNpcSpawns(): Promise<NpcSpawn[]> {
-    return fetchNpcSpawns(npcSpawnsOsrsUrl);
+export function fetchOsrsNpcSpawns(signal?: AbortSignal): Promise<NpcSpawn[]> {
+    return fetchNpcSpawns(npcSpawnsOsrsUrl, signal);
 }
 
-export function fetchLegacyNpcSpawns(): Promise<NpcSpawn[]> {
-    return fetchNpcSpawns(npcSpawns2004Url);
+export function fetchLegacyNpcSpawns(signal?: AbortSignal): Promise<NpcSpawn[]> {
+    return fetchNpcSpawns(npcSpawns2004Url, signal);
 }
 
 export function getMapNpcSpawns(
