@@ -391,7 +391,14 @@ export function parseGameValDat(
         });
     }
 
-    if (reader.remaining > 0 && !issues.some((issue) => issue.code === "TRUNCATED_DATA")) {
+    const hasFatalStructuralIssue = issues.some(
+        (issue) =>
+            issue.code === "TRUNCATED_DATA" ||
+            issue.code === "INVALID_UTF8" ||
+            issue.code === "INVALID_TABLE_COUNT" ||
+            issue.code === "INVALID_ENTRY_COUNT",
+    );
+    if (reader.remaining > 0 && !hasFatalStructuralIssue) {
         issues.push({
             code: "TRAILING_DATA",
             message: `GameVal DAT has ${reader.remaining} trailing byte(s) after the declared tables.`,
@@ -568,6 +575,8 @@ export function validateCustomGameVals(
     customEntries: readonly CustomGameValEntry[],
 ): CustomGameValValidationIssue[] {
     const issues: CustomGameValValidationIssue[] = [];
+    const customBySymbol = new Map<string, CustomGameValEntry[]>();
+    const customByTableId = new Map<string, CustomGameValEntry[]>();
 
     for (const entry of customEntries) {
         const symbol = `${entry.table}.${entry.key}`;
@@ -624,6 +633,43 @@ export function validateCustomGameVals(
                 related: [...idConflicts],
             });
         }
+
+        const earlierSymbolEntries = customBySymbol.get(symbol) ?? [];
+        if (earlierSymbolEntries.some((existing) => existing.id >= 0 && existing.id !== entry.id)) {
+            issues.push({
+                code: "SYMBOL_CONFLICT",
+                message: `Custom GameVal "${symbol}" is assigned conflicting ids by project sources.`,
+                table: entry.table,
+                key: entry.key,
+                symbol,
+                id: entry.id,
+                sourcePath: entry.sourcePath,
+                line: entry.line,
+            });
+        }
+
+        const customIdKey = tableIdKey(entry.table, entry.id);
+        const earlierIdEntries = customByTableId.get(customIdKey) ?? [];
+        if (earlierIdEntries.some((existing) => `${existing.table}.${existing.key}` !== symbol)) {
+            issues.push({
+                code: "ID_CONFLICT",
+                message: `Custom GameVal "${symbol}" uses id ${entry.id}, which another project symbol already uses in table "${entry.table}".`,
+                table: entry.table,
+                key: entry.key,
+                symbol,
+                id: entry.id,
+                sourcePath: entry.sourcePath,
+                line: entry.line,
+            });
+        }
+
+        const symbolEntries = customBySymbol.get(symbol);
+        if (symbolEntries) symbolEntries.push(entry);
+        else customBySymbol.set(symbol, [entry]);
+
+        const idEntries = customByTableId.get(customIdKey);
+        if (idEntries) idEntries.push(entry);
+        else customByTableId.set(customIdKey, [entry]);
     }
 
     return issues.sort(
