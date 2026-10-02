@@ -37,7 +37,7 @@
                     onClose={() => state.closeWorldMap()}
                     onDoubleClick={(x, y) => state.teleportFromWorldMap(x, y)}
                     getPosition={state.getPosition}
-                    loadMapImageUrl={state.loadMapImageUrl}
+                    loadMapImageBlob={state.loadMapImageBlob}
                 />
             </div>
         {/if}

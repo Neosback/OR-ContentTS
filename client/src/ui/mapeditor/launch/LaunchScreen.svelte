@@ -89,7 +89,8 @@
                 onDoubleClick={(x, y) => launch.onWorldMapDoubleClick(x, y)}
                 onRegionSelect={(_mapX, _mapY, regionId) => launch.selectRegionId(regionId)}
                 getPosition={() => ({ x: editor.camera.getPosX(), y: editor.camera.getPosZ() })}
-                loadMapImageUrl={(mapX, mapY) => editor.getMinimapPreviewImageUrl(mapX, mapY)}
+                loadMapImageBlob={(mapX, mapY) =>
+                    editor.loadMinimapPreviewBlob(mapX, mapY)}
             />
         {/if}
 

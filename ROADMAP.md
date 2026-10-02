@@ -144,7 +144,8 @@ Later/standalone cache writing:
 
 ## Phase 5: rendering and performance
 
-- [ ] Profile CPU scene build, draw calls, buffer uploads, cache misses and memory first.
+- [x] Replace the 2D world map's eager blob-URL/image residency with virtualized canvas tiles, on-demand persisted PNG reads, display-resolution ImageBitmap decoding, bounded weighted LRU residency, and explicit bitmap disposal.
+- [ ] Profile CPU scene build, draw calls, buffer uploads, cache misses and remaining 3D-map memory first.
 - [ ] Strengthen the render-backend interface above the current WebGL2 implementation.
 - [ ] Optional WebGPU backend only where it provides a measurable benefit.
 - [ ] Mesh simplification/LOD work only if profiling shows triangle count is a limiting factor.

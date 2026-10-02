@@ -105,8 +105,11 @@ export class MapViewerUiState {
         y: this.mapViewer.camera.getPosZ(),
     });
 
-    loadMapImageUrl = (mapX: number, mapY: number): string | undefined =>
-        this.mapViewer.getMapImageUrl(mapX, mapY, false);
+    loadMapImageBlob = (
+        mapX: number,
+        mapY: number,
+    ): Promise<Blob | undefined> =>
+        this.mapViewer.loadWorldMapImageBlob(mapX, mapY);
 
     loadMinimapImageUrl = (mapX: number, mapY: number): string | undefined =>
         this.mapViewer.getMapImageUrl(mapX, mapY, true);

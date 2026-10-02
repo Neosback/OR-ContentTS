@@ -28,6 +28,7 @@ As of the PR #60 OpenRune project-session checkpoint:
 - The active setup runtime now retains one `OpenRuneProjectSession` per active OpenRune profile/root. Actual profile activation binds the runtime, Basic-cache activation clears it, switching roots hides the old session before the replacement finishes, and framework-neutral getters/subscriptions expose the current snapshot to future editors.
 - OpenRune LIVE cache resolution reuses the retained session filesystem/project index when that profile is active. Repository availability probes remain side-effect free and cannot silently switch the active project runtime.
 - Cache Repository's **Reload project** action now refreshes the retained OpenRune session before reloading LIVE, so one user action rescans GameVals/config/map/server sources as a coherent generation.
+- The 2D world map now uses virtualized canvas rendering with bounded decoded-bitmap residency. Full-resolution 256×256 region PNGs remain persisted in Cache Storage, but cached tiles are no longer eagerly turned into permanent blob URLs. Visible tiles decode only to the physical pixel size they can actually occupy (capped at the original source resolution), use a weighted LRU budget, and are explicitly closed on eviction/close. This removes the previous runaway decoded-image/GPU residency loop without reducing visible map quality.
 - The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
 - Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
 - The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
@@ -284,6 +285,7 @@ These PRs establish the current baseline:
 | #59 | Split Cache & Project Setup into Basic cache vs OpenRune project-root modes and removed the pinned development-cache bootstrap |
 | #60 | Added the framework-neutral OpenRune project session with atomic full-project source/index refresh |
 | #61 | Bound the active OpenRune setup to one retained project session, reused it for LIVE cache resolution, and made Reload project refresh the shared source graph |
+| #62 | Reworked the 2D world map into a virtualized canvas tile renderer with on-demand Cache Storage reads, display-resolution decoding, bounded bitmap residency, and explicit disposal |
 
 Do not reintroduce systems replaced by these PRs.
 
