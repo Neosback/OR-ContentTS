@@ -101,6 +101,16 @@ describe("InMemoryProjectFileSystem", () => {
         await expect(fs.readText("missing.txt")).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
 
+    it("rejects seed layouts that make one path both a file and directory", () => {
+        expect(
+            () =>
+                new InMemoryProjectFileSystem({
+                    "content/file.toml": "nested",
+                    content: "file",
+                }),
+        ).toThrowError(ProjectFileSystemError);
+    });
+
     it("supports read-only capability gating", async () => {
         const fs = new InMemoryProjectFileSystem(seed, { writable: false });
 
