@@ -49,3 +49,31 @@ jobs:
 
       - name: Vite build
         run: npm run build
+
+
+  tauri-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Regenerate Cargo lock
+        run: cargo generate-lockfile --manifest-path client/src-tauri/Cargo.toml
+
+      - name: Cargo check locked
+        run: cargo check --manifest-path client/src-tauri/Cargo.toml --locked
+
+      - name: Upload Cargo lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-cargo-lock
+          path: client/src-tauri/Cargo.lock
+          if-no-files-found: error
