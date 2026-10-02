@@ -37,8 +37,11 @@ function fixture() {
         ".data/gamevals-binary/gamevals.dat": new Uint8Array([1, 2]),
         ".data/gamevals-binary/gamevals_generated.dat": new Uint8Array([3, 4]),
         ".data/raw-cache/map/npcs/lumbridge.toml": "[[spawn]]",
+        ".data/raw-cache/map/npcs/nested/ignored.toml": "[[spawn]]",
         ".data/raw-cache/map/objs/lumbridge.toml": "[[spawn]]",
+        ".data/raw-cache/map/objs/nested/ignored.toml": "[[spawn]]",
         ".data/raw-cache/map/area/lumbridge.toml": "[[area]]",
+        ".data/raw-cache/map/area/nested/ignored.toml": "[[area]]",
         ".data/raw-cache/server/inventories/shops.toml": "[[inventory]]",
         ".data/cache/LIVE/main_file_cache.dat2": new Uint8Array([1]),
         ".data/cache/SERVER/main_file_cache.dat2": new Uint8Array([2]),
@@ -139,6 +142,10 @@ describe("indexOpenRuneProject", () => {
             objTomlFiles: [".data/raw-cache/map/objs/lumbridge.toml"],
             areaTomlFiles: [".data/raw-cache/map/area/lumbridge.toml"],
         });
+        // OpenRune's map packers use Files.list(), not a recursive walk.
+        expect(index.rawMapSources.npcTomlFiles.some((path) => path.includes("/nested/"))).toBe(false);
+        expect(index.rawMapSources.objTomlFiles.some((path) => path.includes("/nested/"))).toBe(false);
+        expect(index.rawMapSources.areaTomlFiles.some((path) => path.includes("/nested/"))).toBe(false);
         expect(index.rawServerSources).toEqual({
             root: ".data/raw-cache/server",
             tomlFiles: [".data/raw-cache/server/inventories/shops.toml"],
