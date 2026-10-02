@@ -174,9 +174,7 @@ export class MapViewer {
         }
     }
 
-    init(): void {
-        void this.indexCachedWorldMapImages();
-    }
+    init(): void {}
 
     initCache(cache: LoadedCache): void {
         this.loadedCache = cache;
@@ -208,6 +206,7 @@ export class MapViewer {
         this.isNewTextureAnim = cache.info.game === "runescape" && cache.info.revision >= 681;
 
         this.renderer.initCache();
+        void this.indexCachedWorldMapImages();
 
         this.updateSearchParams();
     }
