@@ -47,6 +47,13 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
         for (const [rawPath, value] of Object.entries(seed)) {
             const path = this.requireFilePath(rawPath);
             this.ensureParentDirectories(path);
+            if (this.directories.has(path)) {
+                throw new ProjectFileSystemError(
+                    "IS_DIRECTORY",
+                    `Seed path "${path}" is already a directory.`,
+                    path,
+                );
+            }
             this.files.set(path, typeof value === "string" ? encoder.encode(value) : cloneBytes(value));
         }
     }
