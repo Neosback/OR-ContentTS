@@ -69,6 +69,39 @@ export function packModel(
     );
 }
 
+/**
+ * Packs one model at multiple scene offsets in one WASM call. The model arrays cross
+ * the JS/WASM boundary once; returned counts match sequential `packModel` calls.
+ */
+export function packModelOffsets(
+    packer: MeshPacker,
+    model: Model,
+    transparent: boolean,
+    offsets: Int32Array,
+    reuseVertices = true,
+): Uint32Array {
+    return packer.add_model_offsets(
+        model.faceCount,
+        model.verticesX,
+        model.verticesY,
+        model.verticesZ,
+        model.contourVerticesY ?? EMPTY_I32,
+        model.indices1,
+        model.indices2,
+        model.indices3,
+        model.faceColors1,
+        model.faceColors2,
+        model.faceColors3,
+        model.faceTextures ?? EMPTY_I16,
+        model.faceAlphas ?? EMPTY_I8,
+        model.faceRenderPriorities ?? EMPTY_I8,
+        model.uvs ?? EMPTY_F32,
+        offsets,
+        transparent,
+        reuseVertices,
+    );
+}
+
 /** Result of running slot-mesh emit jobs (see `buildSlotMesh`). */
 export interface SlotJobOutput {
     /** Output vertices, 4 words each: the three packed words, then the slot. */
