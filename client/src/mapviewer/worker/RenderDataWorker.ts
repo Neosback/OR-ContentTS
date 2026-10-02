@@ -382,23 +382,6 @@ const worker = {
         }
         workerState.varManager.set(values);
     },
-    async loadCachedMapImages(): Promise<Map<number, string>> {
-        const workerState = await workerStatePromise;
-        if (!workerState) {
-            throw new Error("Worker not initialized");
-        }
-        const keys = await workerState.mapImageCache.keys();
-        const mapImageUrls = new Map<number, string>();
-        const promises: Promise<void>[] = [];
-        for (const key of keys) {
-            if (key.headers.get("RS-Cache-Name") !== workerState.cache.info.name) {
-                continue;
-            }
-            promises.push(initCachedMapImage(workerState.mapImageCache, mapImageUrls, key));
-        }
-        await Promise.all(promises);
-        return mapImageUrls;
-    },
     async exportSpritesToZip(): Promise<Blob> {
         const workerState = await workerStatePromise;
         if (!workerState) {
@@ -460,28 +443,6 @@ const worker = {
         return zip.generateAsync({ type: "blob" });
     },
 };
-
-async function initCachedMapImage(
-    mapImageCache: Cache,
-    mapImageUrls: Map<number, string>,
-    key: Request,
-): Promise<void> {
-    const resp = await mapImageCache.match(key);
-    if (!resp) {
-        return;
-    }
-    const fileName = key.url.slice(key.url.lastIndexOf("/") + 1);
-    const split = fileName.replace(".png", "").split("_");
-    if (split.length !== 2) {
-        return;
-    }
-    const mapX = parseInt(split[0]);
-    const mapY = parseInt(split[1]);
-
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    mapImageUrls.set(getMapSquareId(mapX, mapY), url);
-}
 
 async function offscreenCanvasToPng(canvas: OffscreenCanvas): Promise<string> {
     const blob = await canvas.convertToBlob({ type: "image/png" });
