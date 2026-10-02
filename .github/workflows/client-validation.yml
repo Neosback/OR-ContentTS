@@ -83,6 +83,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore(tauri): lock persisted scope dependency"
+          git fetch origin "${{ github.head_ref }}"
+          git rebase "origin/${{ github.head_ref }}"
           git push origin HEAD:${{ github.head_ref }}
 
   tauri-check:
