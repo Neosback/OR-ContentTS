@@ -303,49 +303,6 @@ export function calculate_tile_lights(size_x, size_y, heights, occlusions, ignor
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
-
-/**
- * Packs flattened terrain vertices into fixed-size per-tile slots.
- *
- * `tile_counts` gives the number of vertices for each tile in order. The four
- * vertex arrays are concatenated in that same tile order. Output is exactly
- * `tile_counts.len() * 36 * 8` bytes and is byte-identical to
- * `TerrainVertexBuffer.addVertex` followed by a zero-filled tile upload.
- * @param {Uint32Array} tile_counts
- * @param {Int32Array} xs
- * @param {Int32Array} zs
- * @param {Int32Array} hsls
- * @param {Int32Array} texture_indices
- * @returns {Uint8Array}
- */
-export function pack_terrain_vertex_batch(tile_counts, xs, zs, hsls, texture_indices) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray32ToWasm0(tile_counts, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArray32ToWasm0(xs, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(zs, wasm.__wbindgen_export);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passArray32ToWasm0(hsls, wasm.__wbindgen_export);
-        const len3 = WASM_VECTOR_LEN;
-        const ptr4 = passArray32ToWasm0(texture_indices, wasm.__wbindgen_export);
-        const len4 = WASM_VECTOR_LEN;
-        wasm.pack_terrain_vertex_batch(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
-        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
-        if (r3) {
-            throw takeObject(r2);
-        }
-        var v6 = getArrayU8FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export2(r0, r1 * 1, 1);
-        return v6;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
-}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
@@ -393,11 +350,6 @@ function getArrayI32FromWasm0(ptr, len) {
 function getArrayU32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
-}
-
-function getArrayU8FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
 }
 
 let cachedDataViewMemory0 = null;

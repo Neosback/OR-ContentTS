@@ -12,7 +12,6 @@ export const meshpacker_new: (a: number, b: number, c: number, d: number, e: num
 export const meshpacker_used_texture_ids: (a: number, b: number) => void;
 export const meshpacker_vertex_count: (a: number) => number;
 export const meshpacker_vertices: (a: number, b: number) => void;
-export const pack_terrain_vertex_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
 export const slotmeshoutput_take_anim_indices: (a: number, b: number) => void;
 export const slotmeshoutput_take_job_lengths: (a: number, b: number) => void;
 export const slotmeshoutput_take_static_indices: (a: number, b: number) => void;
