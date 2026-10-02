@@ -133,6 +133,14 @@ export async function syncActiveOpenRuneProjectRuntime(
         return inFlight.promise;
     }
 
+    if (
+        activeState &&
+        (activeState.profileId !== profile.id ||
+            activeState.rootPath !== rootPath)
+    ) {
+        publish(null);
+    }
+
     const serial = ++activationSerial;
     const build = (async (): Promise<ActiveOpenRuneProjectRuntimeState> => {
         const fileSystem = options.createFileSystem
