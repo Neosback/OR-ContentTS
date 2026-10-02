@@ -67,6 +67,22 @@ The adapter deliberately grants only the fs write commands it needs in the Tauri
 
 Symlink access remains subject to Tauri's filesystem scope checks. The adapter does not turn symlinks into a way to bypass the selected project root.
 
+
+### Browser File System Access adapter
+
+`browser-project-filesystem.ts` implements `ProjectFileSystem` on top of a user-selected browser directory handle when `showDirectoryPicker()` is available.
+
+The browser picker is opened in `readwrite` mode from an explicit user action. All later file operations remain project-relative beneath that granted root handle, so Svelte and OpenRune source parsers do not depend directly on browser filesystem APIs.
+
+Browser support is optional. `getBrowserProjectAccessMode()` reports either:
+
+- `filesystem` when direct directory access is available;
+- `import-download` when it is not.
+
+The `import-download` mode is the compatibility path: existing Studio import/export workflows remain available rather than making direct filesystem access a browser requirement. OpenRune source tooling should check the access mode and only offer in-place project mutation when a writable `ProjectFileSystem` has actually been selected.
+
+Picker cancellation is not an error. Permission/security failures are surfaced as typed `ProjectFileSystemError` values, and binary reads/writes use defensive copies so callers cannot mutate backing file data accidentally.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
