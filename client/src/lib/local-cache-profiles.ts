@@ -1,3 +1,5 @@
+export type CacheSetupKind = "basic" | "openrune";
+
 export type LocalCacheProfile = {
   id: string;
   name: string;
@@ -5,9 +7,18 @@ export type LocalCacheProfile = {
   locationNotes: string;
   description?: string;
   iconDataUrl?: string;
+  /** Missing on older persisted profiles; treat as "basic". */
+  setupKind?: CacheSetupKind;
+  /** Basic-cache direct disk path. */
   systemCachePath?: string;
   useSystemFolder?: boolean;
+  /** OpenRune Server checkout/project root. The LIVE cache and sources are rediscovered from here. */
+  openRuneRootPath?: string;
 };
+
+export function cacheSetupKind(profile: LocalCacheProfile): CacheSetupKind {
+  return profile.setupKind === "openrune" ? "openrune" : "basic";
+}
 
 const LEGACY_PROFILES_KEY = "openrune-local-cache-profiles-v1";
 const LEGACY_ACTIVE_KEY = "openrune-active-cache-profile-id-v1";
@@ -37,8 +48,10 @@ function safeParse(json: string | null): LocalCacheProfile[] {
         locationNotes: typeof p.locationNotes === "string" ? p.locationNotes : "",
         description: typeof p.description === "string" ? p.description : undefined,
         iconDataUrl: typeof p.iconDataUrl === "string" ? p.iconDataUrl : undefined,
+        setupKind: p.setupKind === "openrune" ? "openrune" : "basic",
         systemCachePath: typeof p.systemCachePath === "string" ? p.systemCachePath : undefined,
         useSystemFolder: p.useSystemFolder === true,
+        openRuneRootPath: typeof p.openRuneRootPath === "string" ? p.openRuneRootPath : undefined,
       }));
   } catch {
     return [];
