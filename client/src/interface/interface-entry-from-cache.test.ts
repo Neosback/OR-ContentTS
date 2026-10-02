@@ -23,7 +23,7 @@ function decodedFixture(): DecodedInterfaceType {
         components: {
             0: root,
             1: child,
-        } as DecodedInterfaceType["components"],
+        } as unknown as DecodedInterfaceType["components"],
         interfaceParents: {
             [String(548 << 16)]: {
                 group: 162,
