@@ -7,8 +7,7 @@
   },
   "scripts": {
     "setup": "npm --prefix client ci",
-    "ensure-cache": "npm --prefix client run ensure-cache",
-    "start": "npm run ensure-cache && npm --prefix client run dev",
+    "start": "npm --prefix client run dev",
     "client": "npm run start",
     "validate": "npm --prefix client run validate"
   }
