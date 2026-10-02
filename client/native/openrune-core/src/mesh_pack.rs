@@ -197,6 +197,63 @@ impl MeshPacker {
         }
         Ok((self.indices.len() - start) as u32)
     }
+
+    /// Adds one model at multiple scene offsets while copying the model arrays across the JS/WASM boundary once.
+    /// Output order and per-placement counts are identical to sequential `add_model` calls.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_model_offsets(
+        &mut self,
+        face_count: u32,
+        vx: &[i32],
+        vy: &[i32],
+        vz: &[i32],
+        contour_y: &[i32],
+        indices1: &[i32],
+        indices2: &[i32],
+        indices3: &[i32],
+        colors1: &[i32],
+        colors2: &[i32],
+        colors3: &[i32],
+        face_textures: &[i16],
+        face_alphas: &[i8],
+        priorities: &[i8],
+        uvs: &[f32],
+        offsets: &[i32],
+        transparent: bool,
+        reuse_vertices: bool,
+    ) -> Result<Vec<u32>, JsError> {
+        if offsets.len() % 3 != 0 {
+            return Err(JsError::new("model offsets must be xyz triples"));
+        }
+
+        let mut counts = Vec::with_capacity(offsets.len() / 3);
+        for offset in offsets.chunks_exact(3) {
+            counts.push(self.add_model(
+                face_count,
+                vx,
+                vy,
+                vz,
+                contour_y,
+                indices1,
+                indices2,
+                indices3,
+                colors1,
+                colors2,
+                colors3,
+                face_textures,
+                face_alphas,
+                priorities,
+                uvs,
+                true,
+                offset[0],
+                offset[1],
+                offset[2],
+                transparent,
+                reuse_vertices,
+            )?);
+        }
+        Ok(counts)
+    }
 }
 
 impl MeshPacker {
