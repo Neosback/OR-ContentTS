@@ -475,12 +475,13 @@ export function parseOpenRuneCoordGrid(raw: string): OpenRuneMapCoordGrid | unde
 export function formatOpenRuneCoordGrid(
     coords: OpenRuneMapCoordGrid | string,
 ): string {
-    if (typeof coords === "string") {
-        const parsed = parseOpenRuneCoordGrid(coords);
-        if (!parsed) throw new Error(`Invalid OpenRune CoordGrid "${coords}".`);
-        return parsed.raw;
-    }
-    return `${coords.level}_${coords.mapX}_${coords.mapZ}_${coords.localX}_${coords.localZ}`;
+    const raw =
+        typeof coords === "string"
+            ? coords
+            : `${coords.level}_${coords.mapX}_${coords.mapZ}_${coords.localX}_${coords.localZ}`;
+    const parsed = parseOpenRuneCoordGrid(raw);
+    if (!parsed) throw new Error(`Invalid OpenRune CoordGrid "${raw}".`);
+    return parsed.raw;
 }
 
 function resolveSymbol(
