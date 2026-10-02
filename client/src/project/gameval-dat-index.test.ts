@@ -186,8 +186,8 @@ describe("buildGameValDatIndex", () => {
         const index = buildGameValDatIndex([base, generated]);
 
         expect(index.issues.map((issue) => issue.code)).toEqual([
-            "SYMBOL_CONFLICT",
             "ID_CONFLICT",
+            "SYMBOL_CONFLICT",
         ]);
         expect(findGameValDatSymbol(index, "obj.a").map((entry) => entry.id)).toEqual([
             10,
@@ -285,8 +285,8 @@ describe("validateCustomGameVals", () => {
         ]);
 
         expect(issues.map((issue) => issue.code)).toEqual([
-            "SYMBOL_CONFLICT",
             "ID_CONFLICT",
+            "SYMBOL_CONFLICT",
         ]);
     });
 
