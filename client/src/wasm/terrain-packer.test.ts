@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { loadOpenRuneCoreSync } from "./openrune-core-loader";
+import { loadOpenRuneCoreSync, setOpenRuneCoreEnabled } from "./openrune-core-loader";
+import { addTerrainTile, packTerrainTileBatch } from "../mapeditor/webgl/loader/EditorMapDataLoader";
+import { TOTAL_TILE_VERTICES, TerrainVertexBuffer } from "../mapeditor/webgl/buffer/TerrainVertexBuffer";
+import type { SceneTile } from "../rs/scene/SceneTile";
 import {
     TERRAIN_TILE_SLOT_BYTES,
     packTerrainVertexBatchTs,
@@ -88,6 +91,56 @@ describe("terrain vertex batch packer", () => {
         expect(Array.from(packTerrainVertexBatchWasm(input))).toEqual(
             Array.from(packTerrainVertexBatchTs(input)),
         );
+    });
+
+    it("matches the existing per-tile renderer packer for flattened SceneTile models", () => {
+        const textureIndex = new Map<number, number>([
+            [5, 3],
+            [20, 11],
+        ]);
+        const tiles = [
+            {
+                tileModel: {
+                    faces: [
+                        {
+                            vertices: [
+                                { x: 10, z: 20, hsl: 0x1234, textureId: -1 },
+                                { x: 30, z: 40, hsl: 0x01ff, textureId: 5 },
+                                { x: -50, z: 60, hsl: 0x00aa, textureId: 20 },
+                            ],
+                        },
+                    ],
+                },
+            },
+            { tileModel: undefined },
+            {
+                tileModel: {
+                    faces: [
+                        {
+                            vertices: [
+                                { x: 70, z: -80, hsl: 0x0033, textureId: -1 },
+                                { x: 90, z: 100, hsl: 0x00fe, textureId: 999 },
+                            ],
+                        },
+                    ],
+                },
+            },
+        ] as unknown as SceneTile[];
+
+        const reference = new Uint8Array(tiles.length * TERRAIN_TILE_SLOT_BYTES);
+        for (let i = 0; i < tiles.length; i++) {
+            const buffer = new TerrainVertexBuffer(TOTAL_TILE_VERTICES);
+            addTerrainTile(textureIndex, buffer, tiles[i]!, -768, -768);
+            reference.set(buffer.bytes, i * TERRAIN_TILE_SLOT_BYTES);
+        }
+
+        setOpenRuneCoreEnabled(false);
+        const ts = packTerrainTileBatch(textureIndex, tiles, -768, -768);
+        setOpenRuneCoreEnabled(true);
+        const wasm = packTerrainTileBatch(textureIndex, tiles, -768, -768);
+
+        expect(Array.from(ts)).toEqual(Array.from(reference));
+        expect(Array.from(wasm)).toEqual(Array.from(reference));
     });
 
     it("rejects malformed batches", () => {
