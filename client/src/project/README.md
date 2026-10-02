@@ -106,6 +106,24 @@ Generated cache contents are deliberately not traversed. LIVE and SERVER are ind
 
 Module discovery follows the checkout structure rather than a hard-coded plugin list, which matches OpenRune's recursive Gradle subproject convention. Source provenance is retained by path and module association so later GameVal/RSCM/TOML parsers can layer semantic indexes on top without flattening ownership.
 
+
+## RSCM parser and index
+
+`rscm-index.ts` provides the pure TypeScript semantic layer for RuneScape Config Mapping files discovered by the OpenRune project index.
+
+RSCM rules used by the Studio:
+
+- the `.rscm` filename is the namespace, so `item.rscm` defines `item.*` symbols;
+- mappings are line-oriented `key=value`;
+- grouped keys containing `:` are preserved as part of the key;
+- blank lines and full-line `#`, `//`, and `;` comments are ignored;
+- ids must be `-1` or non-negative safe integers;
+- `-1` represents an unassigned mapping and is excluded from duplicate-id conflict checks.
+
+The parser retains source path and line number for every mapping. The aggregate index provides symbol and namespace/id lookups while reporting duplicate symbols, conflicting symbol assignments, and namespace-local id collisions as structured issues instead of silently selecting a declaration.
+
+This layer is read-only. RSCM assignment/writes remain OpenRune-owned workflow behavior, and the future unified GameVal registry should merge this provenance with module `gamevals.toml` and generated/base DAT mappings under explicit precedence and validation rules.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
