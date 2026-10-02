@@ -85,6 +85,11 @@ export class MapViewer {
     minimapImageUrls: Map<number, string> = new Map();
     loadingMapImageIds: Set<number> = new Set();
 
+    /** Cached full-resolution world-map PNG requests, indexed without decoding their blobs. */
+    cachedWorldMapImageRequests: Map<number, Request> = new Map();
+    private loadingWorldMapImageBlobs: Map<number, Promise<Blob | undefined>> = new Map();
+    private worldMapImageIndexGeneration = 0;
+
     cameraSpeed: number = 1;
 
     constructor(
@@ -170,9 +175,7 @@ export class MapViewer {
     }
 
     init(): void {
-        this.workerPool.loadCachedMapImages().then((mapImageUrls) => {
-            mapImageUrls.forEach((value, key) => this.mapImageUrls.set(key, value));
-        });
+        void this.indexCachedWorldMapImages();
     }
 
     initCache(cache: LoadedCache): void {
@@ -181,6 +184,9 @@ export class MapViewer {
         this.loaderFactory = getCacheLoaderFactory(cache.info, this.cacheSystem);
         this.workerPool.initCache(cache, this.objSpawns, this.npcSpawns);
         this.clearMapImageUrls();
+        this.cachedWorldMapImageRequests.clear();
+        this.loadingWorldMapImageBlobs.clear();
+        this.worldMapImageIndexGeneration++;
 
         this.textureLoader = this.loaderFactory.getTextureLoader();
         this.seqTypeLoader = this.loaderFactory.getSeqTypeLoader();
@@ -280,6 +286,123 @@ export class MapViewer {
 
     static getCachedMapImageUrl(mapX: number, mapY: number): string {
         return CACHED_MAP_IMAGE_PREFIX + `${mapX}_${mapY}.png`;
+    }
+
+    private async indexCachedWorldMapImages(): Promise<void> {
+        const generation = ++this.worldMapImageIndexGeneration;
+        const cacheName = this.loadedCache.info.name;
+        const requests = await this.mapImageCache.keys();
+
+        if (
+            generation !== this.worldMapImageIndexGeneration ||
+            cacheName !== this.loadedCache.info.name
+        ) {
+            return;
+        }
+
+        const next = new Map<number, Request>();
+        for (const request of requests) {
+            if (request.headers.get("RS-Cache-Name") !== cacheName) continue;
+
+            const fileName = new URL(request.url).pathname.split("/").pop();
+            const match = /^(\d+)_(\d+)\.png$/.exec(fileName ?? "");
+            if (!match) continue;
+
+            const mapX = Number(match[1]);
+            const mapY = Number(match[2]);
+            if (
+                !Number.isSafeInteger(mapX) ||
+                !Number.isSafeInteger(mapY) ||
+                mapX < 0 ||
+                mapY < 0 ||
+                mapX >= MapManager.MAX_MAP_X ||
+                mapY >= MapManager.MAX_MAP_Y
+            ) {
+                continue;
+            }
+            next.set(getMapSquareId(mapX, mapY), request);
+        }
+
+        this.cachedWorldMapImageRequests = next;
+    }
+
+    private async cachedWorldMapBlob(mapId: number): Promise<Blob | undefined> {
+        const request = this.cachedWorldMapImageRequests.get(mapId);
+        if (!request) return undefined;
+        const response = await this.mapImageCache.match(request);
+        return response?.blob();
+    }
+
+    async loadWorldMapImageBlob(
+        mapX: number,
+        mapY: number,
+    ): Promise<Blob | undefined> {
+        if (
+            mapX < 0 ||
+            mapY < 0 ||
+            mapX >= MapManager.MAX_MAP_X ||
+            mapY >= MapManager.MAX_MAP_Y
+        ) {
+            return undefined;
+        }
+
+        const mapId = getMapSquareId(mapX, mapY);
+        if (this.renderer.mapManager.invalidMapIds.has(mapId)) {
+            return undefined;
+        }
+
+        const existing = this.loadingWorldMapImageBlobs.get(mapId);
+        if (existing) return existing;
+
+        const cacheName = this.loadedCache.info.name;
+        const load = (async (): Promise<Blob | undefined> => {
+            const cached = await this.cachedWorldMapBlob(mapId);
+            if (cached) return cached;
+
+            const minimapData = await this.workerPool.queueMapImage(
+                mapX,
+                mapY,
+                0,
+                true,
+                false,
+            );
+            if (!minimapData) {
+                this.renderer.mapManager.invalidMapIds.add(mapId);
+                return undefined;
+            }
+            if (cacheName !== this.loadedCache.info.name) {
+                return undefined;
+            }
+
+            const blob = minimapData.minimapBlob;
+            const request = new Request(
+                MapViewer.getCachedMapImageUrl(mapX, mapY),
+                {
+                    headers: {
+                        "RS-Cache-Name": cacheName,
+                    },
+                },
+            );
+            await this.mapImageCache.put(
+                request,
+                new Response(blob, {
+                    headers: {
+                        "Content-Type": blob.type || "image/png",
+                    },
+                }),
+            );
+            this.cachedWorldMapImageRequests.set(mapId, request);
+            return blob;
+        })();
+
+        this.loadingWorldMapImageBlobs.set(mapId, load);
+        try {
+            return await load;
+        } finally {
+            if (this.loadingWorldMapImageBlobs.get(mapId) === load) {
+                this.loadingWorldMapImageBlobs.delete(mapId);
+            }
+        }
     }
 
     async queueLoadMapImage(mapX: number, mapY: number) {
