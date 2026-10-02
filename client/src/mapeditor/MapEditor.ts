@@ -1963,21 +1963,54 @@ export class MapEditor {
     }
 
     /**
-     * Minimap preview for setup/world-map UI. Unlike getMinimapImageUrl(), this never
-     * streams a full editable map square merely because a thumbnail became visible.
+     * Full-resolution minimap preview for the virtualized setup/world-map UI.
+     *
+     * Unloaded regions render directly through the worker and return the Blob
+     * without creating a retained object URL or streaming a full editable map
+     * square. Loaded regions use the live editor minimap so unsaved edits remain
+     * visible, then convert the editor's bounded minimap URL back to a Blob.
      */
-    getMinimapPreviewImageUrl(mapX: number, mapY: number): string | undefined {
-        if (mapX < 0 || mapY < 0 || mapX >= MapManager.MAX_MAP_X || mapY >= MapManager.MAX_MAP_Y) {
+    async loadMinimapPreviewBlob(
+        mapX: number,
+        mapY: number,
+    ): Promise<Blob | undefined> {
+        if (
+            mapX < 0 ||
+            mapY < 0 ||
+            mapX >= MapManager.MAX_MAP_X ||
+            mapY >= MapManager.MAX_MAP_Y
+        ) {
             return undefined;
         }
+
+        const mapManager = this.renderer.mapManager;
         const mapId = getMapSquareId(mapX, mapY);
-        const loaded = this.renderer.mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
-        if (loaded) {
-            void this.queueLiveMinimapImage(mapX, mapY);
-        } else {
-            void this.queueMinimapImage(mapX, mapY);
+        if (mapManager.invalidMapIds.has(mapId)) return undefined;
+
+        const loaded = mapManager.getMap(mapX, mapY) as
+            | EditorMapSquare
+            | undefined;
+        if (!loaded) {
+            const minimapData = await this.workerPool.queueMapImage(
+                mapX,
+                mapY,
+                this.selectedLevel,
+                true,
+                true,
+            );
+            if (!minimapData) {
+                mapManager.invalidMapIds.add(mapId);
+                return undefined;
+            }
+            return minimapData.minimapBlob;
         }
-        return this.minimapImageUrls.get(mapId);
+
+        await this.queueLiveMinimapImage(mapX, mapY);
+        const url = this.minimapImageUrls.get(mapId);
+        if (!url) return undefined;
+
+        const response = await fetch(url);
+        return response.ok ? response.blob() : undefined;
     }
 
     /** Debounced: bust minimap blobs near the camera after terrain / overlay edits. */
