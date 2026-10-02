@@ -45,4 +45,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src/wasm/openrune-core
           git commit -m "build: regenerate OpenRune WASM bundle"
+          git fetch origin perf/rust-terrain-pack
+          git rebase origin/perf/rust-terrain-pack
           git push origin HEAD:perf/rust-terrain-pack
