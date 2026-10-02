@@ -22,7 +22,6 @@ import { applyDrawMode } from "./draw-backend";
 import { createTextureArray } from "../../picogl/PicoTexture";
 import { getMapSquareId } from "../../rs/map/MapFileIndex";
 import { Scene, loadHeightMapTextureData } from "../../rs/scene/Scene";
-import type { SceneTile } from "../../rs/scene/SceneTile";
 import { getOverlayHighlightUvTriangles } from "../../rs/scene/SceneTileModel";
 import {
     OVERLAY_MESH_BOUNDARY_SEG_MAX,
@@ -48,11 +47,11 @@ import { cloneSceneLocData, serializeSceneLocData } from "./sceneLocData";
 import { cloneSceneTerrainData } from "../liveMinimapWorkerPayload";
 import {
     LEVEL_TILE_VERTICES,
+    TOTAL_TILE_VERTICES,
     TerrainVertexBuffer,
     getTileOffset,
 } from "./buffer/TerrainVertexBuffer";
-import { addTerrain, packTerrainTileBatch } from "./loader/EditorMapDataLoader";
-import { TERRAIN_TILE_SLOT_BYTES } from "../../wasm/terrain-packer";
+import { addTerrain, addTerrainTile } from "./loader/EditorMapDataLoader";
 import {
     DEFAULT_BRUSH_OUTLINE,
     DEFAULT_GIZMO_APPEARANCE,
@@ -3380,6 +3379,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         try {
             const sceneBuilder = this.host.sceneBuilder;
             const selectedLevel = this.host.selectedLevel;
+            const vertexBuf = new TerrainVertexBuffer(TOTAL_TILE_VERTICES);
 
             for (const [mapId, tileIds] of this.affectedTilesMap) {
                 const map = this.mapManager.getMapById(mapId);
@@ -3457,8 +3457,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 const tileShapes = scene.tileShapes;
                 const tileRotations = scene.tileRotations;
 
-                const rebuiltTiles: { tile: SceneTile; targetVertexOffset: number }[] = [];
-                profile.measure("tiles.model-rebuild", () => {
+                profile.measure("tiles.rebuild", () => {
                     for (const tileId of tileIds) {
                         const tileX = tileId >> 8;
                         const tileY = tileId & 0xff;
@@ -3493,36 +3492,24 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                                 continue;
                             }
 
-                            rebuiltTiles.push({
+                            const vertexOffset = map.borderSize * -128;
+                            vertexBuf.clear();
+                            addTerrainTile(
+                                this.textureIndexMap,
+                                vertexBuf,
                                 tile,
-                                targetVertexOffset: getTileOffset(level, tileX, tileY),
-                            });
+                                vertexOffset,
+                                vertexOffset,
+                            );
+
+                            const offset = getTileOffset(level, tileX, tileY);
+                            map.terrainVertexBuffer.data(
+                                vertexBuf.view,
+                                offset * TerrainVertexBuffer.STRIDE,
+                            );
                         }
                     }
                 });
-
-                if (rebuiltTiles.length > 0) {
-                    const vertexOffset = map.borderSize * -128;
-                    const packedTiles = profile.measure("tiles.vertex-pack", () =>
-                        packTerrainTileBatch(
-                            this.textureIndexMap,
-                            rebuiltTiles.map((job) => job.tile),
-                            vertexOffset,
-                            vertexOffset,
-                        ),
-                    );
-
-                    profile.measure("tiles.gpu-upload", () => {
-                        for (let tileIndex = 0; tileIndex < rebuiltTiles.length; tileIndex++) {
-                            const job = rebuiltTiles[tileIndex]!;
-                            const byteStart = tileIndex * TERRAIN_TILE_SLOT_BYTES;
-                            map.terrainVertexBuffer.data(
-                                packedTiles.subarray(byteStart, byteStart + TERRAIN_TILE_SLOT_BYTES),
-                                job.targetVertexOffset * TerrainVertexBuffer.STRIDE,
-                            );
-                        }
-                    });
-                }
             }
 
             profile.measure("minimap.dirty", () => {
