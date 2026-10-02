@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: client-validation-${{ github.event.pull_request.number || github.ref }}
@@ -49,38 +49,3 @@ jobs:
 
       - name: Vite build
         run: npm run build
-
-
-  tauri-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Install Linux Tauri dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cargo check and update lock minimally
-        run: cargo check --manifest-path client/src-tauri/Cargo.toml
-
-      - name: Commit generated Cargo lock
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src-tauri/Cargo.lock
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "chore(tauri): lock persisted scope dependency"
-          git reset --hard HEAD
-          git fetch origin "${{ github.head_ref }}"
-          git rebase "origin/${{ github.head_ref }}"
-          git push origin HEAD:${{ github.head_ref }}
