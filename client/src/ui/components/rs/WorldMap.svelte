@@ -84,6 +84,7 @@
     const bitmapCache = new WorldMapBitmapCache<string, ImageBitmap>();
     const pendingLoads = new Map<string, PendingTile>();
     const activeLoads = new Map<string, Promise<void>>();
+    const missingRegionIds = new Set<number>();
     let visibleKeys = new Set<string>();
     let renderRaf = 0;
     let disposed = false;
@@ -164,7 +165,13 @@
         for (const tile of prioritized) {
             const key = bitmapKey(tile, decodePixels);
             nextVisible.add(key);
-            if (bitmapCache.get(key) || activeLoads.has(key)) continue;
+            if (
+                missingRegionIds.has(tile.id) ||
+                bitmapCache.get(key) ||
+                activeLoads.has(key)
+            ) {
+                continue;
+            }
             pendingLoads.set(key, {
                 key,
                 mapX: tile.mapX,
@@ -192,13 +199,22 @@
             const [key, tile] = next;
             pendingLoads.delete(key);
 
-            const promise = loadTile(tile).finally(() => {
-                activeLoads.delete(key);
-                if (!disposed) {
-                    pumpLoads();
-                    requestRender();
-                }
-            });
+            const promise = loadTile(tile)
+                .catch((error) => {
+                    console.error(
+                        "Failed loading world map tile",
+                        tile.mapX,
+                        tile.mapY,
+                        error,
+                    );
+                })
+                .finally(() => {
+                    activeLoads.delete(key);
+                    if (!disposed) {
+                        pumpLoads();
+                        requestRender();
+                    }
+                });
             activeLoads.set(key, promise);
         }
     }
@@ -221,7 +237,11 @@
 
     async function loadTile(tile: PendingTile): Promise<void> {
         const blob = await loadMapImageBlob(tile.mapX, tile.mapY);
-        if (!blob || disposed) return;
+        if (!blob) {
+            missingRegionIds.add(getMapSquareId(tile.mapX, tile.mapY));
+            return;
+        }
+        if (disposed) return;
 
         const bitmap = await decodeBitmap(blob, tile.decodePixels);
         if (disposed) {
@@ -374,6 +394,7 @@
         if (renderRaf) cancelAnimationFrame(renderRaf);
         renderRaf = 0;
         pendingLoads.clear();
+        missingRegionIds.clear();
         bitmapCache.clear();
     });
 </script>
