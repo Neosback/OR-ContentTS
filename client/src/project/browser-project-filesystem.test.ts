@@ -213,6 +213,7 @@ describe("BrowserProjectFileSystem", () => {
             modifiedAt: 1234,
         });
         expect(await fs.stat("missing")).toBeUndefined();
+        expect(await fs.stat("missing/nested.toml")).toBeUndefined();
     });
 
     it("reads text and bytes without exposing mutable file data", async () => {
