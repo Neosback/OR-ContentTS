@@ -81,45 +81,58 @@ describe.runIf(enabled)("mesh pack kernel benchmark", () => {
     }
 
     it("repeated cached-model placements", () => {
-        const model = fixtureModels(1, 250)[0]!;
         const map = new Map<number, number>();
         const tables = buildTextureTables(map, () => false);
 
-        for (const placements of [2, 4, 16, 64, 400]) {
-            const offsets = Int32Array.from({ length: placements * 3 }, (_, i) => {
-                const placement = Math.floor(i / 3);
-                if (i % 3 === 0) return placement * 13;
-                if (i % 3 === 1) return (placement & 7) * -4;
-                return placement * 9;
-            });
+        for (const faces of [40, 250]) {
+            const model = fixtureModels(1, faces)[0]!;
+            for (const placements of [2, 4, 16, 64, 400]) {
+                const offsets = Int32Array.from({ length: placements * 3 }, (_, i) => {
+                    const placement = Math.floor(i / 3);
+                    if (i % 3 === 0) return placement * 13;
+                    if (i % 3 === 1) return (placement & 7) * -4;
+                    return placement * 9;
+                });
+                const repeats = placements <= 4 ? 250 : placements <= 16 ? 80 : placements <= 64 ? 20 : 4;
 
-            const time = (label: string, run: () => void): number => {
-                for (let i = 0; i < 3; i++) run();
-                const samples: number[] = [];
-                for (let i = 0; i < 11; i++) {
-                    const start = performance.now();
+                const sequentialRun = () => {
+                    for (let repeat = 0; repeat < repeats; repeat++) {
+                        const packer = new MeshPacker(tables.index, tables.transparent, 4096);
+                        for (let i = 0; i < offsets.length; i += 3) {
+                            packModel(packer, model, false, [offsets[i]!, offsets[i + 1]!, offsets[i + 2]!]);
+                        }
+                        packer.free();
+                    }
+                };
+                const batchedRun = () => {
+                    for (let repeat = 0; repeat < repeats; repeat++) {
+                        const packer = new MeshPacker(tables.index, tables.transparent, 4096);
+                        packModelOffsets(packer, model, false, offsets);
+                        packer.free();
+                    }
+                };
+                const time = (label: string, run: () => void): number => {
                     run();
-                    samples.push(performance.now() - start);
-                }
-                samples.sort((a, b) => a - b);
-                const median = samples[5]!;
-                console.log(`${placements} repeated placements ${label}: median ${median.toFixed(3)} ms`);
-                return median;
-            };
+                    const samples: number[] = [];
+                    for (let i = 0; i < 9; i++) {
+                        const start = performance.now();
+                        run();
+                        samples.push(performance.now() - start);
+                    }
+                    samples.sort((a, b) => a - b);
+                    const median = samples[4]!;
+                    console.log(
+                        `${faces} faces x ${placements} placements x ${repeats} ${label}: ${median.toFixed(2)} ms`,
+                    );
+                    return median;
+                };
 
-            const sequential = time("sequential", () => {
-                const packer = new MeshPacker(tables.index, tables.transparent, 4096);
-                for (let i = 0; i < offsets.length; i += 3) {
-                    packModel(packer, model, false, [offsets[i]!, offsets[i + 1]!, offsets[i + 2]!]);
-                }
-                packer.free();
-            });
-            const batched = time("batched", () => {
-                const packer = new MeshPacker(tables.index, tables.transparent, 4096);
-                packModelOffsets(packer, model, false, offsets);
-                packer.free();
-            });
-            console.log(`   ${placements}-placement speed-up x${(sequential / batched).toFixed(2)}`);
+                const sequential = time("sequential", sequentialRun);
+                const batched = time("batched", batchedRun);
+                console.log(
+                    `   ${faces}f/${placements}p speed-up x${(sequential / batched).toFixed(2)}`,
+                );
+            }
         }
     });
 });
