@@ -318,7 +318,12 @@ class TomlLiteralCursor {
 }
 
 function parseLiteral(raw: string): unknown {
-    return new TomlLiteralCursor(stripInlineComment(raw).trim()).parse();
+    const withoutComments = raw
+        .split(/\r?\n/)
+        .map((line) => stripInlineComment(line))
+        .join("\n")
+        .trim();
+    return new TomlLiteralCursor(withoutComments).parse();
 }
 
 type Assignment = {
@@ -622,11 +627,11 @@ function parseSpawnFile(
             typeof count !== "number" ||
             !Number.isSafeInteger(count) ||
             count < 0 ||
-            count > 0xffffffff
+            count > 0x7fffffff
         ) {
             issues.push({
                 code: "INVALID_COUNT",
-                message: `OpenRune obj spawn count at ${sourcePath}:${countValue.line ?? sourceLine} must be an integer in 0..4294967295.`,
+                message: `OpenRune obj spawn count at ${sourcePath}:${countValue.line ?? sourceLine} must be an integer in 0..2147483647.`,
                 sourcePath,
                 line: countValue.line ?? sourceLine,
                 kind: "obj",
@@ -1080,9 +1085,9 @@ export function serializeOpenRuneObjSpawnToml(
                 if (
                     !Number.isSafeInteger(spawn.count) ||
                     spawn.count < 0 ||
-                    spawn.count > 0xffffffff
+                    spawn.count > 0x7fffffff
                 ) {
-                    throw new Error("OpenRune obj spawn count must be in 0..4294967295.");
+                    throw new Error("OpenRune obj spawn count must be in 0..2147483647.");
                 }
                 lines.push(`count = ${spawn.count}`);
             }
