@@ -20,6 +20,8 @@ const inFlight = new Map<string, Promise<LoadedCache | null>>();
 export async function resolveActiveProfileCache(
     profile: LocalCacheProfile,
 ): Promise<LoadedCache | null> {
+    await syncActiveOpenRuneProjectRuntime(profile);
+
     const warm = getRuntimeLoadedCache(profile.id);
     if (warm) {
         return warm;
@@ -31,7 +33,6 @@ export async function resolveActiveProfileCache(
     }
 
     const load = (async () => {
-        await syncActiveOpenRuneProjectRuntime(profile);
         const binding = await resolveProfileCacheSource(profile);
         if (!binding) {
             return null;
