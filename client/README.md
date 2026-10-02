@@ -43,7 +43,12 @@ The architecture boundary scans the active source tree and package manifest to r
 See the repository [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROADMAP.md](../ROADMAP.md) for the current architecture and planned work.
 
 
-## OpenRune project integration
+## Cache & project setup
+
+Studio does not download a pinned cache on startup.
+
+- **Basic cache** is the compatibility path for cache-only use. Desktop reads the selected cache directory directly; browser mode imports it into local browser storage.
+- **OpenRune project** is the enhanced path. In the desktop app, select the OpenRune Server repository root once. Studio discovers LIVE/SERVER caches, GameVal/RSCM/module mappings, raw map/server TOML, and pack roots from that project. The OpenRune root remains the single authoritative path.
 
 The frontend is source-first when connected to an OpenRune checkout:
 
