@@ -1,6 +1,7 @@
 import { getMapSquareId } from "../rs/map/MapFileIndex";
 import { Loc } from "../rs/scene/Loc";
 import { runEditTransaction, type EditorTransactionSource } from "./editor-transaction";
+import { beginEditPathProfile } from "./edit-path-profiler";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import type { EditorMapSquare } from "./webgl/EditorMapSquare";
 import { getObjectChunkIdsForTileRect } from "./webgl/objectChunk";
@@ -325,24 +326,47 @@ export function recordEditObjectMutation(
         return mutate();
     }
 
-    return runEditTransaction(host, { source, label }, () => {
-        const before = readBefore();
-        const ok = mutate();
-        if (!ok) return false;
-
-        const after = readAfter();
-        if (!entriesEqual(before, after)) {
-            host.recordEditMutation({
-                kind: "map.objects",
-                mapId: getMapSquareId(map.mapX, map.mapY),
-                level,
-                sceneBorderSize: map.borderSize,
-                before: cloneSceneTileLocEntries(before),
-                after: cloneSceneTileLocEntries(after),
-            });
-        }
-        return true;
+    const mapId = getMapSquareId(map.mapX, map.mapY);
+    const profile = beginEditPathProfile("object.edit.sync", {
+        mapId,
+        level,
+        label,
+        source,
     });
+
+    try {
+        return runEditTransaction(host, { source, label }, () => {
+            const before = profile.measure("snapshot.before", readBefore);
+            const ok = profile.measure("mutate", mutate);
+            if (!ok) {
+                profile.annotate({ changed: false, beforeEntries: before.length });
+                return false;
+            }
+
+            const after = profile.measure("snapshot.after", readAfter);
+            const changed = !entriesEqual(before, after);
+            if (changed) {
+                profile.measure("history.record", () => {
+                    host.recordEditMutation({
+                        kind: "map.objects",
+                        mapId,
+                        level,
+                        sceneBorderSize: map.borderSize,
+                        before: cloneSceneTileLocEntries(before),
+                        after: cloneSceneTileLocEntries(after),
+                    });
+                });
+            }
+            profile.annotate({
+                changed,
+                beforeEntries: before.length,
+                afterEntries: after.length,
+            });
+            return true;
+        });
+    } finally {
+        profile.end();
+    }
 }
 
 
