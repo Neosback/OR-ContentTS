@@ -198,7 +198,7 @@ impl MeshPacker {
         Ok((self.indices.len() - start) as u32)
     }
 
-    /// Adds one model at multiple scene offsets while copying the model arrays across the JS/WASM boundary once.
+    /// Adds one model at multiple scene offsets while copying its model arrays across the JS/WASM boundary once.
     /// Output order and per-placement counts are identical to sequential `add_model` calls.
     #[allow(clippy::too_many_arguments)]
     pub fn add_model_offsets(
