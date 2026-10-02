@@ -44,6 +44,7 @@ function fixture() {
         ".data/cache/SERVER/main_file_cache.dat2": new Uint8Array([2]),
         ".git/objects/ignored": "ignored",
         "content/skills/woodcutting/build/generated.txt": "ignored",
+        "content/skills/woodcutting/out/gamevals.toml": "[gamevals.loc]\ngenerated = 1",
         "node_modules/fake/build.gradle.kts": "ignored",
     });
 }
@@ -152,6 +153,7 @@ describe("indexOpenRuneProject", () => {
         expect(index.modules.some((module) => module.path.startsWith(".git"))).toBe(false);
         expect(index.modules.some((module) => module.path.startsWith("node_modules"))).toBe(false);
         expect(index.modules.some((module) => module.path.includes("/build/"))).toBe(false);
+        expect(index.gameValTomlFiles.some((path) => path.includes("/out/"))).toBe(false);
     });
 
     it("returns a useful empty index for a non-OpenRune directory", async () => {

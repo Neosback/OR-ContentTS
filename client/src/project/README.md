@@ -86,7 +86,7 @@ Picker cancellation is not an error. Permission/security failures are surfaced a
 
 ## OpenRune project index
 
-`openrune-project-index.ts` provides the portable, read-only discovery layer above `ProjectFileSystem`. It intentionally indexes paths and provenance without parsing RSCM, GameVal DAT, or TOML payloads yet.
+`openrune-project-index.ts` provides the portable, read-only discovery layer above `ProjectFileSystem`. It indexes paths and provenance only; RSCM, GameVal DAT, and `gamevals.toml` semantics live in separate parser/index layers.
 
 The index discovers:
 
@@ -141,6 +141,28 @@ The parser mirrors OpenRune's current source behavior:
 The aggregate DAT index retains base/generated provenance and provides symbol plus table/id lookups. It also reports duplicate/conflicting DAT mappings.
 
 `validateCustomGameVals()` applies the OpenRune reservation rule to project-owned mappings: assigned custom ids must be strictly greater than the maximum id present in the base `gamevals.dat` table. Generated DAT mappings participate in symbol/id collision checks but not in base-range reservation. Unassigned `-1` declarations remain valid for OpenRune's normal assignment workflow.
+
+
+## Module gamevals.toml parser and index
+
+`gameval-toml-index.ts` parses the exact `[gamevals.<table>]` subset consumed by OpenRune's current `GameValProvider`.
+
+The Studio recognizes the same table names exposed by OpenRune's `RSCMType`, preserves grouped keys such as `interface:component`, accepts `-1` as an unassigned declaration, and retains source path, line number, and owning Gradle module when the project index can resolve one.
+
+The parser intentionally follows OpenRune loader behavior instead of pretending to be a general TOML parser:
+
+- only exact `[gamevals.<table>]` sections participate;
+- unrelated TOML sections are ignored;
+- full-line `#` comments are ignored;
+- the right-hand side must be an integer as written, so an inline comment after the number is not silently stripped;
+- unsupported GameVal namespaces are surfaced as diagnostics;
+- malformed entries and invalid ids do not erase other valid declarations in the file.
+
+The aggregate index provides deterministic symbol and table/id lookups and reports duplicate declarations, conflicting symbol assignments, and table-local id collisions with source provenance.
+
+Project discovery also skips generated `build/`, `out/`, and `target/` trees so compiled/copied `gamevals.toml` files are not indexed as additional authoring sources. This matches OpenRune's generated-output exclusion.
+
+This remains a read-only semantic layer. Cross-source precedence between base DAT, generated DAT, module TOML, and RSCM belongs in the unified GameVal registry rather than being hidden inside the individual parsers.
 
 ## Local ProjectStore
 

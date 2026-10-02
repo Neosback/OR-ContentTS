@@ -80,6 +80,7 @@ const SOURCE_SKIP_DIRECTORY_NAMES = new Set([
     "build",
     "dist",
     "node_modules",
+    "out",
     "target",
 ]);
 
