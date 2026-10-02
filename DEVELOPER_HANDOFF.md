@@ -25,6 +25,9 @@ As of the PR #60 OpenRune project-session checkpoint:
   - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
   - **OpenRune project:** Tauri stores one OpenRune Server repository root, validates/indexes it with `indexOpenRuneProject()`, and rediscovers LIVE/SERVER plus GameVal/RSCM/raw-map/server/pack sources from that root. The user is never asked for a second LIVE-cache path.
 - `OpenRuneProjectSession` now composes that project root into one framework-neutral runtime snapshot: `ProjectFileSystem`, project discovery, unified GameVals, PackConfig, raw map sources, server TOML, local capabilities, and diagnostic counts. Refresh is atomic, so a failed rescan does not publish a partially updated source graph.
+- The active setup runtime now retains one `OpenRuneProjectSession` per active OpenRune profile/root. Actual profile activation binds the runtime, Basic-cache activation clears it, switching roots hides the old session before the replacement finishes, and framework-neutral getters/subscriptions expose the current snapshot to future editors.
+- OpenRune LIVE cache resolution reuses the retained session filesystem/project index when that profile is active. Repository availability probes remain side-effect free and cannot silently switch the active project runtime.
+- Cache Repository's **Reload project** action now refreshes the retained OpenRune session before reloading LIVE, so one user action rescans GameVals/config/map/server sources as a coherent generation.
 - The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
 - Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
 - The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
@@ -280,6 +283,7 @@ These PRs establish the current baseline:
 | #58 | Added OpenRune PackServerConfig TOML indexing, shop/inventory stock support, provenance/conflict diagnostics, and guarded source writes |
 | #59 | Split Cache & Project Setup into Basic cache vs OpenRune project-root modes and removed the pinned development-cache bootstrap |
 | #60 | Added the framework-neutral OpenRune project session with atomic full-project source/index refresh |
+| #61 | Bound the active OpenRune setup to one retained project session, reused it for LIVE cache resolution, and made Reload project refresh the shared source graph |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -661,7 +665,7 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, and framework-neutral OpenRune project session are now in place. The next integration slice should bind the active OpenRune setup to one retained session in the Studio runtime, then the major source/publication work continues with the TypeScript terrain file-0 and static-loc file-1 encoders.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, and active retained runtime binding are now in place. The next major source/publication work is the TypeScript terrain file-0 encoder, followed by static-loc file-1 encoding and golden round-trip fixtures.
 
 For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
 
