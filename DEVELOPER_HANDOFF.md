@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #60 OpenRune project-session checkpoint:
+As of the PR #63 browser/OpenRune setup checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
