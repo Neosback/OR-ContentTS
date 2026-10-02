@@ -1,21 +1,28 @@
 # OpenRune Content Studio Developer Handoff
 
 **Repository:** `Neosback/OR-ContentTS`  
-**Current baseline:** Svelte frontend seams + in-repo Kotlin Studio backend + stable launch/connection contract + split backend CI; OpenRune Server remains external/reference-only
+**Current baseline:** Svelte 5 frontend + portable ProjectFileSystem/CacheSource/OpenRune source indexes + optional in-repo Kotlin Studio backend; OpenRune Server remains external/reference-only
 
 This document is the current engineering handoff for developers continuing OpenRune Content Studio.
 
 ### Current repository status
 
-As of PR #34:
+As of the PR #54 cache-repository checkpoint:
 
-- `backend/` is the canonical Studio backend source.
-- The temporary `Neosback/rspsi` repository is migration history only.
-- Backend compilation, protocol tests, API/security tests, OpenRune inspection/indexing tests, Gradle/process tests, and runnable distribution packaging are all green in CI.
-- The inherited monolithic `foundationGate` has been replaced by explicit, diagnosable backend validation stages.
-- There are no required Content Studio changes in `Neosback/OpenRune-Server`.
-- OpenRune Server must remain an external compatibility/reference target. If a Studio feature would require patching OpenRune Server framework code, that feature must degrade/remain unavailable until it can be implemented externally.
-- Backend runtime integration with the frontend is not wired yet. That is intentional: the next integration work should first add portable project filesystem, GameVal/RSCM, and OpenRune source adapters. Backend transport comes later for explicit OpenRune build, map publication through FileStore `PackMaps`, and verification operations.
+- `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
+- OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
+- The active frontend is Svelte 5. React/TSX migration is complete.
+- The portable project layer now includes `ProjectFileSystem` plus in-memory, Tauri, and browser File System Access adapters.
+- TypeScript OpenRune project discovery is implemented for Gradle modules, pack roots, `gamevals.toml`, RSCM, raw map/server sources, and LIVE/SERVER cache locations.
+- Pure TypeScript RSCM, GameVal DAT, and module `gamevals.toml` parsers/indexes are implemented with source provenance and conflict diagnostics.
+- Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
+- Cache Repository now has explicit platform behavior:
+  - browser fallback: choose a cache folder once when creating a profile, then import that same selection into IndexedDB;
+  - Tauri: choose a native cache directory and read it directly through `ProjectFileSystemCacheSource`, with no IndexedDB cache mirror;
+  - Studio local range caches remain direct streamed development sources.
+- Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
+- The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
+- The Kotlin backend is still intentionally **not** the universal cache/project transport. It should start lazily only for JVM/OpenRune-only operations such as Gradle build/test, FileStore map publication, and parity verification.
 
 
 ## 1. Critical direction
@@ -42,9 +49,9 @@ framework-neutral TypeScript
     +-- Map codecs / region packages / writable cache target
     |
 platform adapters
-    +-- browser storage/import/download
+    +-- browser IndexedDB import/download fallback
     +-- browser File System Access (when supported)
-    +-- Tauri dialog/filesystem
+    +-- Tauri direct filesystem/cache access
     +-- optional StudioBackendClient for JVM/OpenRune build + verification
 ```
 
@@ -249,6 +256,18 @@ These PRs establish the current baseline:
 | #34 | Moved the Kotlin backend into `backend/`, made it canonical, replaced legacy `foundationGate`, split backend CI by subsystem, and validated the runnable distribution |
 | #35 | Updated the backend handoff/docs around the monorepo move and zero-required-OpenRune-changes invariant |
 | #36 | Added the backend launch/connection contract: ephemeral port, parent token, READY handshake, stable status identity, and loopback browser CORS/preflight |
+| #43 | Added edit-path profiling and documented renderer/edit latency hotspots |
+| #44 | Added the measured Rust/WASM repeated-placement kernel and retained TS fallback |
+| #45 | Documented staged wgpu renderer adoption; WebGL2 remains the reference/fallback |
+| #46 | Added the framework-neutral `ProjectFileSystem` foundation |
+| #47 | Added the Tauri `ProjectFileSystem` adapter with scoped native filesystem access |
+| #48 | Added browser File System Access `ProjectFileSystem` support with import/download fallback |
+| #49 | Added TypeScript OpenRune project discovery/indexing |
+| #50 | Added pure TypeScript RSCM parsing/indexing with provenance and conflict diagnostics |
+| #51 | Added OpenRune-compatible GameVal DAT parsing, base/generated provenance, and validation |
+| #52 | Added module `gamevals.toml` parsing/indexing and generated-output exclusion |
+| #53 | Removed the Interface Workbench's redundant cache-proxy load; selected interfaces now come from the active decoded cache |
+| #54 | Cache Repository platform-source cleanup: direct Tauri disk cache source, one-pick browser import, persisted Tauri scope, and shared cache-store validation |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -419,7 +438,18 @@ The Cache Repository and active map/editor cache resolver consume these source s
 
 `client/src/mapviewer/Caches.ts` remains a compatibility facade for existing callers, but generic cache acquisition belongs in the cache-source layer.
 
-Future OpenRune-local cache adapters should implement the same `CacheSource` contract without changing the map/editor UI. Prefer File System Access/Tauri filesystem adapters when the platform can read cache files directly; backend cache access is optional parity/diagnostic infrastructure.
+Current cache acquisition now also includes `ProjectFileSystemCacheSource`, which reads a Jagex cache directory through any `ProjectFileSystem`.
+
+Platform behavior:
+
+- Tauri profiles with `useSystemFolder/systemCachePath` resolve directly to `ProjectFileSystemCacheSource(new TauriProjectFileSystem(path))`; they do not create an IndexedDB mirror.
+- Browser profile creation uses one `webkitdirectory` selection and immediately imports that exact `File[]` into IndexedDB. The old second-picker flow was removed.
+- Browsers with File System Access have the underlying `BrowserProjectFileSystem` foundation, but persistent cache-directory handle binding is still a follow-up; IndexedDB remains the universal browser fallback.
+- Studio local `/caches` entries continue to use `StaticRangeCacheSource` with browser Cache Storage disabled.
+
+The synchronous `CacheSystem -> MemoryStore` contract means direct filesystem cache sources still load active cache-store bytes into JS memory. Do not confuse this with persistent duplication: Tauri reads from disk and does not store another browser copy.
+
+Backend cache access remains optional parity/diagnostic infrastructure.
 
 ### C. WorldSource — completed
 
@@ -474,19 +504,19 @@ Important OpenRune map findings:
 - the current OpenRune Server LIVE task list does not register `PackMaps`;
 - `PackMaps` records changed squares in memory and `PackWorldMap` consumes them, so Studio map publication should run both in one bounded JVM operation.
 
-The next implementation sequence is:
+The portable filesystem/discovery/parser foundation is now substantially complete. Continue in this order:
 
-1. `ProjectFileSystem`;
-2. Tauri direct project filesystem adapter;
-3. optional browser File System Access adapter;
-4. pure TypeScript RSCM/GameVal registry with provenance;
-5. TypeScript OpenRune project/source index;
-6. source-aware OpenRune config/server/map TOML adapters;
-7. terrain file-0 and static-loc file-1 encoders;
-8. portable raw/region package export;
-9. bounded backend `PackMaps + PackWorldMap` publication into LIVE;
-10. explicit normal OpenRune build when SERVER output is requested;
-11. output verification.
+1. build the unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence;
+2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
+3. move remaining Interface/CS2 cache-proxy lookups, especially enum definitions, behind local `CacheSystem` loaders;
+4. add source-aware OpenRune config/server/map TOML adapters;
+5. add TypeScript terrain file-0 and static-loc file-1 encoders;
+6. add portable raw/region package export;
+7. add bounded backend `PackMaps + PackWorldMap` publication into LIVE;
+8. run the explicit normal OpenRune build when SERVER output is requested;
+9. verify LIVE/SERVER outputs.
+
+A deeper optional optimization is an async/random-access cache store so Tauri can avoid materializing the full active DAT2 file in JS memory. Do not block source/editor integration on that refactor.
 
 Do not prioritize a general writable JS5/DAT2 cache implementation for OpenRune publication. Reuse OpenRune-FileStore first.
 
@@ -550,11 +580,13 @@ The Studio must continue to start and support local editing without either the b
 
 ### Tauri and web
 
-Tauri should use its native dialog/filesystem plugins for ordinary OpenRune project access. A scoped `ProjectFileSystem` adapter should read/write the selected project directly; do not start the backend merely to access files.
+Tauri uses native dialog/filesystem plugins for ordinary OpenRune project and cache access. A scoped `ProjectFileSystem` adapter reads/writes the selected project directly, and `ProjectFileSystemCacheSource` reads a selected cache directory directly. Tauri cache profiles must not be mirrored into IndexedDB.
+
+Filesystem scope selected by the user is persisted across desktop launches through `tauri-plugin-persisted-scope`. The persisted-scope plugin must remain registered after `tauri-plugin-fs`.
 
 Tauri may supervise a packaged backend sidecar **lazily** for explicit backend-only actions such as OpenRune build/test or FileStore/JVM verification.
 
-Plain web mode remains fully usable without a backend. Supporting browsers may use File System Access; all browsers retain import/download/IndexedDB workflows. `HttpBackendTransport` is only for explicit pairing when the user requests backend-only capabilities.
+Plain web mode remains fully usable without a backend. The universal cache flow is one folder selection followed by IndexedDB import. Supporting browsers may later bind a retained File System Access directory handle directly to `ProjectFileSystemCacheSource`; all browsers retain import/download/IndexedDB workflows. `HttpBackendTransport` is only for explicit pairing when the user requests backend-only capabilities.
 
 Do not duplicate TypeScript cache/map/GameVal domain logic in Rust or Kotlin.
 
@@ -617,9 +649,17 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The **immediate OpenRune integration work after this baseline** should stay portable: start with `ProjectFileSystem`, direct Tauri filesystem access, and the TypeScript RSCM/GameVal/project-index layer. Then add source-aware TOML adapters and TypeScript terrain/loc encoders.
+The portable filesystem/discovery layer is now in place. The immediate next source work should be the unified GameVal registry, then source-aware TOML adapters and TypeScript terrain/loc encoders.
 
-After those portable seams exist, add the first narrow backend publication feature: an explicit `PackMaps + PackWorldMap` operation against LIVE, followed by the existing allowlisted OpenRune cache build when SERVER output is requested.
+For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
+
+For cache access, preserve the platform split:
+- browser universal fallback = one-time folder import into IndexedDB;
+- browser progressive enhancement = File System Access handle bound to `ProjectFileSystemCacheSource`;
+- Tauri = native direct-disk `ProjectFileSystemCacheSource`, no IndexedDB mirror;
+- backend = no role in normal cache reads.
+
+After the remaining portable seams exist, add the first narrow backend publication feature: an explicit `PackMaps + PackWorldMap` operation against LIVE, followed by the existing allowlisted OpenRune cache build when SERVER output is requested.
 
 Do not make `StudioBackendClient` a dependency for ordinary editing or source-file updates.
 
@@ -638,6 +678,7 @@ The Interface Editor's current GameVal/RSCM direction is documented in
 Important points:
 
 - decoded interface structure remains cache-index-3 authoritative;
+- interface selection now consumes the already-decoded `InterfaceViewer` entry locally and no longer calls `/api/cache-proxy/interface/:id`;
 - cache index 24 GameVals currently supply friendly interface names and can also supply component names that the tree does not yet expose;
 - the existing backend already indexes OpenRune source `gamevals.toml` and generated `.rscm` mappings, but equivalent portable indexing should be implemented in TypeScript for normal web/Tauri use;
 - project metadata should enrich cache metadata with symbolic identity, module/source provenance, references, and diagnostics regardless of whether it came from TypeScript or optional JVM analysis;
