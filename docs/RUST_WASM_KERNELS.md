@@ -46,6 +46,24 @@ Rules that keep it safe:
   the maps load on a worker pool. A region already loaded in well under a second, so this is a modest, real gain,
   not a transformation.
 
+### Repeated cached-model placements
+
+The same cached `Model` is often placed several times in one merge group. `MeshPacker.add_model_offsets` batches
+those placements so the model arrays cross the JS/WASM boundary once and only the xyz offsets vary. The TypeScript
+path and ordinary `add_model` path remain unchanged.
+
+Parity coverage proves the batched output is byte-identical to sequential `packModel` calls for both opaque and
+transparent passes.
+
+The dispatch is intentionally conservative. Current CI micro-benchmarks showed:
+
+- 40-face models: about **1.06x-1.35x** faster across 2-400 repeated placements;
+- 250-face models: 2-4 placements were slightly slower (**0.92x-0.96x**), while 16+ placements were faster
+  (**1.04x-1.17x**).
+
+Studio therefore batches when the model has at most 64 faces, or when a repeated run has at least 16 placements.
+This avoids trading a small number of heavy placements for extra WASM-call overhead.
+
 ## Kernel 2: slot-mesh emit (`MeshPacker.build_slot_mesh`)
 
 `buildSlotMesh` (object-slot-mesh.ts) is now three phases: build a flat list of emit jobs

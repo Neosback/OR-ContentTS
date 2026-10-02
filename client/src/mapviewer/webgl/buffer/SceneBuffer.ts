@@ -11,7 +11,7 @@ import { LocAnimatedData } from "../loc/LocAnimatedData";
 import { LocAnimatedGroup } from "../loc/LocAnimatedGroup";
 import { SceneLocEntity } from "../loc/SceneLocEntity";
 import type { MeshPacker } from "../../../wasm/openrune-core/openrune_core";
-import { packModel, runSlotJobs, type SlotJobOutput } from "../../../wasm/mesh-packer";
+import { packModel, packModelOffsets, runSlotJobs, type SlotJobOutput } from "../../../wasm/mesh-packer";
 import { VertexBuffer } from "./VertexBuffer";
 
 export enum ContourGroundType {
@@ -341,24 +341,14 @@ export class SceneBuffer {
     addModelGroup(group: ModelMergeGroup): void {
         const groupOffset = this.indexByteOffset();
 
-        for (const sceneModel of group.models) {
-            const model = sceneModel.model;
-
-            const vertexOffset: vec3 = [
-                sceneModel.sceneX,
-                sceneModel.sceneHeight,
-                sceneModel.sceneZ,
-            ];
-            if (sceneModel.heightOffset !== 0) {
-                vertexOffset[1] = -sceneModel.heightOffset;
-            }
-            const offset = this.indexByteOffset();
-            this.addModelPass(model, group.transparent, vertexOffset);
-            const elements = (this.indexByteOffset() - offset) / 4;
-
+        const addInteractionCommand = (
+            sceneModel: SceneModel,
+            offset: number,
+            elements: number,
+        ): void => {
             const drawCommand: DrawCommand = {
-                offset: offset,
-                elements: elements,
+                offset,
+                elements,
                 instances: [
                     {
                         sceneX: Math.max(0, sceneModel.sceneX),
@@ -384,6 +374,74 @@ export class SceneBuffer {
                     this.drawCommandsInteractLod.push(drawCommand);
                 }
             }
+        };
+
+        let modelIndex = 0;
+        while (modelIndex < group.models.length) {
+            const sceneModel = group.models[modelIndex]!;
+            const model = sceneModel.model;
+
+            // Cached loc models are commonly reused for many placements. Keep consecutive
+            // placements of the same Model in one WASM call so its arrays cross the
+            // JS/WASM boundary once instead of once per placement.
+            if (this.packer) {
+                let runEnd = modelIndex + 1;
+                while (
+                    runEnd < group.models.length &&
+                    group.models[runEnd]!.model === model
+                ) {
+                    runEnd++;
+                }
+
+                const runLength = runEnd - modelIndex;
+                // Micro-benchmarks show batching is reliably useful for small cached models,
+                // while larger models need enough repeated placements to amortize the
+                // larger returned counts array and one bigger wasm call. Stay conservative
+                // rather than regressing the common 2-4 placement case for heavy models.
+                const shouldBatchPlacements =
+                    runLength > 1 && (model.faceCount <= 64 || runLength >= 16);
+                if (shouldBatchPlacements) {
+                    const offsets = new Int32Array(runLength * 3);
+                    for (let i = 0; i < runLength; i++) {
+                        const item = group.models[modelIndex + i]!;
+                        const base = i * 3;
+                        offsets[base] = item.sceneX;
+                        offsets[base + 1] =
+                            item.heightOffset !== 0 ? -item.heightOffset : item.sceneHeight;
+                        offsets[base + 2] = item.sceneZ;
+                    }
+
+                    const firstOffset = this.indexByteOffset();
+                    const counts = packModelOffsets(
+                        this.packer,
+                        model,
+                        group.transparent,
+                        offsets,
+                    );
+                    let offset = firstOffset;
+                    for (let i = 0; i < runLength; i++) {
+                        const elements = counts[i]!;
+                        addInteractionCommand(group.models[modelIndex + i]!, offset, elements);
+                        offset += elements * 4;
+                    }
+                    modelIndex = runEnd;
+                    continue;
+                }
+            }
+
+            const vertexOffset: vec3 = [
+                sceneModel.sceneX,
+                sceneModel.sceneHeight,
+                sceneModel.sceneZ,
+            ];
+            if (sceneModel.heightOffset !== 0) {
+                vertexOffset[1] = -sceneModel.heightOffset;
+            }
+            const offset = this.indexByteOffset();
+            this.addModelPass(model, group.transparent, vertexOffset);
+            const elements = (this.indexByteOffset() - offset) / 4;
+            addInteractionCommand(sceneModel, offset, elements);
+            modelIndex++;
         }
 
         const groupElements = (this.indexByteOffset() - groupOffset) / 4;

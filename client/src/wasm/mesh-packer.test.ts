@@ -11,7 +11,7 @@ import type { TextureLoader } from "../rs/texture/TextureLoader";
 import { emitSlotJobsTs, buildSlotMesh } from "../mapeditor/webgl/loader/object-slot-mesh";
 import type { DrawCommand } from "../mapviewer/webgl/buffer/SceneBuffer";
 import type { LocAnimatedData } from "../mapviewer/webgl/loc/LocAnimatedData";
-import { MeshPacker, buildTextureTables, packModel, runSlotJobs } from "./mesh-packer";
+import { MeshPacker, buildTextureTables, packModel, packModelOffsets, runSlotJobs } from "./mesh-packer";
 import { initSync } from "./openrune-core/openrune_core";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -166,6 +166,44 @@ describe("MeshPacker (wasm) matches SceneBuffer.addModel (TS)", () => {
         const reference = build(false);
         expect(reference.indices.length).toBeGreaterThan(1000);
         expect(build(true)).toEqual(reference);
+    });
+
+    it("batched repeated placements are byte-identical to sequential packModel calls", () => {
+        const random = rng(0x51a7);
+        const model = randomModel(random, { textured: true, contour: true });
+        const offsets = Int32Array.from({ length: 90 }, (_, i) => {
+            const placement = Math.floor(i / 3);
+            if (i % 3 === 0) return placement * 37 - 400;
+            if (i % 3 === 1) return placement % 4 === 0 ? -32 : placement * 3;
+            return placement * 23 + 75;
+        });
+        const tables = buildTextureTables(TEXTURE_INDEX, (id) => TRANSLUCENT_TEXTURES.has(id));
+
+        for (const transparent of [false, true]) {
+            const sequential = new MeshPacker(tables.index, tables.transparent, 16);
+            const expectedCounts: number[] = [];
+            for (let i = 0; i < offsets.length; i += 3) {
+                expectedCounts.push(
+                    packModel(
+                        sequential,
+                        model,
+                        transparent,
+                        [offsets[i]!, offsets[i + 1]!, offsets[i + 2]!],
+                    ),
+                );
+            }
+
+            const batched = new MeshPacker(tables.index, tables.transparent, 16);
+            const counts = packModelOffsets(batched, model, transparent, offsets);
+
+            expect(Array.from(counts)).toEqual(expectedCounts);
+            expect(Array.from(batched.vertices())).toEqual(Array.from(sequential.vertices()));
+            expect(Array.from(batched.indices())).toEqual(Array.from(sequential.indices()));
+            expect(Array.from(batched.used_texture_ids())).toEqual(Array.from(sequential.used_texture_ids()));
+
+            sequential.free();
+            batched.free();
+        }
     });
 
     it("refuses direct addModel calls once a packer owns the buffer", () => {

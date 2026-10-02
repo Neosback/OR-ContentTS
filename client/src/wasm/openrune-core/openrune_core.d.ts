@@ -13,6 +13,11 @@ export class MeshPacker {
      */
     add_model(face_count: number, vx: Int32Array, vy: Int32Array, vz: Int32Array, contour_y: Int32Array, indices1: Int32Array, indices2: Int32Array, indices3: Int32Array, colors1: Int32Array, colors2: Int32Array, colors3: Int32Array, face_textures: Int16Array, face_alphas: Int8Array, priorities: Int8Array, uvs: Float32Array, has_offset: boolean, offset_x: number, offset_y: number, offset_z: number, transparent: boolean, reuse_vertices: boolean): number;
     /**
+     * Adds one model at multiple scene offsets while copying its model arrays across the JS/WASM boundary once.
+     * Output order and per-placement counts are identical to sequential `add_model` calls.
+     */
+    add_model_offsets(face_count: number, vx: Int32Array, vy: Int32Array, vz: Int32Array, contour_y: Int32Array, indices1: Int32Array, indices2: Int32Array, indices3: Int32Array, colors1: Int32Array, colors2: Int32Array, colors3: Int32Array, face_textures: Int16Array, face_alphas: Int8Array, priorities: Int8Array, uvs: Float32Array, offsets: Int32Array, transparent: boolean, reuse_vertices: boolean): Uint32Array;
+    /**
      * Runs the emit jobs (`[first, count, slot, target]` per job) against the packed vertices and indices.
      */
     build_slot_mesh(jobs: Uint32Array): SlotMeshOutput;
@@ -53,6 +58,7 @@ export interface InitOutput {
     readonly __wbg_meshpacker_free: (a: number, b: number) => void;
     readonly __wbg_slotmeshoutput_free: (a: number, b: number) => void;
     readonly meshpacker_add_model: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number, y: number, z: number, a1: number, b1: number, c1: number, d1: number, e1: number, f1: number, g1: number, h1: number, i1: number, j1: number, k1: number) => void;
+    readonly meshpacker_add_model_offsets: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number, y: number, z: number, a1: number, b1: number, c1: number, d1: number, e1: number, f1: number, g1: number, h1: number, i1: number) => void;
     readonly meshpacker_build_slot_mesh: (a: number, b: number, c: number, d: number) => void;
     readonly meshpacker_index_count: (a: number) => number;
     readonly meshpacker_indices: (a: number, b: number) => void;
