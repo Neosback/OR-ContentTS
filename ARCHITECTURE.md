@@ -43,6 +43,8 @@ The active client source tree is now Svelte/TypeScript only. The retained React/
 
 WebGL2 remains the reference renderer. Svelte owns UI orchestration, while rendering and cache-heavy work stay in framework-neutral TypeScript. Future Rust/WASM work should sit behind the same TypeScript-facing runtime boundaries rather than coupling directly to Svelte components.
 
+Any wgpu/WebGPU work is an experimental rendering-backend track, not a replacement for the editor domain model or the measured Rust CPU kernels. The first recommended target is the editor object slot-mesh pass because it already exposes stable packed geometry independent of PicoGL. See `docs/WGPU_RENDERER_PLAN.md` for the ranked migration plan and acceptance gates.
+
 ## Editor mutation boundary
 
 Editor behavior now follows a common flow:
