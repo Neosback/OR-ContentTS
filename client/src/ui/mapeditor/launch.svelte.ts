@@ -9,6 +9,8 @@ import type { Project } from "../../project/project-store";
 import type { CacheList } from "../../mapviewer/Caches";
 import { getMapRenderWorkerPool } from "../../mapviewer/map-render-worker-pool";
 import { renderDataLoaderSerializer } from "../../mapviewer/worker/RenderDataLoader";
+import { perfLog } from "../../perf/gl-memory";
+import { perf } from "../../perf/perf-profile";
 import { isIos } from "../../util/DeviceUtil";
 import { readJson, readStorage, writeStorage } from "../lib/persisted";
 import { router } from "../lib/router.svelte";
@@ -213,8 +215,9 @@ export class LaunchController {
     targetRegion = $state("12342");
     targetRegionX = $state("");
     targetRegionY = $state("");
-    regionRadius = $state(1);
-    sandboxRegionRadius = $state(1);
+    // Start small: each region adds geometry, workers and GPU memory. The profile caps the maximum.
+    regionRadius = $state(Math.min(perf.profile.defaultRegionRadius, perf.profile.maxRegionRadius));
+    sandboxRegionRadius = $state(Math.min(perf.profile.defaultRegionRadius, perf.profile.maxRegionRadius));
     selectedLoadFileName = $state("");
     lastLoadedMaps = $state<LastLoadedEntry[]>([]);
 
@@ -397,6 +400,7 @@ export class LaunchController {
         const host = this.pluginHost;
         if (!editor || !host) return;
 
+        perfLog(`phase: launch start r=${meta.radius}`);
         const bounds = boundsAround(meta.mapX, meta.mapY, meta.radius);
         editor.configureRegionFocus(meta.mapX, meta.mapY, meta.radius);
         host.setSandboxModeActive(mode === "sandbox");
@@ -406,6 +410,7 @@ export class LaunchController {
 
         // Mount/start the renderer before waiting for map squares. The WebGL map
         // builder advances from the renderer frame loop.
+        perfLog("phase: launch end (regions queued)");
         this.beginEntering(bounds, mode);
         for (let x = bounds.minX; x <= bounds.maxX; x++) {
             for (let y = bounds.minY; y <= bounds.maxY; y++) editor.renderer.mapManager.loadMap(x, y);
@@ -436,7 +441,7 @@ export class LaunchController {
 
         const mapX = Math.max(0, Math.min(99, target.mapX));
         const mapY = Math.max(0, Math.min(199, target.mapY));
-        const radius = Math.max(0, Math.floor(mode === "sandbox" ? this.sandboxRegionRadius : this.regionRadius));
+        const radius = Math.max(0, Math.min(perf.profile.maxRegionRadius, Math.floor(mode === "sandbox" ? this.sandboxRegionRadius : this.regionRadius)));
         this.launch({ mode, mapX, mapY, regionId: mapX * 256 + mapY, radius }, mode, true);
     }
 

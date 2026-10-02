@@ -2,11 +2,11 @@ import { cn } from "../util/cn";
 
 /** Compact floating strip (paint tools undocked). */
 export const mapEditorStripChromeClass =
-    "rounded-md border border-border/80 bg-card/95 shadow-lg backdrop-blur-sm";
+    "rounded-md border border-border/80 bg-card shadow-lg";
 
 /** Larger docked / floating panels (palettes, workspaces). */
 export const mapEditorPanelChromeClass =
-    "rounded-lg border border-border/80 bg-card/95 shadow-xl backdrop-blur-sm";
+    "rounded-lg border border-border/80 bg-card shadow-xl";
 
 export function mapEditorStripChrome(...extra: Array<string | false | null | undefined>): string {
     return cn(mapEditorStripChromeClass, "p-0.5", ...extra);

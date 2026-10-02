@@ -43,6 +43,10 @@ export class RenderDataWorkerPool {
         return this.runAll((w) => w.initCache(cache, objSpawns, npcSpawns));
     }
 
+    setWasmEnabled(enabled: boolean): Promise<void> {
+        return this.runAll((w) => w.setWasmEnabled(enabled));
+    }
+
     async runAll(task: (w: RenderDataWorkerThread) => any): Promise<void> {
         await Promise.all(this.workers.map((desc) => desc.init.then(task)));
     }

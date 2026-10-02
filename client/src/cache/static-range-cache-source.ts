@@ -74,7 +74,8 @@ export class StaticRangeCacheSource implements CacheSource {
     constructor(options: StaticRangeCacheSourceOptions = {}) {
         this.id = options.id ?? "static-range";
         this.basePath = normalizeBasePath(options.basePath ?? "/caches/");
-        this.fetchImpl = options.fetchImpl ?? fetch;
+        // Wrapped, not stored bare: calling `window.fetch` as a method of this object throws "Illegal invocation".
+        this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
         this.loadFiles = options.loadFiles ?? defaultLoadFiles;
     }
 

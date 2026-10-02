@@ -1,3 +1,4 @@
+import { perfLog } from "../../perf/gl-memory";
 import type { Renderer } from "../../components/renderer/Renderer";
 
 /**
@@ -14,7 +15,9 @@ export function rendererCanvas(host: HTMLElement, renderer: Renderer): { update(
         host.appendChild(next.canvas);
         if (next.overlayCanvas) host.appendChild(next.overlayCanvas);
 
+        perfLog("phase: renderer init start");
         void next.init().then(() => {
+            perfLog("phase: renderer init done");
             if (!disposed && current === next) next.start();
         });
 

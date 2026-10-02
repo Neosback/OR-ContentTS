@@ -16,7 +16,7 @@
     } from "../../../mapeditor/map-editor-underlay-gradient";
     import { Badge } from "../../components/ui/badge";
     import { Button } from "../../components/ui/button";
-    import { CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+    import { CardContent } from "../../components/ui/card";
     import { Label } from "../../components/ui/label";
     import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
     import { ScrollArea } from "../../components/ui/scroll-area";
@@ -69,56 +69,50 @@
     }
 
     const tabs: readonly (readonly [UnderlayPanelTab, string])[] = [["swatches", "Swatches"], ["gradient", "Gradient"]];
-    const filters: readonly (readonly [SwatchFilter, string])[] = [["all", "All"], ["textured", "Textured"], ["plain", "Non-textured"]];
-    const chip = "map-editor-swatch group relative aspect-square min-h-[2.5rem] overflow-hidden rounded-md border-2 transition-all";
+    const filters: readonly (readonly [SwatchFilter, string])[] = [["all", "All"], ["textured", "Textured"], ["plain", "Plain"]];
+    const chip = "map-editor-swatch group relative aspect-square min-h-[2rem] overflow-hidden rounded-md border-2 transition-all";
     const checkBadge = "absolute left-1 top-1 z-[2] flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md";
 </script>
 
 <div class="map-editor-panel flex min-h-0 flex-1 flex-col">
-    <CardHeader class="space-y-1.5 border-b border-border bg-muted/20 px-4 py-3">
-        <div class="flex items-center justify-between gap-2">
-            <CardTitle class="text-sm font-semibold tracking-tight text-foreground">{adapter.title}</CardTitle>
-            <Badge
-                variant="outline"
-                class="h-5 border-border px-2 font-mono text-[10px] font-normal tabular-nums"
-                title={swatchFilter === "all" ? `${adapter.items.length} ${noun}s` : `${visibleItems.length} shown (${adapter.items.length} total)`}
-            >
-                {swatchFilter === "all" ? adapter.items.length : `${visibleItems.length}/${adapter.items.length}`}
-            </Badge>
-        </div>
+    <!-- One compact row: the drawer tab already says which palette this is, so no title or tall header here. -->
+    <div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-muted/20 px-2 py-1.5">
         <div class="flex gap-0.5 rounded-md border border-border bg-background/80 p-0.5">
             {#each tabs as [id, label] (id)}
-                <Button size="sm" variant={gradient.tab === id ? "secondary" : "ghost"} class={cn("h-7 flex-1 text-[11px] font-medium", gradient.tab === id && "ring-1 ring-primary/35")} onclick={() => adapter.setTab(id)}>
+                <Button size="sm" variant={gradient.tab === id ? "secondary" : "ghost"} class={cn("h-6 px-2.5 text-[11px] font-medium", gradient.tab === id && "ring-1 ring-primary/35")} onclick={() => adapter.setTab(id)}>
                     {label}
                 </Button>
             {/each}
         </div>
         {#if gradient.tab === "swatches"}
-            <div class="rounded-md border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-foreground" role="status">
-                <span class="text-muted-foreground">Active {noun}: </span>
-                <span class="font-mono tabular-nums text-primary">{noneSelected ? "None" : `#${selectedId}`}</span>
-            </div>
+            <span class="text-xs" role="status">
+                <span class="text-muted-foreground">Active: </span>
+                <span class="font-mono font-medium tabular-nums text-primary">{noneSelected ? "None" : `#${selectedId}`}</span>
+            </span>
             {#if adapter.hasTextureFilter}
-                <div class="flex flex-col gap-1.5">
-                    <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Show swatches</span>
-                    <div class="flex flex-wrap gap-1">
-                        {#each filters as [value, label] (value)}
-                            <Button size="sm" variant={swatchFilter === value ? "secondary" : "outline"} class={cn("h-7 min-w-[4.5rem] flex-1 px-2 text-[11px] font-medium", swatchFilter === value && "ring-1 ring-primary/40")} aria-pressed={swatchFilter === value} onclick={() => (swatchFilter = value)}>
-                                {label}
-                            </Button>
-                        {/each}
-                    </div>
+                <div class="flex gap-1" role="group" aria-label="Show swatches">
+                    {#each filters as [value, label] (value)}
+                        <Button size="sm" variant={swatchFilter === value ? "secondary" : "outline"} class={cn("h-6 px-2 text-[11px] font-medium", swatchFilter === value && "ring-1 ring-primary/40")} aria-pressed={swatchFilter === value} onclick={() => (swatchFilter = value)}>
+                            {label}
+                        </Button>
+                    {/each}
                 </div>
             {/if}
         {:else}
-            <div class="rounded-md border border-muted bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">Gradient mode paints from a generated {noun} palette.</div>
+            <span class="text-[11px] text-muted-foreground">Paints from a generated {noun} palette.</span>
         {/if}
-    </CardHeader>
-    <Separator />
+        <Badge
+            variant="outline"
+            class="ml-auto h-5 border-border px-2 font-mono text-[10px] font-normal tabular-nums"
+            title={swatchFilter === "all" ? `${adapter.items.length} ${noun}s` : `${visibleItems.length} shown (${adapter.items.length} total)`}
+        >
+            {swatchFilter === "all" ? adapter.items.length : `${visibleItems.length}/${adapter.items.length}`}
+        </Badge>
+    </div>
     <CardContent class="flex min-h-0 flex-1 flex-col p-0">
         <ScrollArea class="min-h-0 flex-1">
             {#if gradient.tab === "swatches"}
-                <div class="map-editor-swatch-grid grid gap-1.5 p-3">
+                <div class="map-editor-swatch-grid grid gap-1.5 p-2" style="grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr))">
                     {#if adapter.hasNone}
                         <button
                             type="button"

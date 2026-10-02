@@ -1,3 +1,4 @@
+import { getTileBrushFocus } from "./plugins/builtins/tile-brush-model";
 import { Renderer } from "../components/renderer/Renderer";
 import { ProjectionType } from "../mapviewer/Camera";
 import { MapManager, MapSquare } from "../mapviewer/MapManager";
@@ -187,8 +188,8 @@ export abstract class MapEditorRenderer<T extends MapSquare = MapSquare> extends
         const deltaMouseY = inputManager.getDeltaMouseY();
 
         const tileFlagsLeftPaint =
-            h.getEditorTool() === "tile-flags" &&
-            h.isEditorToolPluginEnabled("tile-flags") &&
+            getTileBrushFocus(h) === "flags" &&
+            h.isEditorToolPluginEnabled("tile-brush") &&
             inputManager.isKeyDown("MouseLeft");
 
         const regionStampLeftSelect =

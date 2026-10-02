@@ -1,3 +1,4 @@
+import { getTileBrushFocus } from "./tile-brush-model";
 import type { EditorToolPlugin } from "./builtin-plugin-types";
 import { getUnderlayGradientModel } from "./underlay-gradient-model";
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
@@ -30,7 +31,7 @@ export const underlayEditorTool: EditorToolPlugin = {
             description: "Reserved keybind for underlay gradient workflows.",
             defaultChords: [{ code: "ControlLeft" }, { code: "ControlRight" }],
             trigger: "HELD",
-            shouldProcess: ({ host }) => host.getEditorTool() === "underlay",
+            shouldProcess: ({ host }) => getTileBrushFocus(host) === "underlay",
             action: () => true,
         },
     ],

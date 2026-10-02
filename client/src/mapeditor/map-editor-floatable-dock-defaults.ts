@@ -5,49 +5,35 @@ import type { MapEditorDockPanelId } from "./plugins/builtins/builtin-plugin-typ
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 
 const EDITOR_PALETTE_COLUMN_INITIAL_WIDTH = 380;
-const EDITOR_HISTORY_MINIMAP_INITIAL_HEIGHT = 380;
+const EDITOR_HISTORY_MINIMAP_INITIAL_HEIGHT = 240;
+const EDITOR_TILE_PAINTER_INITIAL_HEIGHT = 230;
 const EDITOR_SCENE_PANEL_ID = "editor-scene-editor";
 
 export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPanelId): AddPanelOptions | null {
     switch (panelId) {
-        case "editor-underlays":
-            return {
-                id: "editor-underlays",
-                component: "palette",
-                title: "Underlays",
-                position: { referencePanel: EDITOR_SCENE_PANEL_ID, direction: "right" },
-                initialWidth: EDITOR_PALETTE_COLUMN_INITIAL_WIDTH,
-            };
-        case "editor-overlays":
-            return {
-                id: "editor-overlays",
-                component: "overlayPalette",
-                title: "Overlays",
-                position: { referencePanel: "editor-underlays", direction: "within" },
-                inactive: true,
-            };
-        case "editor-height":
-            return {
-                id: "editor-height",
-                component: "heightPalette",
-                title: "Height",
-                position: { referencePanel: "editor-underlays", direction: "within" },
-                inactive: true,
-            };
         case "editor-object-selector":
             return {
                 id: "editor-object-selector",
                 component: "objectSelectorPalette",
-                title: "Objects",
-                position: { referencePanel: "editor-underlays", direction: "within" },
-                inactive: true,
+                title: "Inspector",
+                position: { referencePanel: EDITOR_SCENE_PANEL_ID, direction: "right" },
+                initialWidth: EDITOR_PALETTE_COLUMN_INITIAL_WIDTH,
+            };
+        case "editor-tile-painter":
+            // A drawer under the viewport: floor, height and flag palettes as tabs of one brush.
+            return {
+                id: "editor-tile-painter",
+                component: "tilePainter",
+                title: "Tile painter",
+                position: { referencePanel: EDITOR_SCENE_PANEL_ID, direction: "below" },
+                initialHeight: EDITOR_TILE_PAINTER_INITIAL_HEIGHT,
             };
         case "editor-object-delete":
             return {
                 id: "editor-object-delete",
                 component: "objectDeletePalette",
                 title: "Delete objects",
-                position: { referencePanel: "editor-underlays", direction: "within" },
+                position: { referencePanel: "editor-object-selector", direction: "within" },
                 inactive: true,
             };
         case "editor-region-stamp":
@@ -55,7 +41,7 @@ export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPan
                 id: "editor-region-stamp",
                 component: "regionStampPalette",
                 title: "Region stamp",
-                position: { referencePanel: "editor-underlays", direction: "within" },
+                position: { referencePanel: "editor-object-selector", direction: "within" },
                 inactive: true,
             };
         case "editor-tile-flags":
@@ -63,7 +49,7 @@ export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPan
                 id: "editor-tile-flags",
                 component: "tileFlagsPalette",
                 title: "Tile flags",
-                position: { referencePanel: "editor-underlays", direction: "within" },
+                position: { referencePanel: "editor-object-selector", direction: "within" },
                 inactive: true,
             };
         case "editor-history":
@@ -71,7 +57,7 @@ export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPan
                 id: "editor-history",
                 component: "historyWorkspace",
                 title: "History",
-                position: { referencePanel: "editor-underlays", direction: "below" },
+                position: { referencePanel: "editor-object-selector", direction: "below" },
                 initialHeight: EDITOR_HISTORY_MINIMAP_INITIAL_HEIGHT,
             };
         case "editor-minimap":

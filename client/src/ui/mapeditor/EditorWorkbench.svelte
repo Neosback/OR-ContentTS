@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onDestroy, onMount, untrack } from "svelte";
 
+    import { perfLog } from "../../perf/gl-memory";
+
     import "../../mapeditor/MapEditorContainer.css";
     import "../../mapeditor/MapEditorWorkbenchDock.css";
     import "../../mapeditor/MapEditorPanel.css";
@@ -30,12 +32,15 @@
     let workbench: Workbench | undefined;
 
     onMount(() => {
+        perfLog("phase: workbench mount");
         editor.hud.start();
         if (!dockHost) return;
         workbench = new Workbench(dockHost, host, createEditorPanels(editor), (panelId, event) =>
             contextMenu.open(event, undefined, workbench?.menuFor(panelId) ?? []),
         );
         editor.layout = workbench;
+        // Bring the starting tool's palette tab forward on first entry.
+        workbench.activateTool(editor.tool.current);
         // Dev-only handle for inspecting the dock from the console.
         if (import.meta.env.DEV) (window as unknown as { __workbench?: Workbench }).__workbench = workbench;
         // 2D/Live placeholder tabs from older layouts are gone for good.

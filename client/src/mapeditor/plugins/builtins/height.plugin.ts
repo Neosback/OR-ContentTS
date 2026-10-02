@@ -1,3 +1,4 @@
+import { getTileBrushFocus } from "./tile-brush-model";
 import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
 import type { EditorToolPlugin } from "./builtin-plugin-types";
@@ -39,7 +40,7 @@ export const heightEditorTool: EditorToolPlugin = {
             description: "While held, height paint lowers terrain and inverts slope direction.",
             defaultChords: [{ code: "AltLeft" }, { code: "AltRight" }],
             trigger: "HELD",
-            shouldProcess: ({ host }) => host.getEditorTool() === "height",
+            shouldProcess: ({ host }) => getTileBrushFocus(host) === "height",
             action: () => true,
         },
         editorCommandKeyBinding("height.mode.raise-lower", { id: "mode-raise-lower", defaultChords: [] }),

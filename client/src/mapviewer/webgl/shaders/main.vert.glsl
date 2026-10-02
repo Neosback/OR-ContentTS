@@ -40,7 +40,13 @@ uniform float u_planeClipEnabled;
 uniform highp usampler2D u_modelInfoTexture;
 uniform mediump isampler2DArray u_heightMap;
 
+#ifdef VERTEX_SLOT
+// Map editor: the fourth word is the model's slot, an index into u_modelInfoTexture (two texels per slot).
+layout(location = 0) in uvec4 a_vertex;
+uniform float u_hideRoofs;
+#else
 layout(location = 0) in uvec3 a_vertex;
+#endif
 
 out vec4 v_color;
 out vec2 v_texCoord;
@@ -68,14 +74,21 @@ struct ModelInfo {
     float contourGround;
     uint interactType;
     uint interactId;
+    uint flags;
 };
 
 ivec2 getDataTexCoordFromIndex(int index) {
     return ivec2(index % 16, index / 16);
 }
 
+#ifdef VERTEX_SLOT
+ModelInfo decodeModelInfo(int slot) {
+    uvec4 data = texelFetch(u_modelInfoTexture, getDataTexCoordFromIndex(slot * 2), 0);
+    uvec4 extra = texelFetch(u_modelInfoTexture, getDataTexCoordFromIndex(slot * 2 + 1), 0);
+#else
 ModelInfo decodeModelInfo(int offset) {
     uvec4 data = texelFetch(u_modelInfoTexture, getDataTexCoordFromIndex(offset + gl_InstanceID), 0);
+#endif
 
     ModelInfo info;
 
@@ -86,12 +99,21 @@ ModelInfo decodeModelInfo(int offset) {
     info.contourGround = float((data.g >> 14) & 0x3u);
     info.interactType = (data.b >> 4) & 0x3u;
     info.interactId = data.a | (((data.b >> 3u) & 0x1u) << 16u);
+#ifdef VERTEX_SLOT
+    info.flags = extra.r;
+#else
+    info.flags = 0u;
+#endif
 
     return info;
 }
 
 void main() {
+#ifdef VERTEX_SLOT
+    int offset = int(a_vertex.w);
+#else
     int offset = int(texelFetch(u_modelInfoTexture, getDataTexCoordFromIndex(DRAW_ID + u_drawIdOffset), 0).r);
+#endif
 
     Vertex vertex = decodeVertex(a_vertex.x, a_vertex.y, a_vertex.z, u_brightness);
 
@@ -109,6 +131,14 @@ void main() {
     v_alphaCutOff = material.alphaCutOff;
 
     ModelInfo modelInfo = decodeModelInfo(offset);
+
+#ifdef VERTEX_SLOT
+    // Roof-shaped locs are hidden per slot instead of by zeroing their draw range.
+    if (u_hideRoofs > 0.5 && (modelInfo.flags & 1u) != 0u) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        return;
+    }
+#endif
 
     if (u_planeClipEnabled > 0.5) {
         if (!isScenePlaneVisible(int(modelInfo.plane), modelInfo.tilePos, u_viewPlaneMax, u_hideBelowViewPlane)) {

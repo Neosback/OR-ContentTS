@@ -3,89 +3,77 @@
 
     import { BUILTIN_EDITOR_TOOL_PLUGINS } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
     import { editorToolSelectCommandId, executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
-    import { getPaintToolsStripModel } from "../../../mapeditor/plugins/builtins/paint-tools-strip-model";
-    import { Button } from "../../components/ui/button";
     import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
     import { contextMenu } from "../../components/context-menu/context-menu.svelte";
     import { cn } from "../../lib/utils";
     import { useEditorState } from "../editor-state.svelte";
     import { TOOL_ICONS } from "../icons";
+    import { visibleRailGroups } from "../tool-rail";
     import { PAINT_TOOLS_PANEL_ID } from "../workbench-controller.svelte";
-    import type { DockviewPanelApi } from "dockview-core";
-
-    let { api }: { api: DockviewPanelApi } = $props();
 
     const editor = useEditorState();
     const host = editor.host;
     const workbench = $derived(editor.layout);
     const docked = $derived(workbench?.locations[PAINT_TOOLS_PANEL_ID] === "grid");
-    const orientation = $derived(editor.read(() => (docked ? "vertical" : getPaintToolsStripModel(host).orientation)));
-    const vertical = $derived(orientation === "vertical");
-    const tools = $derived(editor.read(() => BUILTIN_EDITOR_TOOL_PLUGINS.filter((p) => host.isEditorToolPluginEnabled(p.id))));
     const activeTool = $derived(editor.tool.current);
-    const tooltipSide = $derived(vertical ? "right" : "bottom");
+    const groups = $derived(
+        editor.read(() =>
+            visibleRailGroups((id) => host.isEditorToolPluginEnabled(id)).map((group) =>
+                group.map((id) => BUILTIN_EDITOR_TOOL_PLUGINS.find((plugin) => plugin.id === id)).filter((plugin) => plugin !== undefined),
+            ),
+        ),
+    );
 
-    // A floating strip should hug its buttons instead of looking like an empty tool window.
-    // Dockview contributes an 18px drag titlebar; the panel itself has 6px padding on each side.
-    $effect(() => {
-        if (docked) return;
-        const count = tools.length;
-        const buttonSize = 32;
-        const gap = 2;
-        const panelPadding = 12;
-        const floatingTitlebar = 18;
-        const stripLength = count * buttonSize + Math.max(0, count - 1) * gap + panelPadding;
-        api.setSize(
-            vertical
-                ? { width: 48, height: floatingTitlebar + stripLength }
-                : { width: stripLength, height: floatingTitlebar + buttonSize + panelPadding },
-        );
-    });
+    const buttonBase = "grid size-[34px] shrink-0 place-items-center rounded-[5px] border text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring";
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="flex h-full min-h-0 flex-col bg-card p-1.5"
+    class="flex h-full min-h-0 flex-col items-center gap-1 overflow-hidden bg-card p-[5px]"
     oncontextmenu={(event) => contextMenu.open(event, "Paint tools", workbench?.menuFor(PAINT_TOOLS_PANEL_ID) ?? [])}
 >
-    <div class={cn("flex min-h-0 w-full gap-0.5 overflow-hidden", vertical ? "h-full flex-col items-center" : "flex-row flex-wrap items-center justify-center")}>
-        {#if docked}
-            <Tooltip>
-                <TooltipTrigger>
-                    {#snippet child({ props })}
-                        <Button {...props} size="icon" variant="ghost" class="size-7 shrink-0" aria-label="Undock paint tools" onclick={() => workbench?.floatFromDock(PAINT_TOOLS_PANEL_ID)}>
-                            <SquareArrowOutUpRight class="size-3.5" aria-hidden="true" />
-                        </Button>
-                    {/snippet}
-                </TooltipTrigger>
-                <TooltipContent side="right" class="text-xs">Undock (right-click for more)</TooltipContent>
-            </Tooltip>
-        {/if}
-        <nav class={cn("flex gap-0.5", vertical ? "flex-col items-center" : "flex-row items-center")} aria-label="Map paint tools">
-            {#each tools as tool (tool.id)}
+    {#if docked}
+        <Tooltip>
+            <TooltipTrigger>
+                {#snippet child({ props })}
+                    <button {...props} type="button" class={cn(buttonBase, "size-[22px] border-transparent hover:bg-muted hover:text-foreground")} aria-label="Undock tools" onclick={() => workbench?.floatFromDock(PAINT_TOOLS_PANEL_ID)}>
+                        <SquareArrowOutUpRight class="size-3.5" aria-hidden="true" />
+                    </button>
+                {/snippet}
+            </TooltipTrigger>
+            <TooltipContent side="right" class="text-xs">Undock (right-click for more)</TooltipContent>
+        </Tooltip>
+    {/if}
+
+    <nav class="flex min-h-0 flex-col items-center gap-1" aria-label="Map editor tools">
+        {#each groups as group, index (index)}
+            {#if index > 0}
+                <div class="my-[3px] h-px w-[26px] shrink-0 bg-border" aria-hidden="true"></div>
+            {/if}
+            {#each group as tool (tool.id)}
                 {@const Icon = TOOL_ICONS[tool.icon]}
+                {@const active = activeTool === tool.id}
                 <Tooltip>
                     <TooltipTrigger>
                         {#snippet child({ props })}
-                            <Button
+                            <button
                                 {...props}
-                                size="icon"
-                                variant={activeTool === tool.id ? "default" : "outline"}
-                                class="size-8 shrink-0"
+                                type="button"
+                                class={cn(buttonBase, active ? "border-blue-300 bg-blue-500 text-white" : "border-transparent hover:bg-muted hover:text-foreground")}
                                 aria-label={tool.name}
-                                aria-pressed={activeTool === tool.id}
+                                aria-pressed={active}
                                 onclick={() => executeEditorCommand(editorToolSelectCommandId(tool.id), { host })}
                             >
-                                <Icon class="size-4" aria-hidden="true" />
-                            </Button>
+                                <Icon class="size-[18px]" aria-hidden="true" />
+                            </button>
                         {/snippet}
                     </TooltipTrigger>
-                    <TooltipContent side={tooltipSide} class="max-w-xs text-xs leading-snug">
+                    <TooltipContent side="right" class="max-w-xs text-xs leading-snug">
                         <span class="font-medium text-foreground">{tool.name}</span>
                         <span class="mt-1 block text-muted-foreground">{tool.description}</span>
                     </TooltipContent>
                 </Tooltip>
             {/each}
-        </nav>
-    </div>
+        {/each}
+    </nav>
 </div>

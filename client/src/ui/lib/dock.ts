@@ -13,6 +13,7 @@ import {
 } from "dockview-core";
 
 import "../styles/dockview.css";
+import "../styles/studio-dock.css";
 
 import { readJson, writeStorage } from "./persisted";
 import type { PanelContext, StudioPanel } from "./panel";

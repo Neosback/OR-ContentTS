@@ -1,3 +1,6 @@
+import { PerfGovernor } from "../../perf/perf-governor";
+import { glMemory, perfLog } from "../../perf/gl-memory";
+import { perf } from "../../perf/perf-profile";
 import { pixelRatio } from "../../util/DeviceUtil";
 import { RenderStats } from "./RenderStats";
 
@@ -20,8 +23,8 @@ function maxPixelRatio(): number {
 }
 
 function resizeCanvas(canvas: HTMLCanvasElement, cssSize?: { width: number; height: number }) {
-    // Read live: zooming or moving to another monitor changes it after load.
-    const devicePixelRatio = Math.min(window.devicePixelRatio || pixelRatio, maxPixelRatioCap);
+    // Read live: zooming or moving to another monitor changes it after load, and so does the performance profile.
+    const devicePixelRatio = Math.min(window.devicePixelRatio || pixelRatio, maxPixelRatioCap, perf.profile.pixelRatioCap);
     const width = Math.max(1, Math.round((cssSize?.width ?? canvas.offsetWidth) * devicePixelRatio));
     const height = Math.max(1, Math.round((cssSize?.height ?? canvas.offsetHeight) * devicePixelRatio));
 
@@ -36,6 +39,9 @@ function resizeCanvas(canvas: HTMLCanvasElement, cssSize?: { width: number; heig
 
 const maxPixelRatioCap = maxPixelRatio();
 
+// Active from the first allocation (init), not just after start(): refuse GL allocations beyond 1.5x the profile budget.
+glMemory.setLimit(perf.profile.gpuBudgetMB * 1.5 * 1048576);
+
 export abstract class Renderer {
     canvas: HTMLCanvasElement;
     /** Optional 2D overlay drawn above the WebGL canvas (e.g. CPU wireframes). */
@@ -43,7 +49,18 @@ export abstract class Renderer {
     animationId: number | undefined;
     running: boolean = false;
 
-    fpsLimit: number = 999;
+    /** Frame limit while active; starts at the performance profile's limit and may be changed by the user. */
+    fpsLimit: number = perf.profile.fpsLimit;
+
+    /** No input for this long (and nothing loading) counts as idle and drops to the profile's idle frame rate. */
+    private static readonly IDLE_AFTER_MS = 3000;
+    private static readonly GUARD_WINDOW_MS = 1000;
+    private lastActivityAt = performance.now();
+    private guardWindowStart = 0;
+    private guardWindowFrames = 0;
+    private guardWindowActive = false;
+    private readonly governor = new PerfGovernor();
+    private unsubscribePerf?: () => void;
 
     /** CSS size from a ResizeObserver, so frames don't force a layout by reading offsetWidth. */
     private cssSize?: { width: number; height: number };
@@ -63,8 +80,29 @@ export abstract class Renderer {
 
     abstract cleanUp(): void;
 
+    /** Override to keep rendering at full rate while the scene is busy (regions loading, builds pending). */
+    protected hasPendingWork(): boolean {
+        return false;
+    }
+
+    private readonly markActive = (): void => {
+        this.lastActivityAt = performance.now();
+    };
+
+    private static readonly ACTIVITY_EVENTS = ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"] as const;
+
     start() {
         this.running = true;
+        this.lastActivityAt = performance.now();
+        for (const type of Renderer.ACTIVITY_EVENTS) window.addEventListener(type, this.markActive, { passive: true, capture: true });
+        // Resuming after a guard pause restarts the loop.
+        this.unsubscribePerf = perf.subscribe(() => {
+            if (this.running && this.animationId === undefined && !perf.getSnapshot().paused) {
+                this.governor.reset();
+                this.guardWindowStart = 0;
+                this.animationId = requestAnimationFrame(this.frameCallback);
+            }
+        });
         if (typeof ResizeObserver !== "undefined" && !this.resizeObserver) {
             this.resizeObserver = new ResizeObserver(([entry]) => {
                 this.cssSize = { width: entry.contentRect.width, height: entry.contentRect.height };
@@ -76,6 +114,9 @@ export abstract class Renderer {
 
     stop() {
         this.running = false;
+        for (const type of Renderer.ACTIVITY_EVENTS) window.removeEventListener(type, this.markActive, { capture: true });
+        this.unsubscribePerf?.();
+        this.unsubscribePerf = undefined;
         this.resizeObserver?.disconnect();
         this.resizeObserver = undefined;
         this.cssSize = undefined;
@@ -88,7 +129,52 @@ export abstract class Renderer {
 
     onResize(width: number, height: number) {}
 
+    /** True when the user is not interacting and nothing is loading: the renderer drops to the idle frame rate. */
+    private isIdle(now: number): boolean {
+        return now - this.lastActivityAt > Renderer.IDLE_AFTER_MS && !this.hasPendingWork();
+    }
+
+    /** Called once per frame; every ~second asks the governor whether rendering is hurting the machine. */
+    private observeHealth(now: number, idle: boolean): void {
+        if (this.guardWindowStart === 0) {
+            this.guardWindowStart = now;
+            this.guardWindowFrames = 0;
+            this.guardWindowActive = false;
+        }
+        this.guardWindowFrames++;
+        this.guardWindowActive ||= !idle;
+
+        const elapsed = now - this.guardWindowStart;
+        if (elapsed < Renderer.GUARD_WINDOW_MS) return;
+
+        const memory = (performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+        const action = this.governor.sample(
+            {
+                frameMs: elapsed / this.guardWindowFrames,
+                idle: !this.guardWindowActive,
+                heapBytes: memory?.usedJSHeapSize,
+                heapLimitBytes: memory?.jsHeapSizeLimit,
+                gpuBytes: glMemory.bytes,
+                gpuBudgetBytes: perf.profile.gpuBudgetMB * 1048576,
+            },
+            perf.level,
+        );
+        this.guardWindowStart = 0;
+
+        if (action.type === "downgrade") {
+            perf.downgrade(action.to, `${action.reason}. Lowered the performance level to ${action.to}.`);
+            this.fpsLimit = Math.min(this.fpsLimit, perf.profile.fpsLimit);
+        } else if (action.type === "pause") {
+            perf.pause(`${action.reason}. Rendering was paused to protect your computer.`);
+        }
+    }
+
     frameCallback = (time: DOMHighResTimeStamp) => {
+        // Paused by the performance guard: do not render or reschedule until the user resumes (see start()).
+        if (perf.getSnapshot().paused) {
+            this.animationId = undefined;
+            return;
+        }
         try {
             const resized = resizeCanvas(this.canvas, this.cssSize);
             if (resized) {
@@ -96,21 +182,26 @@ export abstract class Renderer {
             }
 
             const deltaTime = this.stats.getDeltaTime(time);
+            const now = performance.now();
+            const idle = this.isIdle(now);
+            const limit = idle ? Math.min(this.fpsLimit || Infinity, perf.profile.idleFps) : this.fpsLimit;
 
-            if (this.fpsLimit && deltaTime > 0) {
+            if (limit && deltaTime > 0) {
                 const tolerance = 1;
-                if (deltaTime < 1000 / this.fpsLimit - tolerance) {
+                if (deltaTime < 1000 / limit - tolerance) {
                     return;
                 }
             }
 
             this.stats.update(time);
 
+            if (this.stats.frameCount === 0) perfLog(`phase: first frame ${this.canvas.width}x${this.canvas.height}`);
             this.render(time, deltaTime, resized);
 
             this.onFrameEnd();
+            this.observeHealth(now, idle);
         } finally {
-            if (this.running) {
+            if (this.running && !perf.getSnapshot().paused) {
                 this.animationId = requestAnimationFrame(this.frameCallback);
             }
         }

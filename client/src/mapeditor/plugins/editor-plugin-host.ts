@@ -272,6 +272,11 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     setHoveredObject(ref: import("../webgl/sceneLocPicker").EditorObjectRef | undefined): void;
     setSelectedObject(ref: import("../webgl/sceneLocPicker").EditorObjectRef | undefined): void;
     clearSelectedObject(): void;
+    getHoveredTile(): { worldX: number; worldY: number } | undefined;
+    getTileModel(level: number, worldX: number, worldY: number): { model: import("../../rs/scene/SceneTileModel").SceneTileModel; sceneX: number; sceneY: number } | undefined;
+    selectedTile?: { worldX: number; worldY: number; level: number };
+    setSelectedTile(tile: { worldX: number; worldY: number; level: number } | undefined): void;
+    getTileInfo(level: number, worldX: number, worldY: number): import("../map-editor-history").TileFieldSnapshot | undefined;
     rotateSelectedObject(): boolean;
     isObjectDeleteModeActive(): boolean;
     deleteHoveredObject(): boolean;
@@ -880,7 +885,25 @@ export class EditorPluginHost implements IEditorPluginHost {
     }
     setSelectedObject(ref: import("../webgl/sceneLocPicker").EditorObjectRef | undefined): void {
         this._e.selectedObject = ref;
+        if (ref) this._e.selectedTile = undefined;
         this._e.notifyWorkbenchStateChanged();
+    }
+    get selectedTile(): { worldX: number; worldY: number; level: number } | undefined {
+        return this._e.selectedTile;
+    }
+    setSelectedTile(tile: { worldX: number; worldY: number; level: number } | undefined): void {
+        this._e.selectedTile = tile;
+        if (tile) this._e.selectedObject = undefined;
+        this._e.notifyWorkbenchStateChanged();
+    }
+    getTileInfo(level: number, worldX: number, worldY: number): import("../map-editor-history").TileFieldSnapshot | undefined {
+        return this._e.getTileInfo(level, worldX, worldY);
+    }
+    getHoveredTile(): { worldX: number; worldY: number } | undefined {
+        return this._e.getHoveredTile();
+    }
+    getTileModel(level: number, worldX: number, worldY: number): { model: import("../../rs/scene/SceneTileModel").SceneTileModel; sceneX: number; sceneY: number } | undefined {
+        return this._e.getTileModel(level, worldX, worldY);
     }
     clearSelectedObject(): void {
         this._e.clearSelectedObject();

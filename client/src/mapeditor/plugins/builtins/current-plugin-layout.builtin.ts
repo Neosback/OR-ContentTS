@@ -10,6 +10,7 @@ import { objectSelectorEditorTool } from "./object-selector.plugin";
 import { objectDeleteEditorTool } from "./object-delete.plugin";
 import { regionStampEditorTool } from "./region-stamp.plugin";
 import { overlayEditorTool } from "./overlay.plugin";
+import { tileBrushEditorTool } from "./tile-brush.plugin";
 import { tileFlagsEditorTool } from "./tile-flags.plugin";
 import { underlayEditorTool } from "./underlay.plugin";
 
@@ -21,6 +22,7 @@ export const BUILTIN_EDITOR_TOOL_PLUGINS: readonly EditorToolPlugin[] = [
     objectSelectorEditorTool,
     objectDeleteEditorTool,
     regionStampEditorTool,
+    tileBrushEditorTool,
 ];
 
 const editorToolPluginById: Record<MapEditorTool, EditorToolPlugin> = {
@@ -32,6 +34,7 @@ const editorToolPluginById: Record<MapEditorTool, EditorToolPlugin> = {
     "object-delete": objectDeleteEditorTool,
     "region-stamp": regionStampEditorTool,
     "tile-flags": tileFlagsEditorTool,
+    "tile-brush": tileBrushEditorTool,
 };
 
 export function getBuiltinEditorToolPlugin(tool: MapEditorTool): EditorToolPlugin {

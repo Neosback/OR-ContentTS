@@ -29,7 +29,20 @@ export const isTouchDevice = !!(
     navigator.maxTouchPoints || "ontouchstart" in document.documentElement
 );
 
-export const isWebGL2Supported = !!document.createElement("canvas").getContext("webgl2");
+let webGL2Supported: boolean | undefined;
+
+/**
+ * Probes once, on first use. The probe context is released immediately: creating it at module load kept a second
+ * WebGL context (and its GPU memory) alive for the whole page for a check that only the map viewer needs.
+ */
+export function isWebGL2Supported(): boolean {
+    if (webGL2Supported === undefined) {
+        const gl = document.createElement("canvas").getContext("webgl2");
+        webGL2Supported = !!gl;
+        gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    }
+    return webGL2Supported;
+}
 
 export const isWebGPUSupported = "gpu" in navigator;
 

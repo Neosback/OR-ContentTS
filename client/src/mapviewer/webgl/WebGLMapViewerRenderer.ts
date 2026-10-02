@@ -1,3 +1,5 @@
+import { perf } from "../../perf/perf-profile";
+import { applyDrawMode } from "../../mapeditor/webgl/draw-backend";
 import Denque from "denque";
 import { vec2, vec4 } from "gl-matrix";
 import {
@@ -180,13 +182,13 @@ export class WebGLMapViewerRenderer extends MapViewerRenderer<WebGLMapSquare> {
     }
 
     static isSupported(): boolean {
-        return isWebGL2Supported;
+        return isWebGL2Supported();
     }
 
     async init(): Promise<void> {
         await super.init();
 
-        this.app = PicoGL.createApp(this.canvas);
+        this.app = PicoGL.createApp(this.canvas, { antialias: perf.profile.antialias });
         this.gl = this.app.gl as WebGL2RenderingContext;
 
         // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices#use_webgl_provoking_vertex_when_its_available
@@ -194,13 +196,7 @@ export class WebGLMapViewerRenderer extends MapViewerRenderer<WebGLMapSquare> {
 
         this.timer = this.app.createTimer();
 
-        // hack to get the right multi draw extension for picogl
-        const state: any = this.app.state;
-        const ext = this.gl.getExtension("WEBGL_multi_draw");
-        PicoGL.WEBGL_INFO.MULTI_DRAW_INSTANCED = ext;
-        state.extensions.multiDrawInstanced = ext;
-
-        this.hasMultiDraw = !!PicoGL.WEBGL_INFO.MULTI_DRAW_INSTANCED;
+        this.hasMultiDraw = applyDrawMode(this.app, this.gl);
 
         this.mapViewer.workerPool.initLoader(this.dataLoader);
 
@@ -522,6 +518,11 @@ export class WebGLMapViewerRenderer extends MapViewerRenderer<WebGLMapSquare> {
             magFilter: PicoGL.NEAREST,
             internalFormat: PicoGL.RGBA8I,
         });
+    }
+
+    /** Regions still loading or waiting to be built: render at full rate until they are in. */
+    protected override hasPendingWork(): boolean {
+        return this.mapManager.loadingMapIds.size > 0 || this.mapsToLoad.length > 0;
     }
 
     override async queueLoadMap(mapX: number, mapY: number): Promise<void> {

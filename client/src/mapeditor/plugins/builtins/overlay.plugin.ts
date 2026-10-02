@@ -1,3 +1,4 @@
+import { getTileBrushModel } from "./tile-brush-model";
 import { isEditorToolKeybindHeld } from "../../editor-tool-input";
 import { editorCommandKeyBinding } from "../../commands/editor-command-registry";
 import type { EditorToolDataFns, EditorToolPlugin } from "./builtin-plugin-types";
@@ -41,7 +42,7 @@ export const overlayEditorTool: EditorToolPlugin = {
                 { code: ["ControlRight", "AltRight"] },
             ],
             trigger: "HELD",
-            shouldProcess: ({ host }) => host.getEditorTool() === "overlay",
+            shouldProcess: ({ host }) => host.getEditorTool() === "tile-brush" && getTileBrushModel(host).isEnabled("overlay"),
             action: () => true,
         },
         {
@@ -50,7 +51,7 @@ export const overlayEditorTool: EditorToolPlugin = {
             description: "Restrict to overlay footprint while Ctrl is held.",
             defaultChords: [{ code: "ControlLeft" }, { code: "ControlRight" }],
             trigger: "HELD",
-            shouldProcess: ({ host }) => host.getEditorTool() === "overlay",
+            shouldProcess: ({ host }) => host.getEditorTool() === "tile-brush" && getTileBrushModel(host).isEnabled("overlay"),
             action: () => true,
         },
     ],

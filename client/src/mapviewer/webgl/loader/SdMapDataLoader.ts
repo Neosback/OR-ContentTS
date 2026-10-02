@@ -231,7 +231,7 @@ function addSceneModels(
             createModelGroups(modelGroupMap, instancedModels, false);
         } else if (opaqueFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModel(model, opaqueFaces);
+            sceneBuf.addModelPass(model, false, undefined, opaqueFaces);
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {
@@ -257,7 +257,7 @@ function addSceneModels(
             createModelGroups(modelGroupMap, instancedModels, true);
         } else if (transparentFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModel(model, transparentFaces);
+            sceneBuf.addModelPass(model, true, undefined, transparentFaces);
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {

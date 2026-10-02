@@ -1,6 +1,6 @@
 import type { IEditorPluginHost } from "../editor-plugin-host";
 
-export type HeightPaintMode = "raise-lower" | "smooth" | "slope" | "blend" | "flatten" | "terrace";
+export type HeightPaintMode = "raise-lower" | "smooth" | "slope" | "blend" | "flatten" | "terrace" | "set";
 
 type HeightToolState = {
     mode: HeightPaintMode;
@@ -8,6 +8,8 @@ type HeightToolState = {
     blendStrength: number;
     flattenStrength: number;
     terraceStep: number;
+    /** Target height (scene units, as stored in the tile) for the "set" mode. */
+    setHeight: number;
 };
 
 export type HeightToolModel = HeightToolState & {
@@ -16,6 +18,7 @@ export type HeightToolModel = HeightToolState & {
     setBlendStrength: (strength: number) => void;
     setFlattenStrength: (strength: number) => void;
     setTerraceStep: (step: number) => void;
+    setSetHeight: (height: number) => void;
 };
 
 const DEFAULT_HEIGHT_TOOL_STATE: HeightToolState = {
@@ -24,6 +27,7 @@ const DEFAULT_HEIGHT_TOOL_STATE: HeightToolState = {
     blendStrength: 0.45,
     flattenStrength: 0.5,
     terraceStep: 16,
+    setHeight: 0,
 };
 
 const heightToolStateByHost = new WeakMap<IEditorPluginHost, HeightToolState>();
@@ -64,6 +68,10 @@ export function getHeightToolModel(host: IEditorPluginHost): HeightToolModel {
         },
         setTerraceStep(step) {
             state.terraceStep = Math.max(2, Math.min(96, Math.round(step) || 2));
+            notify(host);
+        },
+        setSetHeight(height) {
+            state.setHeight = Math.round(height) || 0;
             notify(host);
         },
     };

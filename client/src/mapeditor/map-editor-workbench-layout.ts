@@ -9,10 +9,7 @@ import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import { BUILTIN_WORKBENCH_UI_PLUGINS } from "./plugins/builtins/current-plugin-layout.builtin";
 
 const ALL_MAP_EDITOR_TOOLS: readonly MapEditorTool[] = [
-    "underlay",
-    "overlay",
-    "height",
-    "tile-flags",
+    "tile-brush",
     "object-selector",
     "object-delete",
     "region-stamp",

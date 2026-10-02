@@ -42,6 +42,13 @@ import {
 } from "./plugins/builtins/current-plugin-layout.builtin";
 import { bootstrapHeightToolModel, getHeightToolWorkbenchSnapshot } from "./plugins/builtins/height-tool-model";
 import {
+    bootstrapTileBrushModel,
+    getTileBrushFocus,
+    getTileBrushModel,
+    getTileBrushWorkbenchSnapshot,
+    type TileBrushComponent,
+} from "./plugins/builtins/tile-brush-model";
+import {
     bootstrapEditorBottomBarModel,
     getEditorBottomBarWorkbenchSnapshot,
 } from "./plugins/builtins/editor-bottom-bar-model";
@@ -157,6 +164,15 @@ interface PersistedWorkbenchPluginsV2 {
 
 type PersistedKeybindOverrides = Record<string, EditorToolKeyChord | null>;
 
+/** Tool ids that now resolve to the Tile painter, with the drawer tab each one opens. */
+const LEGACY_PAINT_TOOL_TABS: Partial<Record<MapEditorTool, TileBrushComponent>> = {
+    underlay: "underlay",
+    overlay: "overlay",
+    height: "height",
+    smooth: "height",
+    "tile-flags": "flags",
+};
+
 export class MapEditor {
     inputManager: InputManager = new InputManager();
     camera: Camera = new Camera(3242, -26, 3202, -245, 1862);
@@ -249,7 +265,8 @@ export class MapEditor {
 
     brushType: MapEditorBrushType = "square";
 
-    editorTool: MapEditorTool = "underlay";
+    /** Opens on the object selector; the Tile tools (underlay, overlay, ...) are one click away. */
+    editorTool: MapEditorTool = "object-selector";
 
     private editorToolListeners = new Set<() => void>();
 
@@ -285,6 +302,8 @@ export class MapEditor {
     /** Object the viewport context menu is open on; outlined until the menu closes. */
     contextMenuObject?: import("./webgl/sceneLocPicker").EditorObjectRef;
     selectedObject?: import("./webgl/sceneLocPicker").EditorObjectRef;
+    /** Ground tile picked by the Select tool (click on empty ground); mutually exclusive with `selectedObject`. */
+    selectedTile?: { worldX: number; worldY: number; level: number };
     /** Source object for stamp-style copy placement (wireframe preview until click). */
     objectCopyTemplate?: import("./webgl/sceneLocPicker").EditorObjectRef;
     objectCopyPlacementActive: boolean = false;
@@ -362,7 +381,18 @@ export class MapEditor {
         this.inputManager.setInputBlockedForUi(this.isEditorInputSuspended());
     }
 
-    setEditorTool(tool: MapEditorTool): void {
+    setEditorTool(requested: MapEditorTool): void {
+        // The single-purpose paint tools now live in the Tile painter: selecting one opens that drawer tab.
+        const legacyTab = LEGACY_PAINT_TOOL_TABS[requested];
+        let tool = requested;
+        if (legacyTab) {
+            const brush = getTileBrushModel(this.pluginHost);
+            brush.setTab(legacyTab);
+            brush.setEnabled(legacyTab, true);
+            tool = "tile-brush";
+            // Re-selecting the tool while it is already active still has to bring the right tab forward.
+            this.notifyEditorToolListeners();
+        }
         if (!this.enabledEditorToolPlugins.has(tool)) {
             return;
         }
@@ -372,6 +402,7 @@ export class MapEditor {
         if (this.editorTool === "object-selector" && tool !== "object-selector") {
             this.cancelObjectCopyPlacement();
             this.clearSelectedObject();
+            this.clearSelectedTile();
         }
         if (tool === "object-delete" || this.editorTool === "object-delete") {
             this.hoveredObject = undefined;
@@ -391,6 +422,10 @@ export class MapEditor {
             this.clearRegionStampSelection();
         }
         this.editorTool = tool;
+        this.notifyEditorToolListeners();
+    }
+
+    private notifyEditorToolListeners(): void {
         for (const listener of this.editorToolListeners) {
             listener();
         }
@@ -887,6 +922,7 @@ export class MapEditor {
         const bottomBarWorkbench = getEditorBottomBarWorkbenchSnapshot(this.pluginHost);
         const panelDisplayWorkbench = getMapEditorPanelDisplaySnapshot(this.pluginHost);
         const tileFlagsWorkbench = getTileFlagsToolWorkbenchSnapshot(this.pluginHost);
+        const tileBrushWorkbench = getTileBrushWorkbenchSnapshot(this.pluginHost);
         const underlayWorkbench = getUnderlayGradientWorkbenchSnapshot(this.pluginHost);
         const overlayWorkbench = getOverlayGradientWorkbenchSnapshot(this.pluginHost);
         const objectVisibility = this.objectsVisible ? "1" : "0";
@@ -900,6 +936,7 @@ export class MapEditor {
         const objectSelector = JSON.stringify({
             hovered: this.hoveredObject ?? null,
             selected: this.selectedObject ?? null,
+            selectedTile: this.selectedTile ?? null,
             copyActive: this.objectCopyPlacementActive,
             copyTemplate: this.objectCopyTemplate ?? null,
         });
@@ -912,7 +949,7 @@ export class MapEditor {
             copyOptions: this.regionStampCopyOptions,
             clipboard: this.regionStampClipboard ? `${this.regionStampClipboard.width}x${this.regionStampClipboard.height}` : null,
         });
-        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${sandbox}|${objectSelector}|${regionStamp}`;
+        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${tileBrushWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${sandbox}|${objectSelector}|${regionStamp}`;
     };
 
     saveDockPanelRestore(panelId: string, options: AddPanelOptions): void {
@@ -1051,7 +1088,8 @@ export class MapEditor {
             tool === "object-selector" ||
             tool === "object-delete" ||
             tool === "region-stamp" ||
-            tool === "tile-flags"
+            tool === "tile-flags" ||
+            (tool === "tile-brush" && getTileBrushFocus(this.pluginHost) === "flags")
         );
     }
 
@@ -1139,6 +1177,23 @@ export class MapEditor {
 
     clearSelectedObject(): void {
         this.selectedObject = undefined;
+    }
+
+    getTileModel(level: number, worldX: number, worldY: number): { model: import("../rs/scene/SceneTileModel").SceneTileModel; sceneX: number; sceneY: number } | undefined {
+        return this.renderer instanceof WebGLMapEditorRenderer ? this.renderer.getTileModel(level, worldX, worldY) : undefined;
+    }
+
+    getHoveredTile(): { worldX: number; worldY: number } | undefined {
+        return this.renderer instanceof WebGLMapEditorRenderer ? this.renderer.getHoveredTile() : undefined;
+    }
+
+    clearSelectedTile(): void {
+        this.selectedTile = undefined;
+    }
+
+    /** Stored tile fields (heights, underlay/overlay ids + 1, shape, flags) for a world tile, if its map is loaded. */
+    getTileInfo(level: number, worldX: number, worldY: number): import("./map-editor-history").TileFieldSnapshot | undefined {
+        return this.renderer instanceof WebGLMapEditorRenderer ? this.renderer.getTileInfo(level, worldX, worldY) : undefined;
     }
 
     isObjectCopyPlacementActive(): boolean {
@@ -1244,6 +1299,7 @@ export class MapEditor {
                 // Keep it available even when older saved layouts/tools omitted it.
                 nextTools.add("height");
                 nextTools.add("tile-flags");
+                nextTools.add("tile-brush");
                 nextTools.add("object-selector");
                 nextTools.add("object-delete");
                 nextTools.add("region-stamp");
@@ -1365,6 +1421,7 @@ export class MapEditor {
         bootstrapPaintToolsStripModel(this.pluginHost);
         bootstrapEditorBottomBarModel(this.pluginHost);
         bootstrapTileFlagsToolModel(this.pluginHost);
+        bootstrapTileBrushModel(this.pluginHost);
         bootstrapUnderlayGradient(this.pluginHost);
         bootstrapOverlayGradient(this.pluginHost);
 

@@ -49,6 +49,7 @@ import { Hasher } from "../../util/Hasher";
 import { LoadedCache } from "../Caches";
 import type { NpcSpawn } from "../../world/world-source";
 import type { ObjSpawn } from "../../world/world-source";
+import { loadOpenRuneCore, setOpenRuneCoreEnabled } from "../../wasm/openrune-core-loader";
 import { MinimapData, loadMinimapBlob, minimapHdPixelsToBlob } from "./MinimapData";
 import { RenderDataLoader, renderDataLoaderSerializer } from "./RenderDataLoader";
 
@@ -56,6 +57,7 @@ registerSerializer(renderDataLoaderSerializer);
 
 const compressionPromise = Promise.all([Bzip2.initWasm(), Gzip.initWasm()]);
 const hasherPromise = Hasher.init();
+const openRuneCorePromise = loadOpenRuneCore();
 
 export type WorkerState = {
     cache: LoadedCache;
@@ -97,6 +99,7 @@ async function initWorker(
 ): Promise<WorkerState> {
     await compressionPromise;
     await hasherPromise;
+    await openRuneCorePromise; // resolves false (TS fallback) instead of rejecting
 
     const cacheSystem = CacheSystem.fromFiles(cache.type, cache.files);
 
@@ -227,6 +230,9 @@ async function withTransientModelCaches<T>(
 }
 
 const worker = {
+    setWasmEnabled(enabled: boolean): void {
+        setOpenRuneCoreEnabled(enabled);
+    },
     async initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): Promise<void> {
         console.log("init worker", cache.info);
         const nextState = initWorker(cache, objSpawns, npcSpawns);

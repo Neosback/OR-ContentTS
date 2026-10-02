@@ -6,9 +6,8 @@
     import { getHeightToolModel } from "../../../mapeditor/plugins/builtins/height-tool-model";
     import { Badge } from "../../components/ui/badge";
     import { Button } from "../../components/ui/button";
-    import { CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+    import { CardContent } from "../../components/ui/card";
     import { Label } from "../../components/ui/label";
-    import { Separator } from "../../components/ui/separator";
     import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
     import { cn } from "../../lib/utils";
     import { useEditorState } from "../editor-state.svelte";
@@ -60,18 +59,13 @@
 {/snippet}
 
 <div class="map-editor-panel flex min-h-0 flex-1 flex-col">
-    <CardHeader class="space-y-1.5 border-b border-border bg-muted/20 px-4 py-3">
-        <div class="flex items-center justify-between gap-2">
-            <CardTitle class="text-sm font-semibold tracking-tight text-foreground">Height</CardTitle>
-            <Badge variant="outline" class="h-5 border-border px-2 font-mono text-[10px] font-normal">Step {step}</Badge>
-        </div>
-        <div class="rounded-md border border-muted bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-            Active mode: <span class="font-medium text-foreground">{selectedMode.name}</span>
-        </div>
-    </CardHeader>
-    <Separator />
-    <CardContent class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        <div class="grid grid-cols-2 gap-1.5">
+    <!-- The drawer tab already says "Height": one slim row with the active mode and step. -->
+    <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/20 px-2 py-1.5 text-[11px] text-muted-foreground">
+        <span class="min-w-0 truncate" title={selectedMode.description}>Mode <span class="font-medium text-foreground">{selectedMode.name}</span> · {selectedMode.description}</span>
+        <Badge variant="outline" class="h-5 shrink-0 border-border px-2 font-mono text-[10px] font-normal">Step {step}</Badge>
+    </div>
+    <CardContent class="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1.5">
             {#each HEIGHT_MODES as m (m.id)}
                 {@const Icon = HEIGHT_MODE_ICONS[m.icon]}
                 {@const selected = m.id === mode}
@@ -94,8 +88,6 @@
                 </Tooltip>
             {/each}
         </div>
-        <p class="text-xs text-muted-foreground">{selectedMode.description}</p>
-
         {@render slider(`Height step (${step})`, 1, 32, step, "How much each stroke raises/lowers height.", (raw) => {
             getBuiltinEditorToolPlugin("height").data?.applyHeightStepFromRawInput?.(host, raw);
             host.notifyWorkbenchStateChanged();

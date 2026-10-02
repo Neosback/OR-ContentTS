@@ -35,6 +35,8 @@ export function createObjectProgram(hasMultiDraw: boolean, discardAlpha: boolean
     if (discardAlpha) {
         defines.push("DISCARD_ALPHA");
     }
+    // The editor merges a map square's object geometry and tags vertices with their model slot.
+    defines.push("VERTEX_SLOT");
     return [prependDefines(mainVertShader, defines), prependDefines(mainFragShader, defines)];
 }
 

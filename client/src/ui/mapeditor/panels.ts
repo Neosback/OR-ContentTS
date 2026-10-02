@@ -4,28 +4,21 @@ import { sveltePanel, type PanelContext, type StudioPanel } from "../lib/panel";
 import { editorContext, type EditorState } from "./editor-state.svelte";
 import BrushWorkspaceDockPanel from "./panels/BrushWorkspaceDockPanel.svelte";
 import HistoryPanel from "./panels/HistoryPanel.svelte";
+import InspectorPanel from "./panels/InspectorPanel.svelte";
 import MinimapPanel from "./panels/MinimapPanel.svelte";
 import PaintToolsPanel from "./panels/PaintToolsPanel.svelte";
 import PaletteHost from "./panels/PaletteHost.svelte";
 import PanelRoot from "./panels/PanelRoot.svelte";
 import ScenePanel from "./panels/ScenePanel.svelte";
-import HeightPalette from "./palettes/HeightPalette.svelte";
+import TilePainterPanel from "./panels/TilePainterPanel.svelte";
 import ObjectDeletePalette from "./palettes/ObjectDeletePalette.svelte";
-import ObjectSelectorPalette from "./palettes/ObjectSelectorPalette.svelte";
-import OverlayPalette from "./palettes/OverlayPalette.svelte";
 import RegionStampPalette from "./palettes/RegionStampPalette.svelte";
-import TileFlagsPalette from "./palettes/TileFlagsPalette.svelte";
-import UnderlayPalette from "./palettes/UnderlayPalette.svelte";
 
 /** Palette component per dockview component name (the names `getMapEditorFloatableDockPanelDefaults` uses). */
 const PALETTES: Record<string, { title: string; component: Component }> = {
-    palette: { title: "Underlays", component: UnderlayPalette },
-    overlayPalette: { title: "Overlays", component: OverlayPalette },
-    heightPalette: { title: "Height", component: HeightPalette },
-    objectSelectorPalette: { title: "Objects", component: ObjectSelectorPalette },
+    objectSelectorPalette: { title: "Inspector", component: InspectorPanel },
     objectDeletePalette: { title: "Delete objects", component: ObjectDeletePalette },
     regionStampPalette: { title: "Region stamp", component: RegionStampPalette },
-    tileFlagsPalette: { title: "Tile flags", component: TileFlagsPalette },
 };
 
 /** Every dockview component the editor workbench can host. Panels mount outside the app tree, so each gets the editor state as context. */
@@ -53,6 +46,7 @@ export function createEditorPanels(state: EditorState): StudioPanel[] {
         panel("sceneEditor", "Editor", ScenePanel, { keepAlive: true, fixed: true }),
         panel("paintTools", "Tools", PaintToolsPanel, { props: (ctx) => ({ api: ctx.api }) }),
         panel("brushWorkspace", "Brush", BrushWorkspaceDockPanel),
+        panel("tilePainter", "Tile painter", TilePainterPanel, { props: (ctx) => ({ api: ctx.api }) }),
         panel("historyWorkspace", "History", HistoryPanel),
         panel("minimapWorkspace", "Minimap", MinimapPanel),
     ];

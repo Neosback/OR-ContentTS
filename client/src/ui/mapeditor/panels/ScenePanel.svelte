@@ -4,7 +4,10 @@
     import "../../../mapeditor/MapEditorContainer.css";
     import { contextMenu } from "../../components/context-menu/context-menu.svelte";
     import { TooltipProvider } from "../../components/ui/tooltip";
+    import { perf } from "../../../perf/perf-profile";
+    import { Button } from "../../components/ui/button";
     import { rendererCanvas } from "../../lib/actions";
+    import { perfState } from "../../lib/perf.svelte";
     import { useEditorState } from "../editor-state.svelte";
     import { BRUSH_PANEL_ID } from "../workbench-controller.svelte";
     import QuickControlsMenu from "./QuickControlsMenu.svelte";
@@ -33,11 +36,28 @@
     }
 </script>
 
+{#snippet guardBanner()}
+    {@const snapshot = perfState.current}
+    {#if snapshot.notice}
+        <div class="pointer-events-auto absolute left-1/2 top-3 z-30 w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-md border {snapshot.paused ? 'border-red-500/60 bg-red-950/90' : 'border-amber-500/50 bg-amber-950/90'} p-3 text-xs text-foreground shadow-lg" role="alert">
+            <p class="font-semibold">{snapshot.paused ? "Rendering paused" : "Performance guard"}</p>
+            <p class="mt-1 leading-snug">{snapshot.notice.message}</p>
+            <div class="mt-2 flex gap-2">
+                {#if snapshot.paused}
+                    <Button size="sm" class="h-7 text-xs" onclick={() => perf.resume()}>Resume</Button>
+                {/if}
+                <Button size="sm" variant="outline" class="h-7 text-xs" onclick={() => perf.dismissNotice()}>Dismiss</Button>
+            </div>
+        </div>
+    {/if}
+{/snippet}
+
 <TooltipProvider delayDuration={250}>
     <div class="map-editor-viewport-panel relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-background">
+        {@render guardBanner()}
         {#if stickyNav}
             <div class="pointer-events-none absolute right-2 top-2 z-20">
-                <div class="pointer-events-auto flex items-center gap-1 rounded-md border border-border/70 bg-card/90 p-0.5 backdrop-blur-sm">
+                <div class="pointer-events-auto flex items-center gap-1 rounded-md border border-border/70 bg-card p-0.5">
                     <QuickControlsMenu />
                 </div>
             </div>

@@ -11,17 +11,21 @@ import { isTauriRuntime } from "../../lib/tauri/is-tauri";
 import type { ContextMenuItem } from "../components/context-menu/context-menu.svelte";
 import { createStudioDock, floatPanel, pinGroup, popoutPanel, type StudioDock } from "../lib/dock";
 import type { StudioPanel } from "../lib/panel";
+import { applyTilePainterDrawer, TILE_PAINTER_PANEL_ID } from "./tile-painter-drawer";
 
 export const SCENE_PANEL_ID = "editor-scene-editor";
 export const PAINT_TOOLS_PANEL_ID = "editor-paint-tools";
 export const BRUSH_PANEL_ID = "editor-brush-workspace";
 
 /** The tool strip is a narrow docked column; the brush bar a short docked row. */
-export const PAINT_TOOLS_STRIP_WIDTH = 40;
+export const PAINT_TOOLS_STRIP_WIDTH = 44;
 export const BRUSH_BAR_HEIGHT = 44;
 
+/** How many palette tabs fit in the right-hand column before the rest collapse into the overflow menu. */
+const VISIBLE_PALETTE_TABS = 3;
+
 /** Bump when panel ids or their meaning change; an old saved layout is then discarded. */
-const LAYOUT_STORAGE_KEY = "map-editor-workbench-layout-v3";
+const LAYOUT_STORAGE_KEY = "map-editor-workbench-layout-v5";
 
 export type PanelLocation = "grid" | "floating" | "popout";
 
@@ -33,7 +37,7 @@ interface FloatRect {
 }
 
 /** Default floating rectangles (workbench-relative) for the two panels that start as overlays. */
-const PAINT_TOOLS_FLOAT: FloatRect = { x: 16, y: 48, width: 48, height: 266 };
+const PAINT_TOOLS_FLOAT: FloatRect = { x: 12, y: 44, width: PAINT_TOOLS_STRIP_WIDTH, height: 212 };
 const BRUSH_FLOAT: FloatRect = { x: 12, y: 120, width: 300, height: 420 };
 
 function panelTitle(panelId: string): string {
@@ -122,8 +126,15 @@ export class Workbench {
         if (strip) {
             // Docked: a fixed-width column. Floating: the group's own drag bar is the handle, so the tab header goes.
             if (strip.api.location.type === "grid") pinGroup(strip.group, { width: PAINT_TOOLS_STRIP_WIDTH, hideHeader: true });
-            else strip.group.model.header.hidden = true;
+            else {
+                strip.group.model.header.hidden = true;
+                // Dockview gives every group a 100px minimum width unless it has explicit constraints.
+                strip.group.api.setConstraints({ minimumWidth: PAINT_TOOLS_STRIP_WIDTH, maximumWidth: PAINT_TOOLS_STRIP_WIDTH });
+                strip.group.api.setSize({ width: PAINT_TOOLS_STRIP_WIDTH, height: PAINT_TOOLS_FLOAT.height });
+            }
         }
+        const painter = this.api.getPanel(TILE_PAINTER_PANEL_ID);
+        if (painter?.api.location.type === "grid") applyTilePainterDrawer(painter.group);
         const brush = this.api.getPanel(BRUSH_PANEL_ID);
         if (brush) {
             if (brush.api.location.type === "grid") pinGroup(brush.group, { height: BRUSH_BAR_HEIGHT, hideHeader: true });
@@ -132,11 +143,13 @@ export class Workbench {
     }
 
     private addBrushBar(): void {
+        // The brush bar is the very bottom row: under the Tile painter drawer when that is docked, else under the viewport.
+        const painter = this.api.getPanel(TILE_PAINTER_PANEL_ID);
         this.api.addPanel({
             id: BRUSH_PANEL_ID,
             component: "brushWorkspace",
             title: "Brush",
-            position: { referencePanel: SCENE_PANEL_ID, direction: "below" },
+            position: { referencePanel: painter?.api.location.type === "grid" ? TILE_PAINTER_PANEL_ID : SCENE_PANEL_ID, direction: "below" },
             initialHeight: BRUSH_BAR_HEIGHT,
             minimumHeight: BRUSH_BAR_HEIGHT,
             maximumHeight: BRUSH_BAR_HEIGHT,
@@ -213,6 +226,22 @@ export class Workbench {
     /** Selecting a tool brings its palette tabs forward. */
     activateTool(tool: Parameters<typeof activateEditorToolWorkspaces>[2]): void {
         activateEditorToolWorkspaces(this.api, this.host, tool);
+        this.orderPaletteTabs(tool);
+    }
+
+    /**
+     * Keeps the selected tool's palette tab on screen. With seven tabs in a 380px column the later ones fall into the
+     * overflow menu, so a tool whose tab is past the first few is moved to the front of its group.
+     */
+    private orderPaletteTabs(tool: Parameters<typeof activateEditorToolWorkspaces>[2]): void {
+        const activeId = EDITOR_TOOL_DOCK_PANEL[tool];
+        const active = activeId ? this.api.getPanel(activeId) : undefined;
+        if (!active || active.api.location.type !== "grid") return;
+        const group = active.group;
+        if (group.panels.indexOf(active) >= VISIBLE_PALETTE_TABS) {
+            active.api.moveTo({ group, index: 0 });
+            active.api.setActive();
+        }
     }
 
     // ── placement ────────────────────────────────────────────

@@ -40,6 +40,12 @@ export const HEIGHT_MODES: readonly {
         icon: "layers",
     },
     {
+        id: "set",
+        name: "Set height",
+        description: "Stamps an exact height onto every brushed tile (\"Send tile to tile brush\" fills it in).",
+        icon: "layers",
+    },
+    {
         id: "terrace",
         name: "Terrace",
         description: "Snaps terrain into stepped levels for layered landforms.",

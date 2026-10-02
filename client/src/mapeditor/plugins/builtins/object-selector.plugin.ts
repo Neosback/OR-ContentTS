@@ -4,8 +4,8 @@ import type { EditorToolPlugin } from "./builtin-plugin-types";
 
 export const objectSelectorEditorTool: EditorToolPlugin = {
     id: "object-selector",
-    name: "Object Selector",
-    description: "Hover and click world objects to inspect them with wireframe highlights.",
+    name: "Select",
+    description: "Pick tiles and objects: click an object to select it, click bare ground to select a tile. R rotates, C copies.",
     icon: "mouse-pointer-2",
     workspaces: [{ panelId: "editor-object-selector", activateTab: true }],
     actions: [{ kind: "select-tool", tool: "object-selector" }],

@@ -4,6 +4,8 @@ import { Transfer, type TransferDescriptor } from "threads/worker";
 
 import { AnimationFrames } from "../../../mapviewer/webgl/AnimationFrames";
 import { DrawRange, NULL_DRAW_RANGE, newDrawRange } from "../../../mapviewer/webgl/DrawRange";
+import type { Model } from "../../../rs/model/Model";
+import { buildSlotMesh } from "./object-slot-mesh";
 import { ModelHashBuffer, getModelHash } from "../../../mapviewer/webgl/buffer/ModelHashBuffer";
 import {
     DrawCommand,
@@ -34,10 +36,23 @@ import {
     EditorMapObjectChunkData,
     EditorMapObjectRebuildInput,
 } from "./EditorMapObjectChunkData";
+import { createMeshPacker } from "../../../wasm/openrune-core-loader";
 import { EditorMapTerrainData } from "./EditorMapTerrainData";
 import type { SceneLocData } from "../sceneLocData";
 
 const modelHashBuf = new ModelHashBuffer(5000);
+
+/** Models are immutable once built and shared between identical placements, so hash each object once. */
+const modelHashCache = new WeakMap<Model, number>();
+
+function getCachedModelHash(model: Model): number {
+    let hash = modelHashCache.get(model);
+    if (hash === undefined) {
+        hash = getModelHash(modelHashBuf, model);
+        modelHashCache.set(model, hash);
+    }
+    return hash;
+}
 
 export function loadEditorMapData(
     workerState: WorkerState,
@@ -53,6 +68,13 @@ export function loadEditorMapData(
     }
 
     const borderSize = 6;
+    const timings: Record<string, number> = {};
+    let mark = performance.now();
+    const lap = (name: string): void => {
+        const now = performance.now();
+        timings[name] = Math.round((now - mark) * 10) / 10;
+        mark = now;
+    };
 
     const baseX = mapX * Scene.MAP_SQUARE_SIZE - borderSize;
     const baseY = mapY * Scene.MAP_SQUARE_SIZE - borderSize;
@@ -67,6 +89,7 @@ export function loadEditorMapData(
         smoothUnderlays,
         LocLoadType.MODELS,
     );
+    lap("buildScene");
     const sceneLocDecodeStats = collectSceneLocDecodeStats(scene, borderSize);
 
     const terrainVertexBuffer = new TerrainVertexBuffer(scene.levels * LEVEL_TILE_VERTICES);
@@ -79,10 +102,13 @@ export function loadEditorMapData(
         3,
     );
 
+    lap("terrain");
     const sceneLocData = serializeSceneLocData(scene, borderSize);
-    const objectChunks = buildAllObjectChunks(workerState, textureIndexMap, scene, borderSize);
+    lap("serializeLocs");
+    const objectChunks = buildAllObjectChunks(workerState, textureIndexMap, scene, borderSize, lap, timings);
 
     const heightMapTextureData = loadHeightMapTextureData(scene);
+    lap("heightMap");
 
     const transferables: Transferable[] = [
         terrainVertexBuffer.bytes.buffer,
@@ -129,6 +155,7 @@ export function loadEditorMapData(
             objectChunks,
 
             heightMapTextureData,
+            timings,
         },
         transferables,
     );
@@ -192,20 +219,39 @@ function buildEditorSceneFromData(
     return scene;
 }
 
+/** Accumulated per-stage ms across all chunks of the load in progress (diagnostics, see `EditorMapData.timings`). */
+const chunkStageMs: Record<string, number> = {};
+
+function chunkStage(name: string, since: number): number {
+    const now = performance.now();
+    chunkStageMs[name] = (chunkStageMs[name] ?? 0) + (now - since);
+    return now;
+}
+
 function buildAllObjectChunks(
     workerState: WorkerState,
     textureIndexMap: Map<number, number>,
     scene: Scene,
     borderSize: number,
+    lap?: (name: string) => void,
+    timings?: Record<string, number>,
 ): EditorMapObjectChunkData[] {
     const chunks: EditorMapObjectChunkData[] = [];
+    for (const key of Object.keys(chunkStageMs)) delete chunkStageMs[key];
     bakeMergedSceneModels(
         scene,
         workerState.locModelLoader,
         workerState.sceneBuilder.centerLocHeightWithSize,
     );
+    lap?.("bakeMergedModels");
     for (let chunkId = 0; chunkId < OBJECT_CHUNK_COUNT; chunkId++) {
         chunks.push(buildObjectChunkMesh(workerState, textureIndexMap, scene, borderSize, chunkId));
+    }
+    lap?.("chunkMeshes");
+    if (timings) {
+        for (const [name, ms] of Object.entries(chunkStageMs)) {
+            timings[`chunk.${name}`] = Math.round(ms * 10) / 10;
+        }
     }
     return chunks;
 }
@@ -217,7 +263,12 @@ function buildObjectChunkMesh(
     borderSize: number,
     chunkId: number,
 ): EditorMapObjectChunkData {
-    const objectSceneBuf = new SceneBuffer(workerState.textureLoader, textureIndexMap, 100000);
+    // Starts small (the buffer grows on demand): 64 chunks x 100k vertices x 12 B was ~77 MB of mostly empty
+    // memory per region, and all of it was transferred to the main thread.
+    let t = performance.now();
+    const objectSceneBuf = new SceneBuffer(workerState.textureLoader, textureIndexMap, 2048);
+    const packer = createMeshPacker(textureIndexMap, (id) => workerState.textureLoader.isTransparent(id), 2048);
+    if (packer) objectSceneBuf.useMeshPacker(packer);
     const sceneLocs = getSceneLocsForChunk(
         workerState.locTypeLoader,
         scene,
@@ -226,6 +277,7 @@ function buildObjectChunkMesh(
         chunkId,
     );
     const sceneModels = sceneLocs.locs;
+    t = chunkStage("scanLocs", t);
     const locAnimatedGroups = addLocEntities(
         workerState,
         scene,
@@ -234,54 +286,26 @@ function buildObjectChunkMesh(
         objectSceneBuf,
         sceneLocs.locEntities,
     );
+    t = chunkStage("locEntities", t);
     addSceneModels(objectSceneBuf, sceneModels);
+    t = chunkStage("addSceneModels", t);
     const locsAnimated = objectSceneBuf.addLocAnimatedGroups(locAnimatedGroups);
+    t = chunkStage("animatedGroups", t);
 
-    const objectVertices = objectSceneBuf.vertexBuf.byteArray();
-    const objectIndices = new Int32Array(objectSceneBuf.indices);
-    // The "interact" lists split merged groups into one command per model with its real position,
-    // so plane visibility and GPU picking work per object instead of per merged group.
-    const objectModelTextureData = createModelInfoTextureData(objectSceneBuf.drawCommandsInteract);
-    const objectModelTextureDataAlpha = createModelInfoTextureData(objectSceneBuf.drawCommandsInteractAlpha);
-    const objectDrawRanges = objectSceneBuf.drawCommandsInteract.map((cmd) =>
-        newDrawRange(cmd.offset, cmd.elements, cmd.instances.length),
-    );
-    const objectDrawRangesAlpha = objectSceneBuf.drawCommandsInteractAlpha.map((cmd) =>
-        newDrawRange(cmd.offset, cmd.elements, cmd.instances.length),
-    );
-
-    return {
-        chunkId,
-        objectVertices,
-        objectIndices,
-        objectModelTextureData,
-        objectModelTextureDataAlpha,
-        objectDrawRanges,
-        objectDrawRangesAlpha,
-        roofRangeIndices: roofIndices(objectSceneBuf.drawCommandsInteract),
-        roofRangeIndicesAlpha: roofIndices(objectSceneBuf.drawCommandsInteractAlpha),
-        locsAnimated,
-    };
-}
-
-function roofIndices(drawCommands: readonly DrawCommand[]): number[] {
-    const indices: number[] = [];
-    drawCommands.forEach((cmd, index) => {
-        if (cmd.instances[0]?.roof) {
-            indices.push(index);
-        }
-    });
-    return indices;
+    const slotMesh = buildSlotMesh(objectSceneBuf, locsAnimated);
+    packer?.free(); // wasm memory is not garbage collected
+    t = chunkStage("pack", t);
+    return { chunkId, ...slotMesh };
 }
 
 function collectObjectChunkTransferables(chunks: EditorMapObjectChunkData[]): Transferable[] {
     const transferables: Transferable[] = [];
     for (const chunk of chunks) {
         transferables.push(
-            chunk.objectVertices.buffer,
-            chunk.objectIndices.buffer,
-            chunk.objectModelTextureData.buffer,
-            chunk.objectModelTextureDataAlpha.buffer,
+            chunk.vertices.buffer,
+            chunk.indices.buffer,
+            chunk.animIndices.buffer,
+            chunk.slotInfo.buffer,
         );
     }
     return transferables;
@@ -382,7 +406,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
     const groupedModels = new Map<number, SceneModel[]>();
     for (const sceneModel of sceneModels) {
         const model = sceneModel.model;
-        const hash = getModelHash(modelHashBuf, model);
+        const hash = getCachedModelHash(model);
         const list = groupedModels.get(hash);
         if (list) {
             list.push(sceneModel);
@@ -432,7 +456,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
             createModelGroups(modelGroupMap, instancedModels, false);
         } else if (opaqueFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModel(model, opaqueFaces);
+            sceneBuf.addModelPass(model, false, undefined, opaqueFaces);
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {
@@ -458,7 +482,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
             createModelGroups(modelGroupMap, instancedModels, true);
         } else if (transparentFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModel(model, transparentFaces);
+            sceneBuf.addModelPass(model, true, undefined, transparentFaces);
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {

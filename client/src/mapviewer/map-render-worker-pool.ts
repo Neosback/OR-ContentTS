@@ -1,3 +1,5 @@
+import { readWasmPreference } from "../wasm/openrune-core-loader";
+import { perf } from "../perf/perf-profile";
 import { isWallpaperEngine } from "../util/DeviceUtil";
 
 import { RenderDataWorkerPool } from "./worker/RenderDataWorkerPool";
@@ -9,9 +11,9 @@ const WORKER_COUNT_KEY = "openrune.renderWorkers";
 
 /**
  * Each render worker keeps its own decoded models, textures and scene scratch, so memory rather than
- * cores is the limit on typical 8 GB machines: two workers load a region nearly as fast as four while
- * using about half the memory. `navigator.deviceMemory` caps at 8 (and is Chromium-only), so larger
- * machines opt in to more workers with the override.
+ * cores is the limit on typical 8 GB machines. The worker count comes from the performance profile
+ * ("safe" = 1, "balanced" = 2, "high" = 4) and is fixed when the pool is created, so changing the profile
+ * takes effect after a reload. `localStorage["openrune.renderWorkers"]` overrides it.
  */
 function renderWorkerCount(): number {
     if (isWallpaperEngine) {
@@ -25,15 +27,17 @@ function renderWorkerCount(): number {
     } catch {
         // Storage unavailable (private window): use the default.
     }
+    // The performance profile decides; never more workers than half the cores (the main thread needs room).
     const cores = navigator.hardwareConcurrency || 4;
-    const memoryGb = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
-    return memoryGb <= 8 ? Math.min(2, cores) : Math.min(4, Math.max(1, cores >> 1));
+    return Math.max(1, Math.min(perf.profile.workers, Math.max(1, cores >> 1)));
 }
 
 /** Single pool for map viewer and map editor (only one route mounts at a time). */
 export function getMapRenderWorkerPool(): RenderDataWorkerPool {
     if (!pool) {
         pool = RenderDataWorkerPool.create(renderWorkerCount());
+        // `?wasm=off` (or localStorage "openrune.wasm" = "off") runs the TypeScript reference paths, for A/B timing.
+        void pool.setWasmEnabled(readWasmPreference());
     }
     return pool;
 }

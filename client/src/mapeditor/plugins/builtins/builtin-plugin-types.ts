@@ -42,6 +42,7 @@ export type MapEditorDockPanelId =
     | "editor-object-delete"
     | "editor-region-stamp"
     | "editor-tile-flags"
+    | "editor-tile-painter"
     | "editor-sandbox-terrain"
     | "editor-paint-tools"
     | "editor-brush-workspace"
@@ -114,7 +115,8 @@ export type EditorToolIconName =
     | "flag"
     | "mouse-pointer-2"
     | "trash-2"
-    | "copy";
+    | "copy"
+    | "paintbrush";
 
 export interface EditorToolPlugin {
     id: MapEditorTool;

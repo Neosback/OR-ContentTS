@@ -1,3 +1,4 @@
+import { readResponseToBuffer } from "./read-response";
 import { CacheType } from "./CacheType";
 import { SectorCluster } from "./store/SectorCluster";
 
@@ -307,6 +308,13 @@ async function fetchCachedFile(
     });
     if (resp.status !== 200 && resp.status !== 206) {
         throw new Error("Failed downloading " + path + ", " + resp.status);
+    }
+    // No Cache Storage and nothing to resume: stream straight into one buffer (halves peak memory vs. collecting chunks).
+    if (!cache && offset === 0) {
+        const direct = await readResponseToBuffer(resp, shared, progressListener);
+        if (direct) {
+            return { name, data: direct };
+        }
     }
     const cacheUpdates: Promise<void>[] = [];
     let partCache: Uint8Array[] = [];

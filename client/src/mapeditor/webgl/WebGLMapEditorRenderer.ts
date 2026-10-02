@@ -12,6 +12,12 @@ import PicoGL, {
 } from "picogl";
 
 import { newDrawRange } from "../../mapviewer/webgl/DrawRange";
+import { perfLog } from "../../perf/gl-memory";
+import type { TileFieldSnapshot } from "../map-editor-history";
+import type { SceneTileModel } from "../../rs/scene/SceneTileModel";
+import { readTileFieldSnapshot } from "../map-editor-history-snapshot";
+import { perf } from "../../perf/perf-profile";
+import { applyDrawMode } from "./draw-backend";
 import { createTextureArray } from "../../picogl/PicoTexture";
 import { getMapSquareId } from "../../rs/map/MapFileIndex";
 import { Scene, loadHeightMapTextureData } from "../../rs/scene/Scene";
@@ -96,6 +102,7 @@ import { Model } from "../../rs/model/Model";
 import { ModelData } from "../../rs/model/ModelData";
 import { applyHeightToolRuntime } from "../plugins/builtins/height-edit-runtime";
 import { applyTileRenderFlagsRuntime } from "../plugins/builtins/tile-flags-edit-runtime";
+import { getTileBrushFocus, getTileBrushModel } from "../plugins/builtins/tile-brush-model";
 import { getTileFlagsToolModel } from "../plugins/builtins/tile-flags-tool-model";
 import {
     formatTileRenderFlagsForView,
@@ -126,6 +133,7 @@ const MAX_SERVER_TICKS_PER_FRAME = 2;
 const MAX_CLIENT_TICKS_PER_FRAME = 5;
 
 type PendingMapBuild = { mapId: number; generation: number; builder: EditorMapSquareBuilder };
+
 
 export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     private readonly pendingMapBuilds: PendingMapBuild[] = [];
@@ -276,16 +284,10 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     async init(): Promise<void> {
         await super.init();
 
-        this.app = PicoGL.createApp(this.canvas);
+        this.app = PicoGL.createApp(this.canvas, { antialias: perf.profile.antialias });
         this.gl = this.app.gl as WebGL2RenderingContext;
 
-        // hack to get the right multi draw extension for picogl
-        const state: any = this.app.state;
-        const ext = this.gl.getExtension("WEBGL_multi_draw");
-        PicoGL.WEBGL_INFO.MULTI_DRAW_INSTANCED = ext;
-        state.extensions.multiDrawInstanced = ext;
-
-        this.hasMultiDraw = !!PicoGL.WEBGL_INFO.MULTI_DRAW_INSTANCED;
+        this.hasMultiDraw = applyDrawMode(this.app, this.gl);
 
         this.app.enable(PicoGL.CULL_FACE);
         this.app.enable(PicoGL.DEPTH_TEST);
@@ -462,19 +464,34 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             .colorTarget(0, this.pickColorTarget)
             .depthTarget(this.pickDepthTarget);
 
+        this.releaseObjectPickTargets();
+    }
+
+    private releaseObjectPickTargets(): void {
         this.objectPickFramebuffer?.delete();
         this.objectPickColorTarget?.delete();
         this.objectPickIdTarget?.delete();
         this.objectPickDepthTarget?.delete();
-        const { width, height } = this.app;
-        this.objectPickColorTarget = this.app.createRenderbuffer(width, height, PicoGL.RGBA8, 0);
-        this.objectPickIdTarget = this.app.createRenderbuffer(width, height, PicoGL.RGBA32F, 0);
-        this.objectPickDepthTarget = this.app.createRenderbuffer(width, height, PicoGL.DEPTH_COMPONENT24, 0);
-        this.objectPickFramebuffer = this.app
-            .createFramebuffer()
-            .colorTarget(0, this.objectPickColorTarget)
-            .colorTarget(1, this.objectPickIdTarget)
-            .depthTarget(this.objectPickDepthTarget);
+        this.objectPickFramebuffer = undefined;
+        this.objectPickColorTarget = undefined;
+        this.objectPickIdTarget = undefined;
+        this.objectPickDepthTarget = undefined;
+    }
+
+    /** Created on first use: 24 bytes per canvas pixel (incl. an RGBA32F id target) that only object tools need. */
+    private ensureObjectPickFramebuffer(): Framebuffer {
+        if (!this.objectPickFramebuffer) {
+            const { width, height } = this.app;
+            this.objectPickColorTarget = this.app.createRenderbuffer(width, height, PicoGL.RGBA8, 0);
+            this.objectPickIdTarget = this.app.createRenderbuffer(width, height, PicoGL.RGBA32F, 0);
+            this.objectPickDepthTarget = this.app.createRenderbuffer(width, height, PicoGL.DEPTH_COMPONENT24, 0);
+            this.objectPickFramebuffer = this.app
+                .createFramebuffer()
+                .colorTarget(0, this.objectPickColorTarget)
+                .colorTarget(1, this.objectPickIdTarget)
+                .depthTarget(this.objectPickDepthTarget);
+        }
+        return this.objectPickFramebuffer;
     }
 
     initTextures(): void {
@@ -581,12 +598,18 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         });
     }
 
+    /** Regions still loading or waiting to be built: render at full rate until they are in. */
+    protected override hasPendingWork(): boolean {
+        return this.mapManager.loadingMapIds.size > 0 || this.pendingMapBuilds.length > 0;
+    }
+
     override async queueLoadMap(mapX: number, mapY: number): Promise<void> {
         const generation = this.mapManager.generation;
         const mapId = (mapX << 8) + mapY;
         try {
             // GPU map builders need the renderer resources created by init().
             await this.initialized;
+            perfLog(`phase: request map ${mapX},${mapY}`);
             if (
                 generation !== this.mapManager.generation ||
                 !this.mapManager.loadingMapIds.has(mapId)
@@ -599,6 +622,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 mapY,
                 this.host.terrainSmoothingEnabled,
             );
+            perfLog(`phase: map data back ${mapX},${mapY}`);
             // Maps were cleared (region change, smoothing toggle) while the worker ran.
             if (
                 generation !== this.mapManager.generation ||
@@ -651,6 +675,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
      * Advances queued map-square builds within a per-frame time budget, nearest
      * to the camera first, so streaming new squares no longer stalls a frame.
      */
+
     private processPendingMapBuilds(): void {
         const pending = this.pendingMapBuilds;
         if (pending.length === 0) return;
@@ -716,19 +741,6 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         );
 
         const heightMapTextureData = loadHeightMapTextureData(scene);
-        const emptyChunks: EditorMapObjectChunkData[] = [];
-        for (let chunkId = 0; chunkId < OBJECT_CHUNK_COUNT; chunkId++) {
-            emptyChunks.push({
-                chunkId,
-                objectVertices: new Uint8Array(0),
-                objectIndices: new Int32Array(0),
-                objectModelTextureData: new Uint16Array(16 * 4),
-                objectModelTextureDataAlpha: new Uint16Array(16 * 4),
-                objectDrawRanges: [],
-                objectDrawRangesAlpha: [],
-                locsAnimated: [],
-            });
-        }
         return {
             mapX,
             mapY,
@@ -750,7 +762,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             terrainVertices: terrainVertexBuffer.bytes,
             terrainDrawRanges,
             sceneLocData: { tiles: [] },
-            objectChunks: emptyChunks,
+            objectChunks: [],
             heightMapTextureData,
         };
     }
@@ -774,19 +786,8 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         if (!chunkDataList?.length || !this.objectProgram || !this.objectProgramAlpha) {
             return;
         }
-        const cycle = Math.floor(performance.now() * 0.001 / CLIENT_TICK_SEC);
         for (const chunkData of chunkDataList) {
-            map.updateObjectChunk(
-                this.app,
-                chunkData,
-                this.sceneUniformBuffer,
-                this.textureArray,
-                this.textureMaterials,
-                this.objectProgram,
-                this.objectProgramAlpha,
-                this.host.seqTypeLoader,
-                cycle,
-            );
+            map.updateObjectChunk(chunkData);
         }
     }
 
@@ -847,19 +848,31 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.objectPickFramebuffer?.resize(width, height);
     }
 
-    draw(drawCall: DrawCall, drawRanges: number[][], hiddenIndices?: readonly number[]) {
+    draw(drawCall: DrawCall, drawRanges: number[][]) {
         if (this.hasMultiDraw) {
             drawCall.draw();
         } else {
             for (let i = 0; i < drawRanges.length; i++) {
-                if (hiddenIndices?.includes(i)) {
-                    continue;
-                }
                 drawCall.uniform("u_drawId", i);
                 drawCall.drawRanges(drawRanges[i]);
                 drawCall.draw();
             }
         }
+    }
+
+    private setObjectUniforms(
+        drawCall: DrawCall,
+        viewPlaneMax: number,
+        hideBelowViewPlane: number,
+        showRoofs: number,
+        bridgeLinkBelow: number,
+    ): void {
+        drawCall
+            .uniform("u_viewPlaneMax", viewPlaneMax)
+            .uniform("u_hideBelowViewPlane", hideBelowViewPlane)
+            .uniform("u_showRoofs", showRoofs)
+            .uniform("u_bridgeLinkBelow", bridgeLinkBelow)
+            .uniform("u_planeClipEnabled", 1);
     }
 
     private tickAnimatedLocs(clientTick: number, serverTicksElapsed: number): void {
@@ -870,13 +883,10 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         }
         const hideRoofs = !this.host.showRoofs;
         for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
-            const map = this.mapManager.visibleMaps[i];
-            for (const chunk of map.objectChunks) {
-                chunk.setRoofsHidden(hideRoofs);
-                for (const loc of chunk.locsAnimated) {
-                    loc.update(this.host.seqFrameLoader, clientTick);
-                }
-            }
+            const mesh = this.mapManager.visibleMaps[i].objectMesh;
+            mesh.rebuildIfDirty();
+            mesh.setRoofsHidden(hideRoofs);
+            mesh.updateAnimation(this.host.seqFrameLoader, clientTick);
         }
     }
 
@@ -1019,7 +1029,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     }
 
     private isTileFlagsToolActive(): boolean {
-        return this.host.editorTool === "tile-flags" && this.host.isEditorToolPluginEnabled("tile-flags");
+        return getTileBrushFocus(this.host) === "flags" && this.host.isEditorToolPluginEnabled("tile-brush");
     }
 
     private isTileFlagsPainting(inputManager = this.host.inputManager): boolean {
@@ -1265,70 +1275,24 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             }
         }
 
-        for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
-            const map = this.mapManager.visibleMaps[i];
-            for (const chunk of map.objectChunks) {
-                for (const loc of chunk.locsAnimated) {
-                    const frameId = loc.frame;
-                    const frame = loc.anim.frames[frameId | 0];
-                    const index = loc.getDrawRangeIndex(false, true, false);
-                    if (index !== -1 && !chunk.isRoofRange(index, false)) {
-                        chunk.drawCall.offsets[index] = frame[0];
-                        (chunk.drawCall as any).numElements[index] = frame[1];
-                        chunk.objectDrawRanges[index] = frame;
-                    }
-                    if (loc.anim.framesAlpha) {
-                        const alphaFrame = loc.anim.framesAlpha[frameId | 0];
-                        const alphaIndex = loc.getDrawRangeIndex(true, true, false);
-                        if (alphaIndex !== -1 && !chunk.isRoofRange(alphaIndex, true)) {
-                            chunk.drawCallAlpha.offsets[alphaIndex] = alphaFrame[0];
-                            (chunk.drawCallAlpha as any).numElements[alphaIndex] = alphaFrame[1];
-                            chunk.objectDrawRangesAlpha[alphaIndex] = alphaFrame;
-                        }
-                    }
-                }
-            }
-        }
-
         if (this.host.objectsVisible) {
             for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
-                const map = this.mapManager.visibleMaps[i];
-                for (const chunk of map.objectChunks) {
-                    if (!this.isObjectChunkVisible(map, chunk.chunkId)) {
-                        continue;
-                    }
-                    chunk.drawCall
-                        .uniform("u_viewPlaneMax", viewPlaneMax)
-                        .uniform("u_hideBelowViewPlane", hideBelowViewPlane)
-                        .uniform("u_showRoofs", showRoofs)
-                        .uniform("u_bridgeLinkBelow", bridgeLinkBelow)
-                        .uniform("u_planeClipEnabled", 1);
-                    if (chunk.objectDrawRanges.length > 0) {
-                        this.draw(chunk.drawCall, chunk.objectDrawRanges, chunk.roofsHidden ? chunk.roofRangeIndices : undefined);
-                    }
-                }
+                const mesh = this.mapManager.visibleMaps[i].objectMesh;
+                if (!mesh.drawCall || mesh.rangesOpaque.length === 0) continue;
+                this.setObjectUniforms(mesh.drawCall, viewPlaneMax, hideBelowViewPlane, showRoofs, bridgeLinkBelow);
+                this.draw(mesh.drawCall, mesh.rangesOpaque);
             }
             for (let i = this.mapManager.visibleMapCount - 1; i >= 0; i--) {
-                const map = this.mapManager.visibleMaps[i];
-                for (const chunk of map.objectChunks) {
-                    if (!this.isObjectChunkVisible(map, chunk.chunkId)) {
-                        continue;
-                    }
-                    chunk.drawCallAlpha
-                        .uniform("u_viewPlaneMax", viewPlaneMax)
-                        .uniform("u_hideBelowViewPlane", hideBelowViewPlane)
-                        .uniform("u_showRoofs", showRoofs)
-                        .uniform("u_bridgeLinkBelow", bridgeLinkBelow)
-                        .uniform("u_planeClipEnabled", 1);
-                    if (chunk.objectDrawRangesAlpha.length > 0) {
-                        this.draw(chunk.drawCallAlpha, chunk.objectDrawRangesAlpha, chunk.roofsHidden ? chunk.roofRangeIndicesAlpha : undefined);
-                    }
-                }
+                const mesh = this.mapManager.visibleMaps[i].objectMesh;
+                if (!mesh.drawCallAlpha || mesh.rangesAlpha.length === 0) continue;
+                this.setObjectUniforms(mesh.drawCallAlpha, viewPlaneMax, hideBelowViewPlane, showRoofs, bridgeLinkBelow);
+                this.draw(mesh.drawCallAlpha, mesh.rangesAlpha);
             }
         }
 
         this.renderObjectPicking();
         this.renderObjectSelectorWireframes();
+        this.renderSelectToolTileHighlights();
         this.renderContextMenuObjectWireframe();
         this.renderObjectDeleteWireframes();
         this.renderCopyPlacementFootprintHighlight();
@@ -1892,8 +1856,16 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 }
             } else if (this.host.hoveredObject) {
                 this.host.setSelectedObject({ ...this.host.hoveredObject });
+            } else if (this.hoverWorldX !== -1 && this.hoverWorldY !== -1) {
+                // The Select tool picks tiles as well as objects: clicking bare ground selects that tile.
+                this.host.setSelectedTile({
+                    worldX: this.hoverWorldX,
+                    worldY: this.hoverWorldY,
+                    level: this.host.selectedLevel,
+                });
             } else {
                 this.host.clearSelectedObject();
+                this.host.setSelectedTile(undefined);
             }
         }
         this.lastMouseLeftDown = leftDown;
@@ -1926,6 +1898,48 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         } else {
             this.lastDeleteHoverKey = undefined;
         }
+    }
+
+    /** Select tool: outlines the picked tile and, while no object is hovered, the tile under the cursor. */
+    private renderSelectToolTileHighlights(): void {
+        if (!this.host.isObjectSelectorToolActive() || !this.highlightTileDrawCall) {
+            return;
+        }
+        const level = this.host.selectedLevel;
+        const targets: { worldX: number; worldY: number }[] = [];
+        const selected = this.host.selectedTile;
+        if (selected) {
+            targets.push(selected);
+        }
+        // The hovered tile keeps following the cursor whatever is selected (an object, a tile, or nothing).
+        if (
+            this.hoverWorldX !== -1 &&
+            this.hoverWorldY !== -1 &&
+            !(selected && selected.worldX === this.hoverWorldX && selected.worldY === this.hoverWorldY)
+        ) {
+            targets.push({ worldX: this.hoverWorldX, worldY: this.hoverWorldY });
+        }
+        if (targets.length === 0) {
+            return;
+        }
+        this.app.disable(PicoGL.DEPTH_TEST);
+        this.app.disable(PicoGL.CULL_FACE);
+        this.app.enable(PicoGL.BLEND);
+        this.highlightTileDrawCall.uniform("u_level", selected?.level ?? level);
+        for (const { worldX, worldY } of targets) {
+            const mapX = Math.floor(worldX / 64);
+            const mapY = Math.floor(worldY / 64);
+            const map = this.mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
+            if (!map) {
+                continue;
+            }
+            this.highlightTileDrawCall.uniform("u_mapX", map.mapX);
+            this.highlightTileDrawCall.uniform("u_mapY", map.mapY);
+            this.highlightTileDrawCall.texture("u_heightMap", map.heightMapTexture);
+            this.drawSingleTileHighlight(map, level, ((worldX % 64) + 64) % 64, ((worldY % 64) + 64) % 64, new Set());
+        }
+        this.app.enable(PicoGL.CULL_FACE);
+        this.app.enable(PicoGL.DEPTH_TEST);
     }
 
     private renderObjectSelectorWireframes(): void {
@@ -2689,7 +2703,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         }
 
         const inputManager = this.host.inputManager;
-        if (!this.objectPickActive() || !this.objectPickFramebuffer) {
+        if (!this.objectPickActive()) {
             this.objectPickHit = undefined;
             this.lastObjectPickKey = "";
             return;
@@ -2727,8 +2741,9 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         }
         this.lastObjectPickKey = pickKey;
 
-        this.app.drawFramebuffer(this.objectPickFramebuffer);
-        this.app.readFramebuffer(this.objectPickFramebuffer);
+        const objectPickFramebuffer = this.ensureObjectPickFramebuffer();
+        this.app.drawFramebuffer(objectPickFramebuffer);
+        this.app.readFramebuffer(objectPickFramebuffer);
         gl.enable(gl.SCISSOR_TEST);
         gl.scissor(pixelX, pixelY, 1, 1);
         this.app.enable(PicoGL.DEPTH_TEST);
@@ -2738,17 +2753,12 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.app.clear();
 
         for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
-            const map = this.mapManager.visibleMaps[i];
-            for (const chunk of map.objectChunks) {
-                if (!this.isObjectChunkVisible(map, chunk.chunkId)) {
-                    continue;
-                }
-                if (chunk.objectDrawRanges.length > 0) {
-                    this.draw(chunk.drawCall, chunk.objectDrawRanges, chunk.roofsHidden ? chunk.roofRangeIndices : undefined);
-                }
-                if (chunk.objectDrawRangesAlpha.length > 0) {
-                    this.draw(chunk.drawCallAlpha, chunk.objectDrawRangesAlpha, chunk.roofsHidden ? chunk.roofRangeIndicesAlpha : undefined);
-                }
+            const mesh = this.mapManager.visibleMaps[i].objectMesh;
+            if (mesh.drawCall && mesh.rangesOpaque.length > 0) {
+                this.draw(mesh.drawCall, mesh.rangesOpaque);
+            }
+            if (mesh.drawCallAlpha && mesh.rangesAlpha.length > 0) {
+                this.draw(mesh.drawCallAlpha, mesh.rangesAlpha);
             }
         }
 
@@ -2886,6 +2896,41 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         );
     }
 
+    /** World tile under the cursor, or undefined when the cursor is off the map. */
+    getHoveredTile(): { worldX: number; worldY: number } | undefined {
+        return this.hoverWorldX === -1 || this.hoverWorldY === -1 ? undefined : { worldX: this.hoverWorldX, worldY: this.hoverWorldY };
+    }
+
+    /** The tile's mesh (blended colours, overlay shape) and its scene coordinates, for the Inspector's tile preview. */
+    getTileModel(level: number, worldX: number, worldY: number): { model: SceneTileModel; sceneX: number; sceneY: number } | undefined {
+        const mapX = Math.floor(worldX / 64);
+        const mapY = Math.floor(worldY / 64);
+        const map = this.mapManager.getMapById(getMapSquareId(mapX, mapY)) as EditorMapSquare | undefined;
+        if (!map) {
+            return undefined;
+        }
+        const sceneX = (((worldX % 64) + 64) % 64) + map.borderSize;
+        const sceneY = (((worldY % 64) + 64) % 64) + map.borderSize;
+        const model = map.scene.tiles[level]?.[sceneX]?.[sceneY]?.tileModel;
+        return model ? { model, sceneX, sceneY } : undefined;
+    }
+
+    /** Stored tile fields for a world tile (the Select tool's inspector), if its map square is loaded. */
+    getTileInfo(level: number, worldX: number, worldY: number): TileFieldSnapshot | undefined {
+        const mapX = Math.floor(worldX / 64);
+        const mapY = Math.floor(worldY / 64);
+        const map = this.mapManager.getMapById(getMapSquareId(mapX, mapY)) as EditorMapSquare | undefined;
+        if (!map) {
+            return undefined;
+        }
+        const sx = (((worldX % 64) + 64) % 64) + map.borderSize;
+        const sy = (((worldY % 64) + 64) % 64) + map.borderSize;
+        if (sx < 0 || sx >= map.scene.sizeX || sy < 0 || sy >= map.scene.sizeY) {
+            return undefined;
+        }
+        return readTileFieldSnapshot(map.scene, level, sx, sy);
+    }
+
     private getStoredOverlayAtWorld(level: number, worldX: number, worldY: number): number | undefined {
         const mapX = Math.floor(worldX / 64);
         const mapY = Math.floor(worldY / 64);
@@ -2925,8 +2970,8 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         localTileY: number,
         overlayFloodSet: Set<string> | null,
     ): boolean {
-        const tool = this.host.editorTool;
-        if (tool !== "overlay") {
+        // Overlay-only previews (footprint/flood) apply while the Tile painter's overlay part is switched on.
+        if (this.host.editorTool !== "tile-brush" || !getTileBrushModel(this.host).isEnabled("overlay")) {
             return true;
         }
         if (overlayFloodSet) {
@@ -2971,7 +3016,10 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         const inputManager = this.host.inputManager;
         this.syncTileFlagsPaintStroke();
 
-        const isPainting = this.isTileFlagsToolActive()
+        const brush = getTileBrushModel(this.host);
+        // Painting flags alone is a plain click-drag (it never orbits the camera); mixed strokes hold like the floor tools.
+        const flagsOnly = brush.isEnabled("flags") && !brush.isEnabled("underlay") && !brush.isEnabled("overlay") && !brush.isEnabled("height");
+        const isPainting = this.isTileFlagsToolActive() && flagsOnly
             ? inputManager.isKeyDown("MouseLeft")
             : // Alt+right-click opens the viewport context menu instead of painting.
               inputManager.isHolding() && !inputManager.isAltDown();
@@ -3071,25 +3119,19 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             }
         });
 
-        switch (this.host.editorTool) {
-            case "underlay":
-                this.applyUnderlayChange(hoveredTilesMap);
-                break;
-            case "overlay":
-                this.applyOverlayChange(hoveredTilesMap);
-                break;
-            case "height":
-            case "smooth":
-                applyHeightToolRuntime(this, hoveredTilesMap);
-                break;
-            case "tile-flags":
-                applyTileRenderFlagsRuntime(
-                    this,
-                    hoveredTilesMap,
-                    this.tileFlagsPaintedKeys,
-                    inputManager.isControlDown(),
-                );
-                break;
+        // The Tile painter applies every part that is switched on, floors first and height last so the floor
+        // edits see the tiles as they were when the stroke began.
+        if (brush.isEnabled("underlay")) {
+            this.applyUnderlayChange(hoveredTilesMap);
+        }
+        if (brush.isEnabled("overlay")) {
+            this.applyOverlayChange(hoveredTilesMap);
+        }
+        if (brush.isEnabled("flags")) {
+            applyTileRenderFlagsRuntime(this, hoveredTilesMap, this.tileFlagsPaintedKeys, inputManager.isControlDown());
+        }
+        if (brush.isEnabled("height")) {
+            applyHeightToolRuntime(this, hoveredTilesMap);
         }
 
         this.updateAffectedTiles();

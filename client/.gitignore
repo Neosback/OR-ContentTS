@@ -38,3 +38,4 @@ yarn-error.log*
 /dist
 /.idea
 /src-tauri/target
+native/target

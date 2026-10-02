@@ -338,6 +338,37 @@ export function applyHeightFlattenRuntime(
     }
 }
 
+/** Sets every brushed tile to an exact stored height (clamped to what the level above/below allows). */
+export function applyHeightSetRuntime(
+    renderer: WebGLMapEditorRenderer,
+    hoveredTilesMap: Map<number, Set<number>>,
+    targetHeight: number,
+): void {
+    const level = renderer.host.selectedLevel;
+    for (const [mapId, tileIds] of hoveredTilesMap) {
+        const map = renderer.mapManager.getMapById(mapId);
+        if (!map) {
+            continue;
+        }
+        const scene = map.scene;
+        for (const tileId of tileIds) {
+            const sceneX = tileId >> 8;
+            const sceneY = tileId & 0xff;
+            const worldX = map.mapX * 64 + (sceneX - map.borderSize);
+            const worldY = map.mapY * 64 + (sceneY - map.borderSize);
+            const currentHeight = scene.tileHeights[level][sceneX][sceneY];
+            const minHeight = scene.getMinHeight(level, sceneX, sceneY);
+            const maxHeight = minHeight - 0xff * 8;
+            const nextHeight = clamp(targetHeight, maxHeight, minHeight);
+            if (nextHeight === currentHeight) {
+                continue;
+            }
+            applyHeightChange(renderer, map as EditorMapSquare, level, sceneX, sceneY, worldX, worldY, nextHeight);
+        }
+        map.heightUpdated = true;
+    }
+}
+
 export function applyHeightTerraceRuntime(
     renderer: WebGLMapEditorRenderer,
     hoveredTilesMap: Map<number, Set<number>>,
@@ -392,6 +423,9 @@ export function applyHeightToolRuntime(
             break;
         case "terrace":
             applyHeightTerraceRuntime(renderer, hoveredTilesMap, model.terraceStep);
+            break;
+        case "set":
+            applyHeightSetRuntime(renderer, hoveredTilesMap, model.setHeight);
             break;
         case "raise-lower":
         default:

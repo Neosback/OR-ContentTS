@@ -10,6 +10,8 @@ import { InteractType } from "../InteractType";
 import { LocAnimatedData } from "../loc/LocAnimatedData";
 import { LocAnimatedGroup } from "../loc/LocAnimatedGroup";
 import { SceneLocEntity } from "../loc/SceneLocEntity";
+import type { MeshPacker } from "../../../wasm/openrune-core/openrune_core";
+import { packModel, runSlotJobs, type SlotJobOutput } from "../../../wasm/mesh-packer";
 import { VertexBuffer } from "./VertexBuffer";
 
 export enum ContourGroundType {
@@ -75,6 +77,13 @@ export class SceneBuffer {
 
     usedTextureIds = new Set<number>();
 
+    /**
+     * When set, model faces are packed by the WebAssembly kernel instead of `addModel`. Only for buffers that hold
+     * nothing but models (never terrain tiles): the packer owns the vertices and indices, so `vertexBuf`/`indices`
+     * stay empty and consumers read `packedGeometry()` instead.
+     */
+    private packer?: MeshPacker;
+
     constructor(
         readonly textureLoader: TextureLoader,
         readonly textureIdIndexMap: Map<number, number>,
@@ -83,12 +92,57 @@ export class SceneBuffer {
         this.vertexBuf = new VertexBuffer(initVertexCount);
     }
 
+    /** Routes model packing through the wasm kernel; must be called before anything is added. */
+    useMeshPacker(packer: MeshPacker): void {
+        if (this.vertexBuf.offset !== 0 || this.indices.length !== 0) {
+            throw new Error("useMeshPacker must be called on an empty SceneBuffer");
+        }
+        this.packer = packer;
+    }
+
     vertexCount(): number {
-        return this.vertexBuf.offset;
+        return this.packer ? this.packer.vertex_count() : this.vertexBuf.offset;
     }
 
     indexByteOffset(): number {
-        return this.indices.length * 4;
+        return (this.packer ? this.packer.index_count() : this.indices.length) * 4;
+    }
+
+    /** The packed vertices (12 bytes each, little endian) and the index list, whichever packer built them. */
+    packedGeometry(): { view: DataView; vertexCount: number; indices: ArrayLike<number> } {
+        const packer = this.packer;
+        if (!packer) {
+            return { view: this.vertexBuf.view, vertexCount: this.vertexBuf.offset, indices: this.indices };
+        }
+        for (const id of packer.used_texture_ids()) this.usedTextureIds.add(id);
+        const words = packer.vertices();
+        return { view: new DataView(words.buffer, words.byteOffset, words.byteLength), vertexCount: packer.vertex_count(), indices: packer.indices() };
+    }
+
+
+    /**
+     * Runs slot-mesh emit jobs in the wasm kernel against the packed geometry, without copying it out first.
+     * Undefined when no packer is set: the caller then runs the TypeScript version over `packedGeometry()`.
+     */
+    emitSlotJobs(jobs: Uint32Array): SlotJobOutput | undefined {
+        return this.packer ? runSlotJobs(this.packer, jobs) : undefined;
+    }
+
+    /**
+     * Adds the faces of `model` for one pass (opaque or translucent), through the wasm kernel when one is set.
+     * `faces` is the caller's already-partitioned face list for this pass, used by the TypeScript path to skip
+     * recomputing it; the wasm kernel does its own filtering.
+     */
+    addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): void {
+        if (this.packer) {
+            packModel(this.packer, model, transparent, offset);
+            return;
+        }
+        this.addModel(
+            model,
+            faces ?? getModelFaces(model).filter((face) => isModelFaceTransparent(this.textureLoader, face) === transparent),
+            offset,
+        );
     }
 
     addTerrainTile(tile: SceneTile, offsetX: number, offsetY: number): void {
@@ -173,12 +227,8 @@ export class SceneBuffer {
     }
 
     addModelAnimFrame(model: Model, transparent: boolean): DrawRange {
-        const faces = getModelFaces(model).filter(
-            (face) => isModelFaceTransparent(this.textureLoader, face) === transparent,
-        );
-
         const offset = this.indexByteOffset();
-        this.addModel(model, faces);
+        this.addModelPass(model, transparent);
         const elements = (this.indexByteOffset() - offset) / 4;
 
         return newDrawRange(offset, elements, 1);
@@ -294,10 +344,6 @@ export class SceneBuffer {
         for (const sceneModel of group.models) {
             const model = sceneModel.model;
 
-            const faces = getModelFaces(model).filter(
-                (face) => isModelFaceTransparent(this.textureLoader, face) === group.transparent,
-            );
-
             const vertexOffset: vec3 = [
                 sceneModel.sceneX,
                 sceneModel.sceneHeight,
@@ -307,7 +353,7 @@ export class SceneBuffer {
                 vertexOffset[1] = -sceneModel.heightOffset;
             }
             const offset = this.indexByteOffset();
-            this.addModel(model, faces, vertexOffset);
+            this.addModelPass(model, group.transparent, vertexOffset);
             const elements = (this.indexByteOffset() - offset) / 4;
 
             const drawCommand: DrawCommand = {
@@ -375,6 +421,10 @@ export class SceneBuffer {
     }
 
     addModel(model: Model, faces: ModelFace[], offset?: vec3, reuseVertices: boolean = true): void {
+        if (this.packer) {
+            // The packer owns the vertices; writing to the TS buffers would silently drop this model.
+            throw new Error("SceneBuffer.addModel is TypeScript-only: use addModelPass when a mesh packer is set");
+        }
         if (faces.length === 0) {
             return;
         }

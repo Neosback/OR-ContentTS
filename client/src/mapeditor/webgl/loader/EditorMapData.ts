@@ -39,4 +39,7 @@ export interface EditorMapData {
     objectChunks: EditorMapObjectChunkData[];
 
     heightMapTextureData: Float32Array;
+
+    /** Worker-side stage durations in ms (diagnostics: where a region load spends its time). */
+    timings?: Record<string, number>;
 }

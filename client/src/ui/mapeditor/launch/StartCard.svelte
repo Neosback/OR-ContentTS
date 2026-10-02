@@ -3,6 +3,8 @@
     import Layers3 from "@lucide/svelte/icons/layers-3";
     import MapPinned from "@lucide/svelte/icons/map-pinned";
 
+    import { perf } from "../../../perf/perf-profile";
+    import { perfState } from "../../lib/perf.svelte";
     import { cn } from "../../lib/utils";
     import type { LaunchController, LaunchMode } from "../launch.svelte";
 
@@ -17,10 +19,11 @@
     const preview = $derived(mode === "sandbox" ? launch.sandboxPreview : launch.regionPreview);
     const tileSize = $derived(mode === "sandbox" ? launch.sandboxTileSize : launch.regionPreview.tileSize);
     const entering = $derived(launch.isEnteringEditor && launch.launchMode === mode);
+    const maxRadius = $derived(perfState.current.level && perf.profile.maxRegionRadius);
     const field = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm";
 
     function setRadius(value: string): void {
-        const next = Math.min(3, Math.max(0, Number(value) || 0));
+        const next = Math.min(maxRadius, Math.max(0, Number(value) || 0));
         if (mode === "sandbox") launch.sandboxRegionRadius = next;
         else launch.regionRadius = next;
     }
@@ -63,12 +66,15 @@
             id="launch-radius-{mode}"
             type="number"
             min="0"
-            max="3"
+            max={maxRadius}
             value={mode === "sandbox" ? launch.sandboxRegionRadius : launch.regionRadius}
             oninput={(event) => setRadius(event.currentTarget.value)}
             disabled={!active}
-            class={cn("mb-3", field)}
+            class={cn("mb-1", field)}
         />
+        <p class="mb-3 text-[11px] text-muted-foreground">
+            Max {maxRadius} on the {perf.profile.label} performance profile (Settings → Graphics).
+        </p>
 
         {#if mode === "sandbox"}
             <div class="mb-3 rounded-md border border-border/70 bg-background/60 p-3">

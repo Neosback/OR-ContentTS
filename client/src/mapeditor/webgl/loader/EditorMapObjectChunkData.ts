@@ -1,20 +1,10 @@
-import { DrawRange } from "../../../mapviewer/webgl/DrawRange";
-import { LocAnimatedData } from "../../../mapviewer/webgl/loc/LocAnimatedData";
+import type { SlotMesh } from "./object-slot-mesh";
 import type { SceneData } from "./EditorMapData";
 import type { SceneLocData } from "../sceneLocData";
 
-export interface EditorMapObjectChunkData {
+/** One chunk's object geometry in slot form (see `object-slot-mesh.ts`). */
+export interface EditorMapObjectChunkData extends SlotMesh {
     chunkId: number;
-    objectVertices: Uint8Array;
-    objectIndices: Int32Array;
-    objectModelTextureData: Uint16Array;
-    objectModelTextureDataAlpha: Uint16Array;
-    objectDrawRanges: DrawRange[];
-    objectDrawRangesAlpha: DrawRange[];
-    /** Indices of draw ranges that draw roof-shaped locs (hidden when roofs are off). */
-    roofRangeIndices?: number[];
-    roofRangeIndicesAlpha?: number[];
-    locsAnimated: LocAnimatedData[];
 }
 
 export interface EditorMapObjectRebuildInput {

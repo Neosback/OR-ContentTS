@@ -23,9 +23,12 @@ export class Hud {
     brushType = $state<MapEditorBrushType>("square");
     /** Like `brushType`, but reads as the flood marker while flood-fill modifiers are held. */
     brushTypeActive = $state<MapEditorBrushType | typeof OVERLAY_SAME_ID_FLOOD_BRUSH_HUD>("square");
+    /** World tile under the cursor (undefined off the map); only reassigned when it changes. */
+    hoverTile = $state.raw<{ worldX: number; worldY: number } | undefined>();
 
     private frame = 0;
     private lastFpsAt = 0;
+    private lastSampleAt = 0;
 
     constructor(private readonly host: IEditorPluginHost) {
         this.cameraYaw = host.camera.getYaw();
@@ -49,12 +52,19 @@ export class Hud {
     }
 
     private sample(time: DOMHighResTimeStamp): void {
+        // 25 Hz is plenty for text readouts and keeps Svelte from updating 60 times a second.
+        if (time - this.lastSampleAt < 40) return;
+        this.lastSampleAt = time;
         const host = this.host;
         const floodHeld = getActivePaintModifiers(host).overlaySameIdFloodWithControlAlt;
 
         if (time - this.lastFpsAt >= FPS_INTERVAL_MS) {
             this.lastFpsAt = time;
             this.fps = Math.round(host.renderer.stats.frameTimeFps).toString();
+        }
+        const hover = host.getHoveredTile();
+        if (hover?.worldX !== this.hoverTile?.worldX || hover?.worldY !== this.hoverTile?.worldY) {
+            this.hoverTile = hover;
         }
         this.debugText = host.debugText ?? "";
         this.cameraYaw = host.camera.getYaw();

@@ -76,7 +76,14 @@
         }
 
         let raf = 0;
-        const animate = (): void => {
+        let lastRun = 0;
+        // Tile assembly is cheap but not free, and docked panels stay mounted while hidden: run it at ~12 Hz.
+        const animate = (time: number): void => {
+            if (time - lastRun < 80) {
+                raf = requestAnimationFrame(animate);
+                return;
+            }
+            lastRun = time;
             const cameraX = host.camera.getPosX();
             const cameraY = host.camera.getPosZ();
             const cameraMapX = cameraX >> 6;

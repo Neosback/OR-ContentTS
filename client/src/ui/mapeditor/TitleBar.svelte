@@ -158,7 +158,7 @@
 {/snippet}
 
 <TooltipProvider delayDuration={300}>
-    <header data-map-editor-title-bar class="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-card/80 px-3 backdrop-blur-sm">
+    <header data-map-editor-title-bar class="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
         <div class="flex min-w-0 items-center gap-2">
             <span class="truncate text-sm font-semibold text-foreground">Map editor</span>
             {#if project}

@@ -8,6 +8,8 @@ import { getIdFromTag } from "../../../rs/scene/entity/EntityTag";
 import { LocEntity } from "../../../rs/scene/entity/LocEntity";
 import { INVALID_HSL_COLOR } from "../../../rs/util/ColorUtil";
 import {
+    OBJECT_CHUNKS_PER_AXIS,
+    OBJECT_CHUNK_TILES,
     locFootprintIntersectsChunk,
     sceneTileIntersectsChunk,
 } from "../../../mapeditor/webgl/objectChunk";
@@ -192,6 +194,41 @@ export function getSceneLocs(
     return getSceneLocsForChunk(locTypeLoader, scene, borderSize, maxLevel, -1);
 }
 
+/** Largest loc footprint (tiles beyond the start tile, per axis) in the map square, cached per scene. */
+const maxLocSpanCache = new WeakMap<Scene, { x: number; y: number }>();
+
+function getMaxLocSpan(
+    scene: Scene,
+    startX: number,
+    endX: number,
+    startY: number,
+    endY: number,
+): { x: number; y: number } {
+    let span = maxLocSpanCache.get(scene);
+    if (span) {
+        return span;
+    }
+    span = { x: 0, y: 0 };
+    for (let level = 0; level < scene.levels; level++) {
+        for (let tileX = startX; tileX < endX; tileX++) {
+            for (let tileY = startY; tileY < endY; tileY++) {
+                const tile = scene.tiles[level][tileX][tileY];
+                if (!tile) {
+                    continue;
+                }
+                for (const loc of tile.locs) {
+                    if (loc.startX === tileX && loc.startY === tileY) {
+                        span.x = Math.max(span.x, loc.endX - loc.startX);
+                        span.y = Math.max(span.y, loc.endY - loc.startY);
+                    }
+                }
+            }
+        }
+    }
+    maxLocSpanCache.set(scene, span);
+    return span;
+}
+
 export function getSceneLocsForChunk(
     locTypeLoader: LocTypeLoader,
     scene: Scene,
@@ -212,9 +249,26 @@ export function getSceneLocsForChunk(
     const tileInChunk = (tx: number, ty: number): boolean =>
         chunkId < 0 || sceneTileIntersectsChunk(tx, ty, borderSize, chunkId);
 
+    // A chunk only needs the tiles it covers plus those whose locs reach into it. Scanning the whole map square for
+    // each of the 64 chunks visited every tile 64 times. Tiles are still visited in the same order, so the output is
+    // identical to the full scan.
+    let scanMinX = startX;
+    let scanMaxX = endX - 1;
+    let scanMinY = startY;
+    let scanMaxY = endY - 1;
+    if (chunkId >= 0) {
+        const span = getMaxLocSpan(scene, startX, endX, startY, endY);
+        const chunkMinX = startX + (chunkId % OBJECT_CHUNKS_PER_AXIS) * OBJECT_CHUNK_TILES;
+        const chunkMinY = startY + Math.floor(chunkId / OBJECT_CHUNKS_PER_AXIS) * OBJECT_CHUNK_TILES;
+        scanMinX = Math.max(startX, chunkMinX - span.x);
+        scanMaxX = Math.min(endX - 1, chunkMinX + OBJECT_CHUNK_TILES - 1);
+        scanMinY = Math.max(startY, chunkMinY - span.y);
+        scanMaxY = Math.min(endY - 1, chunkMinY + OBJECT_CHUNK_TILES - 1);
+    }
+
     for (let level = 0; level < scene.levels; level++) {
-        for (let tileX = startX; tileX < endX; tileX++) {
-            for (let tileY = startY; tileY < endY; tileY++) {
+        for (let tileX = scanMinX; tileX <= scanMaxX; tileX++) {
+            for (let tileY = scanMinY; tileY <= scanMaxY; tileY++) {
                 const tile = scene.tiles[level][tileX][tileY];
                 // if (!tile || tile.minLevel > maxLevel) {
                 //     continue;
