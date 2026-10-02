@@ -6,6 +6,7 @@ import {
     setRuntimeLoadedCache,
 } from "./active-cache-runtime";
 import type { LocalCacheProfile } from "./local-cache-profiles";
+import { syncActiveOpenRuneProjectRuntime } from "./active-openrune-project-runtime";
 
 /**
  * Returns the cache for `profile`: warm runtime copy if present, otherwise
@@ -30,6 +31,7 @@ export async function resolveActiveProfileCache(
     }
 
     const load = (async () => {
+        await syncActiveOpenRuneProjectRuntime(profile);
         const binding = await resolveProfileCacheSource(profile);
         if (!binding) {
             return null;
