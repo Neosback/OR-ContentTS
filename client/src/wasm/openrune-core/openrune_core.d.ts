@@ -46,6 +46,16 @@ export class SlotMeshOutput {
     take_words(): Uint32Array;
 }
 
+/**
+ * Packs flattened terrain vertices into fixed-size per-tile slots.
+ *
+ * `tile_counts` gives the number of vertices for each tile in order. The four
+ * vertex arrays are concatenated in that same tile order. Output is exactly
+ * `tile_counts.len() * 36 * 8` bytes and is byte-identical to
+ * `TerrainVertexBuffer.addVertex` followed by a zero-filled tile upload.
+ */
+export function pack_terrain_vertex_batch(tile_counts: Uint32Array, xs: Int32Array, zs: Int32Array, hsls: Int32Array, texture_indices: Int32Array): Uint8Array;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -60,6 +70,7 @@ export interface InitOutput {
     readonly meshpacker_used_texture_ids: (a: number, b: number) => void;
     readonly meshpacker_vertex_count: (a: number) => number;
     readonly meshpacker_vertices: (a: number, b: number) => void;
+    readonly pack_terrain_vertex_batch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
     readonly slotmeshoutput_take_anim_indices: (a: number, b: number) => void;
     readonly slotmeshoutput_take_job_lengths: (a: number, b: number) => void;
     readonly slotmeshoutput_take_static_indices: (a: number, b: number) => void;
