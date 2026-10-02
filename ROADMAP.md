@@ -114,6 +114,7 @@ Portable/source work next:
 - [x] Add a unified GameVal registry across base/generated DAT, module `gamevals.toml`, and RSCM with explicit OpenRune loader-order provenance and conflict diagnostics.
 - [x] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
 - [x] Add a framework-neutral OpenRune project session that owns one `ProjectFileSystem` root and atomically refreshes the project index, GameVal registry, config TOML, raw map TOML, server TOML, capabilities, and diagnostic summary as one runtime snapshot.
+- [x] Bind the active OpenRune setup to one retained project session; Basic setups clear it, OpenRune switches replace it safely, LIVE cache resolution reuses it, availability probes stay side-effect free, and Reload project refreshes the shared source graph.
 - [x] Add source-aware OpenRune config TOML adapters for definitions, including PackConfig block discovery, GameVal-backed id/inherit resolution, provenance, duplicate-target diagnostics, and guarded top-level scalar writes.
 - [x] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters with GameVal resolution, map-square indexing, Area relationship/polygon parsing, canonical generation, and guarded whole-file replacement.
 - [x] Add server TOML adapters for server-content/shop tooling, including PackServerConfig table indexing, raw-server + pack-config provenance, inventory stock parsing, GameVal resolution, duplicate-target diagnostics, guarded scalar writes, and canonical inventory generation.

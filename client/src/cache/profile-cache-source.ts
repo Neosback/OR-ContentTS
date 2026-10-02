@@ -3,6 +3,7 @@ import {
     type LocalCacheProfile,
 } from "../lib/local-cache-profiles";
 import { isTauriRuntime } from "../lib/tauri/is-tauri";
+import { getActiveOpenRuneProjectRuntime } from "../lib/active-openrune-project-runtime";
 import type {
     CacheLoadOptions,
     CacheSource,
@@ -46,6 +47,19 @@ async function createTauriOpenRuneSource(
 ): Promise<CacheSource | undefined> {
     if (!isTauriRuntime() || !profile.openRuneRootPath) return undefined;
 
+    const active = getActiveOpenRuneProjectRuntime(profile.id);
+    if (active?.rootPath === profile.openRuneRootPath) {
+        const liveCachePath = active.snapshot.project.liveCachePath;
+        if (!liveCachePath) return undefined;
+        return new ProjectFileSystemCacheSource(
+            profile,
+            active.session.fileSystem,
+            liveCachePath,
+        );
+    }
+
+    // Availability probes must not mutate the globally active project runtime.
+    // Build a temporary project view only when this profile is not active.
     const [{ TauriProjectFileSystem }, { indexOpenRuneProject }] =
         await Promise.all([
             import("../project/tauri-project-filesystem"),

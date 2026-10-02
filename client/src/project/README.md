@@ -116,6 +116,14 @@ The snapshot also exposes explicit local capabilities such as LIVE/SERVER presen
 
 `openOpenRuneProjectSession()` creates and performs the initial refresh. Platform code remains responsible for constructing the selected-root `ProjectFileSystem`; the session itself contains no Svelte, Tauri, browser, or backend dependency.
 
+### Active OpenRune runtime binding
+
+`../lib/active-openrune-project-runtime.ts` retains one session for the active OpenRune setup. Repeated consumers of the same profile/root reuse that session instead of rescanning the checkout. Switching to a Basic cache clears the OpenRune runtime; switching between OpenRune roots clears the old globally visible state before the replacement finishes, preventing editors from reading stale project A data while profile B is active.
+
+The runtime exposes framework-neutral getters plus a subscription hook for the active session/snapshot. `refreshActiveOpenRuneProjectRuntime()` refreshes the retained session in place, preserving the session identity while advancing its snapshot generation.
+
+OpenRune cache resolution reuses the active session's `ProjectFileSystem` and discovered LIVE path. Passive setup availability probes do not activate sessions; they use a temporary project view when necessary. This distinction prevents repository-list rendering from mutating the active project context.
+
 
 ## RSCM parser and index
 

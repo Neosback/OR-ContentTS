@@ -12,6 +12,11 @@
     } from "../../../cache/profile-cache-source";
     import { clearRuntimeLoadedCache, setRuntimeLoadedCache } from "../../../lib/active-cache-runtime";
     import {
+        clearActiveOpenRuneProjectRuntime,
+        refreshActiveOpenRuneProjectRuntime,
+        syncActiveOpenRuneProjectRuntime,
+    } from "../../../lib/active-openrune-project-runtime";
+    import {
         cacheSetupKind,
         getActiveProfileIdAsync,
         loadLocalCacheProfilesAsync,
@@ -122,26 +127,43 @@
 
     async function onDeleteProfile(id: string): Promise<void> {
         await deleteProfileCache(id);
+        const deletingActive = activeProfileId === id;
         const next = profiles.filter((p) => p.id !== id);
         await persist(next);
-        const nextActive = activeProfileId === id ? (next[0]?.id ?? null) : activeProfileId;
+        const nextActive = deletingActive ? (next[0]?.id ?? null) : activeProfileId;
         activeProfileId = nextActive;
         await setActiveProfileIdAsync(nextActive);
+        if (deletingActive) {
+            clearActiveOpenRuneProjectRuntime();
+            clearRuntimeLoadedCache();
+        }
         addOpen = false;
         editingProfile = null;
         notifySuccess("Profile removed.");
     }
 
-    async function loadProfile(id: string, list: LocalCacheProfile[] = profiles): Promise<void> {
+    async function loadProfile(
+        id: string,
+        list: LocalCacheProfile[] = profiles,
+        refreshOpenRune = false,
+    ): Promise<void> {
         activeProfileId = id;
         await setActiveProfileIdAsync(id);
         const profile = list.find((x) => x.id === id);
         if (!profile) return;
+        const snapshot = $state.snapshot(profile) as LocalCacheProfile;
         try {
+            if (
+                refreshOpenRune &&
+                cacheSetupKind(snapshot) === "openrune"
+            ) {
+                await refreshActiveOpenRuneProjectRuntime(snapshot);
+            } else {
+                await syncActiveOpenRuneProjectRuntime(snapshot);
+            }
+
             clearRuntimeLoadedCache();
-            const loaded = await loadResolvedProfileCache(
-                $state.snapshot(profile) as LocalCacheProfile,
-            );
+            const loaded = await loadResolvedProfileCache(snapshot);
             setRuntimeLoadedCache(profile.id, loaded);
         } catch (error) {
             notifyError(errorMessage(error));
@@ -205,10 +227,11 @@
             void (async () => {
                 try {
                     autoloadProgress = 40;
+                    const snapshot =
+                        $state.snapshot(profile) as LocalCacheProfile;
+                    await syncActiveOpenRuneProjectRuntime(snapshot);
                     clearRuntimeLoadedCache();
-                    const loaded = await loadResolvedProfileCache(
-                        $state.snapshot(profile) as LocalCacheProfile,
-                    );
+                    const loaded = await loadResolvedProfileCache(snapshot);
                     autoloadProgress = 85;
                     setRuntimeLoadedCache(profile.id, loaded);
                     autoloadProgress = 100;
@@ -387,9 +410,11 @@
                                     type="button"
                                     class={actionButton}
                                     onclick={() =>
-                                        cacheSetupKind(p) === "openrune" || p.useSystemFolder
-                                            ? void loadProfile(p.id)
-                                            : startImport(p.id)}
+                                        cacheSetupKind(p) === "openrune"
+                                            ? void loadProfile(p.id, profiles, true)
+                                            : p.useSystemFolder
+                                              ? void loadProfile(p.id)
+                                              : startImport(p.id)}
                                 >
                                     <FolderOpen class="size-3.5" />
                                     {cacheSetupKind(p) === "openrune"

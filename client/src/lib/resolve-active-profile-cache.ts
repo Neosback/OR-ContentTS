@@ -6,6 +6,7 @@ import {
     setRuntimeLoadedCache,
 } from "./active-cache-runtime";
 import type { LocalCacheProfile } from "./local-cache-profiles";
+import { syncActiveOpenRuneProjectRuntime } from "./active-openrune-project-runtime";
 
 /**
  * Returns the cache for `profile`: warm runtime copy if present, otherwise
@@ -19,6 +20,8 @@ const inFlight = new Map<string, Promise<LoadedCache | null>>();
 export async function resolveActiveProfileCache(
     profile: LocalCacheProfile,
 ): Promise<LoadedCache | null> {
+    await syncActiveOpenRuneProjectRuntime(profile);
+
     const warm = getRuntimeLoadedCache(profile.id);
     if (warm) {
         return warm;
