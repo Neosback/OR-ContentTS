@@ -402,7 +402,13 @@ name = "Al Kharid General Store"
 
 ### Studio policy
 
-A future Shop Editor, server-NPC editor, or other server-content editor should edit these existing TOML sources and let OpenRune build SERVER.
+The portable implementation is `client/src/project/openrune-server-toml.ts`. It indexes the same two TOML source families consumed by `PackServerConfig`: recursive `.data/raw-cache/server/**/*.toml` plus pack-owned `pack/configs/**/*.toml` overlays.
+
+It retains block/nested-source provenance, resolves `id` and `inherit` through the unified GameVal registry, reports duplicate resolved server targets instead of inventing precedence, and exposes a typed inventory/shop view for `[[inventory.stock]]` entries. Guarded top-level scalar writes and optimistic whole-file replacement remain behind `ProjectFileSystem`.
+
+Slayer-specific files under the server tree are still separate domain sources. The generic adapter intentionally indexes only the root tables actually registered by `PackServerConfig`; dedicated Slayer tooling can be layered on later without conflating its schema with server config definitions.
+
+A Shop Editor, server-NPC editor, or other server-content editor should edit these existing TOML sources and let OpenRune build SERVER.
 
 Do not create a second Studio-only shop/config database.
 
