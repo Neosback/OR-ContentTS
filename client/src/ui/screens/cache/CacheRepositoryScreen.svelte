@@ -156,7 +156,9 @@
         if (!profile) return;
         if (!savedMap[id]) {
             notifyError(
-                `"${profile.name}" is not currently available. Re-open its folder in Manage or update the imported cache.`,
+                cacheSetupKind(profile) === "openrune"
+                    ? `"${profile.name}" is not currently available. Re-open its OpenRune project root in Manage and make sure LIVE exists.`
+                    : `"${profile.name}" is not currently available. Re-open its cache folder in Manage or update the imported cache.`,
             );
             return;
         }
@@ -282,36 +284,6 @@
             {/if}
         </div>
     </section>
-
-    <section class="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 class="flex items-center gap-2 text-sm font-semibold">
-                <Server class="size-4" />
-                Studio local caches
-            </h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-                Served from <code class="font-mono text-xs">client/caches</code> through <code class="font-mono text-xs">/caches</code> with Range support. These stream directly; nothing is copied into browser storage.
-            </p>
-            <div class="mt-3 space-y-2">
-                {#each serverCaches as info (info.name)}
-                    {@const active = serverProfileId(info.name) === activeProfileId}
-                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 p-3">
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-medium">{info.name}</p>
-                            <p class="text-xs text-muted-foreground">{info.game} · revision {info.revision}</p>
-                        </div>
-                        <button
-                            type="button"
-                            disabled={active}
-                            class="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
-                            onclick={() => void selectServerCache(info)}
-                        >
-                            {active ? "Active" : "Use"}
-                        </button>
-                    </div>
-                {/each}
-            </div>
-        </section>
-    {/if}
 
     <section class="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div class="space-y-2">
