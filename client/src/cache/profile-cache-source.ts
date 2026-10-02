@@ -3,6 +3,7 @@ import {
     type LocalCacheProfile,
 } from "../lib/local-cache-profiles";
 import { isTauriRuntime } from "../lib/tauri/is-tauri";
+import { syncActiveOpenRuneProjectRuntime } from "../lib/active-openrune-project-runtime";
 import type {
     CacheLoadOptions,
     CacheSource,
@@ -46,19 +47,14 @@ async function createTauriOpenRuneSource(
 ): Promise<CacheSource | undefined> {
     if (!isTauriRuntime() || !profile.openRuneRootPath) return undefined;
 
-    const [{ TauriProjectFileSystem }, { indexOpenRuneProject }] =
-        await Promise.all([
-            import("../project/tauri-project-filesystem"),
-            import("../project/openrune-project-index"),
-        ]);
-    const fileSystem = new TauriProjectFileSystem(profile.openRuneRootPath);
-    const project = await indexOpenRuneProject(fileSystem);
-    if (!project.isOpenRuneProject || !project.liveCachePath) return undefined;
+    const runtime = await syncActiveOpenRuneProjectRuntime(profile);
+    const liveCachePath = runtime?.snapshot.project.liveCachePath;
+    if (!runtime || !liveCachePath) return undefined;
 
     return new ProjectFileSystemCacheSource(
         profile,
-        fileSystem,
-        project.liveCachePath,
+        runtime.session.fileSystem,
+        liveCachePath,
     );
 }
 
