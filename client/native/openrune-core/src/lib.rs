@@ -8,6 +8,8 @@
 mod mesh_pack;
 
 mod slot_mesh;
+mod terrain_pack;
 
 pub use mesh_pack::MeshPacker;
 pub use slot_mesh::SlotMeshOutput;
+pub use terrain_pack::pack_terrain_vertex_batch;
