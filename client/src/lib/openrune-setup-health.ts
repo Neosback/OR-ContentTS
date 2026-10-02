@@ -21,10 +21,17 @@ export type OpenRuneSetupHealth = {
     message: string;
 };
 
+export type InspectOpenRuneSetupHealthOptions = {
+    fileSystem?: ProjectFileSystem;
+};
+
 export async function inspectOpenRuneSetupHealth(
     profile: LocalCacheProfile,
+    options: InspectOpenRuneSetupHealthOptions = {},
 ): Promise<OpenRuneSetupHealth> {
-    const fileSystem = await resolveOpenRuneProfileFileSystem(profile);
+    const fileSystem =
+        options.fileSystem ??
+        (await resolveOpenRuneProfileFileSystem(profile));
     if (!fileSystem) {
         return {
             status: "unavailable",
