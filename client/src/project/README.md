@@ -213,6 +213,23 @@ Canonical serializers are available for new/generated NPC, Obj, and Area source 
 
 One OpenRune behavior is intentionally reflected in project discovery: current `MapNpcPacker`, `MapObjPacker`, and `MapAreaPacker` use non-recursive `Files.list()`. Therefore only direct `.toml` children of each raw map source directory are indexed as active authoring sources; nested TOML files are not treated as pack inputs.
 
+## OpenRune server TOML adapter
+
+`openrune-server-toml.ts` is the portable source layer for OpenRune's SERVER-side config inputs. It mirrors the table families currently registered by `PackServerConfig`, including `object`, `npc`, `item`, `varp`, `health`, `anims`, `mesanim`, `walktrigger`, `varn`, `varnbit`, `varcon`, `varobj`, `varconbit`, `hunt`, `stat`, `projectile`, `bas`, and `inventory`.
+
+The project-level index follows the same two input families that OpenRune's server packer consumes:
+
+- recursive `.data/raw-cache/server/**/*.toml` sources;
+- pack-owned `src/main/resources/pack/configs/**/*.toml` overlays.
+
+Each supported root definition retains source kind, path, module/pack provenance, top-level scalar fields, nested section text, `id`/`inherit`, resolved GameVal identities, `isServerOnly`, and the untouched raw block. Unknown server/slayer root tables remain outside the generic PackServerConfig model rather than being misclassified.
+
+The aggregate index exposes lookups by server table, symbol, and resolved table/id target. Duplicate resolved targets are reported as diagnostics. Studio intentionally does not invent a winner because `PackServerConfig` reads all matching TOML inputs and later `associateBy(id)` behavior should not become an undocumented Studio precedence rule.
+
+Inventory definitions additionally expose `[[inventory.stock]]` records with Obj GameVal resolution, count/restock-cycle validation against the cache codec's unsigned-short payload width, and the one-byte 255-entry stock-list ceiling. `serializeOpenRuneInventoryToml()` provides canonical inventory/shop generation for new sources.
+
+`updateOpenRuneServerField()` performs guarded top-level scalar edits while preserving nested tables such as `[npc.params]`, `[[npc.waypoints]]`, and `[[inventory.stock]]`. `replaceOpenRuneServerSourceFile()` provides optimistic-concurrency whole-file replacement for structured editors. These source operations remain local `ProjectFileSystem` work; OpenRune remains responsible for packing SERVER.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
