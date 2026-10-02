@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #54 cache-repository checkpoint:
+As of the PR #60 OpenRune project-session checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -24,6 +24,7 @@ As of the PR #54 cache-repository checkpoint:
 - Cache & Project Setup now has two explicit user-facing modes:
   - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
   - **OpenRune project:** Tauri stores one OpenRune Server repository root, validates/indexes it with `indexOpenRuneProject()`, and rediscovers LIVE/SERVER plus GameVal/RSCM/raw-map/server/pack sources from that root. The user is never asked for a second LIVE-cache path.
+- `OpenRuneProjectSession` now composes that project root into one framework-neutral runtime snapshot: `ProjectFileSystem`, project discovery, unified GameVals, PackConfig, raw map sources, server TOML, local capabilities, and diagnostic counts. Refresh is atomic, so a failed rescan does not publish a partially updated source graph.
 - The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
 - Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
 - The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
@@ -278,6 +279,7 @@ These PRs establish the current baseline:
 | #57 | Added OpenRune NPC/ground-Obj/Area map-source TOML parse/index/generate/write adapters and aligned source discovery with the packers |
 | #58 | Added OpenRune PackServerConfig TOML indexing, shop/inventory stock support, provenance/conflict diagnostics, and guarded source writes |
 | #59 | Split Cache & Project Setup into Basic cache vs OpenRune project-root modes and removed the pinned development-cache bootstrap |
+| #60 | Added the framework-neutral OpenRune project session with atomic full-project source/index refresh |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -659,7 +661,7 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, and PackServerConfig/server-shop TOML adapter are now in place. The next major source/publication work is the TypeScript terrain file-0 and static-loc file-1 encoders.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, and framework-neutral OpenRune project session are now in place. The next integration slice should bind the active OpenRune setup to one retained session in the Studio runtime, then the major source/publication work continues with the TypeScript terrain file-0 and static-loc file-1 encoders.
 
 For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
 
