@@ -14,17 +14,8 @@ import {
     resolveProfileCacheSource,
 } from "./profile-cache-source";
 
-const staticInfo: CacheInfo = {
-    name: "openrune-240",
-    game: "oldschool",
-    environment: "local",
-    revision: 240,
-    timestamp: "2026-09-30T00:00:00.000Z",
-    size: 10,
-};
-
-const importedInfo: CacheInfo = {
-    name: "Imported cache",
+const cacheInfo: CacheInfo = {
+    name: "OpenRune LIVE",
     game: "oldschool",
     environment: "local",
     revision: 240,
@@ -55,59 +46,42 @@ function source(
 }
 
 describe("profile CacheSource resolution", () => {
-    it("maps legacy server profile ids to the static range source", async () => {
-        const staticSource = source("static-range", [staticInfo]);
-        const profile: LocalCacheProfile = {
-            id: "server:openrune-240",
-            name: "OpenRune 240",
-            revision: "240",
-            locationNotes: "Legacy profile binding",
-        };
-
-        const binding = await resolveProfileCacheSource(profile, {
-            staticSource,
-        });
-
-        expect(binding).toEqual({
-            source: staticSource,
-            info: staticInfo,
-            loadOptions: { browserCache: false },
-        });
-    });
-
-    it("maps normal profiles to an imported-cache source", async () => {
-        const importedSource = source("indexeddb-profile:local-1", [importedInfo]);
+    it("maps basic browser profiles to imported cache storage", async () => {
+        const importedSource = source("indexeddb-profile:local-1", [cacheInfo]);
         const createImportedSource = vi.fn(() => importedSource);
         const profile: LocalCacheProfile = {
             id: "local-1",
             name: "Imported cache",
             revision: "240",
             locationNotes: "Browser storage",
+            setupKind: "basic",
         };
 
         const binding = await resolveProfileCacheSource(profile, {
-            staticSource: source("static-range", []),
             createImportedSource,
         });
 
         expect(createImportedSource).toHaveBeenCalledWith(profile);
         expect(binding).toEqual({
             source: importedSource,
-            info: importedInfo,
+            info: cacheInfo,
         });
     });
 
-    it("maps Tauri system-folder profiles to a direct filesystem source", async () => {
-        const systemSource = source("project-filesystem-cache:local-disk", [importedInfo]);
+    it("maps basic Tauri profiles to their selected cache directory", async () => {
+        const systemSource = source("project-filesystem-cache:local-disk", [cacheInfo]);
         const createSystemSource = vi.fn(() => systemSource);
-        const createImportedSource = vi.fn(() => source("indexeddb-profile:should-not-run", []));
+        const createImportedSource = vi.fn(() =>
+            source("indexeddb-profile:should-not-run", []),
+        );
 
         const profile: LocalCacheProfile = {
             id: "local-disk",
-            name: "OpenRune LIVE",
+            name: "Basic disk cache",
             revision: "240",
-            locationNotes: "C:/openrune/.data/cache/LIVE",
-            systemCachePath: "C:/openrune/.data/cache/LIVE",
+            locationNotes: "C:/cache",
+            setupKind: "basic",
+            systemCachePath: "C:/cache",
             useSystemFolder: true,
         };
 
@@ -120,8 +94,62 @@ describe("profile CacheSource resolution", () => {
         expect(createImportedSource).not.toHaveBeenCalled();
         expect(binding).toEqual({
             source: systemSource,
-            info: importedInfo,
+            info: cacheInfo,
         });
+    });
+
+    it("maps OpenRune profiles to a cache source resolved from the project root", async () => {
+        const openRuneSource = source(
+            "project-filesystem-cache:openrune:.data/cache/LIVE",
+            [cacheInfo],
+        );
+        const createOpenRuneSource = vi.fn(() => openRuneSource);
+        const createSystemSource = vi.fn(() =>
+            source("project-filesystem-cache:wrong", []),
+        );
+        const createImportedSource = vi.fn(() =>
+            source("indexeddb-profile:wrong", []),
+        );
+
+        const profile: LocalCacheProfile = {
+            id: "openrune-1",
+            name: "OpenRune",
+            revision: "240",
+            locationNotes: "C:/OpenRune-Server",
+            setupKind: "openrune",
+            openRuneRootPath: "C:/OpenRune-Server",
+        };
+
+        const binding = await resolveProfileCacheSource(profile, {
+            createOpenRuneSource,
+            createSystemSource,
+            createImportedSource,
+        });
+
+        expect(createOpenRuneSource).toHaveBeenCalledWith(profile);
+        expect(createSystemSource).not.toHaveBeenCalled();
+        expect(createImportedSource).not.toHaveBeenCalled();
+        expect(binding).toEqual({
+            source: openRuneSource,
+            info: cacheInfo,
+        });
+    });
+
+    it("treats missing OpenRune LIVE as unavailable during repository probing", async () => {
+        const profile: LocalCacheProfile = {
+            id: "openrune-missing-live",
+            name: "OpenRune",
+            revision: "240",
+            locationNotes: "/openrune",
+            setupKind: "openrune",
+            openRuneRootPath: "/openrune",
+        };
+
+        await expect(
+            hasResolvedProfileCache(profile, {
+                createOpenRuneSource: () => undefined,
+            }),
+        ).resolves.toBe(false);
     });
 
     it("reports an unavailable imported profile without throwing", async () => {
@@ -130,53 +158,36 @@ describe("profile CacheSource resolution", () => {
             name: "Missing",
             revision: "240",
             locationNotes: "",
+            setupKind: "basic",
         };
 
         await expect(
             hasResolvedProfileCache(profile, {
-                staticSource: source("static-range", []),
-                createImportedSource: () => source("indexeddb-profile:missing", []),
+                createImportedSource: () =>
+                    source("indexeddb-profile:missing", []),
             }),
         ).resolves.toBe(false);
     });
 
-    it("treats direct filesystem access failures as unavailable during repository probing", async () => {
+    it("loads an OpenRune project cache through its resolved LIVE source", async () => {
+        const openRuneSource = source("openrune-live", [cacheInfo]);
         const profile: LocalCacheProfile = {
-            id: "disk-denied",
-            name: "Disk cache",
+            id: "openrune-1",
+            name: "OpenRune",
             revision: "240",
-            locationNotes: "/cache",
-            systemCachePath: "/cache",
-            useSystemFolder: true,
+            locationNotes: "/openrune",
+            setupKind: "openrune",
+            openRuneRootPath: "/openrune",
         };
 
         await expect(
-            hasResolvedProfileCache(profile, {
-                createSystemSource: () => ({
-                    id: "disk",
-                    listCaches: async () => {
-                        throw new Error("scope expired");
-                    },
-                    loadCache: async () => loaded(importedInfo),
-                }),
+            loadResolvedProfileCache(profile, {
+                createOpenRuneSource: () => openRuneSource,
             }),
-        ).resolves.toBe(false);
-    });
-
-    it("loads a static profile with browser Cache Storage disabled", async () => {
-        const staticSource = source("static-range", [staticInfo]);
-        const profile: LocalCacheProfile = {
-            id: "server:openrune-240",
-            name: "OpenRune 240",
-            revision: "240",
-            locationNotes: "",
-        };
-
-        await expect(
-            loadResolvedProfileCache(profile, { staticSource }),
-        ).resolves.toEqual(loaded(staticInfo));
-        expect(staticSource.loadCache).toHaveBeenCalledWith(staticInfo, {
-            browserCache: false,
-        });
+        ).resolves.toEqual(loaded(cacheInfo));
+        expect(openRuneSource.loadCache).toHaveBeenCalledWith(
+            cacheInfo,
+            undefined,
+        );
     });
 });
