@@ -14,6 +14,7 @@ import PicoGL, {
 import { newDrawRange } from "../../mapviewer/webgl/DrawRange";
 import { perfLog } from "../../perf/gl-memory";
 import type { TileFieldSnapshot } from "../map-editor-history";
+import { beginEditPathProfile, consumeEditPathQueueDelay, markEditPathQueue } from "../edit-path-profiler";
 import type { SceneTileModel } from "../../rs/scene/SceneTileModel";
 import { readTileFieldSnapshot } from "../map-editor-history-snapshot";
 import { perf } from "../../perf/perf-profile";
@@ -771,28 +772,55 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         if (chunkIds.length === 0 || !this.sceneUniformBuffer || !this.textureArray || !this.textureMaterials) {
             return;
         }
+
         const uniqueChunkIds = [...new Set(chunkIds)];
-        const sceneLocData = serializeSceneLocData(map.scene, map.borderSize);
-        map.sceneLocData = sceneLocData;
-        const chunkDataList = await this.host.workerPool.queueLoadEditorMapObjectData(
-            map.mapX,
-            map.mapY,
-            map.borderSize,
-            cloneSceneTerrainData(map.scene),
-            cloneSceneLocData(sceneLocData),
-            uniqueChunkIds,
-            this.host.terrainSmoothingEnabled,
-        );
-        if (!chunkDataList?.length || !this.objectProgram || !this.objectProgramAlpha) {
-            return;
-        }
-        for (const chunkData of chunkDataList) {
-            map.updateObjectChunk(chunkData);
+        const queueDelayMs = consumeEditPathQueueDelay("object-chunks", getMapSquareId(map.mapX, map.mapY));
+        const profile = beginEditPathProfile("object.chunk-reload", {
+            mapId: getMapSquareId(map.mapX, map.mapY),
+            requestedChunks: chunkIds.length,
+            uniqueChunks: uniqueChunkIds.length,
+            queueDelayMs,
+        });
+
+        try {
+            const sceneLocData = profile.measure("scene.serialize", () =>
+                serializeSceneLocData(map.scene, map.borderSize),
+            );
+            map.sceneLocData = sceneLocData;
+            const terrainData = profile.measure("payload.clone-terrain", () =>
+                cloneSceneTerrainData(map.scene),
+            );
+            const locData = profile.measure("payload.clone-locs", () =>
+                cloneSceneLocData(sceneLocData),
+            );
+            const chunkDataList = await profile.measureAsync("worker.roundtrip", () =>
+                this.host.workerPool.queueLoadEditorMapObjectData(
+                    map.mapX,
+                    map.mapY,
+                    map.borderSize,
+                    terrainData,
+                    locData,
+                    uniqueChunkIds,
+                    this.host.terrainSmoothingEnabled,
+                ),
+            );
+            profile.annotate({ returnedChunks: chunkDataList?.length ?? 0 });
+            if (!chunkDataList?.length || !this.objectProgram || !this.objectProgramAlpha) {
+                return;
+            }
+            profile.measure("gpu.apply", () => {
+                for (const chunkData of chunkDataList) {
+                    map.updateObjectChunk(chunkData);
+                }
+            });
+        } finally {
+            profile.end();
         }
     }
 
     scheduleObjectChunkReload(mapId: number, chunkIds: Iterable<number>): void {
         // Object edits can change which model a ref resolves to.
+        markEditPathQueue("object-chunks", mapId);
         this.wireframeRefMemo.clear();
         this.objectDataRevision++;
         let pending = this.updatedObjectChunksByMapId.get(mapId);
@@ -3342,151 +3370,168 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         if (this.affectedTilesMap.size === 0) {
             return;
         }
-        const sceneBuilder = this.host.sceneBuilder;
 
-        const selectedLevel = this.host.selectedLevel;
+        const profile = beginEditPathProfile("terrain.flush", {
+            maps: this.affectedTilesMap.size,
+            affectedTiles: [...this.affectedTilesMap.values()].reduce((count, tileIds) => count + tileIds.size, 0),
+        });
 
-        const vertexBuf = new TerrainVertexBuffer(TOTAL_TILE_VERTICES);
-        for (const [mapId, tileIds] of this.affectedTilesMap) {
-            const map = this.mapManager.getMapById(mapId);
-            if (!map) {
-                continue;
-            }
+        try {
+            const sceneBuilder = this.host.sceneBuilder;
+            const selectedLevel = this.host.selectedLevel;
+            const vertexBuf = new TerrainVertexBuffer(TOTAL_TILE_VERTICES);
 
-            const scene = map.scene;
-            const rebuildStartLevel = map.heightRebuildMinLevel ?? selectedLevel;
-
-            let endLevel = rebuildStartLevel + 1;
-
-            if (map.heightUpdated) {
-                map.heightMapTextureData = loadHeightMapTextureData(scene);
-                map.updateHeightMapTexture(this.app);
-
-                for (let level = rebuildStartLevel; level < scene.levels; level++) {
-                    scene.calculateTileLights(level, true);
-                }
-                endLevel = scene.levels;
-
-                const heightChangedTiles = this.heightChangedTilesMap.get(mapId);
-                if (heightChangedTiles && heightChangedTiles.size > 0) {
-                    const chunkIds = syncSceneLocHeightsForHeightEdit(
-                        map,
-                        rebuildStartLevel,
-                        heightChangedTiles,
-                    );
-                    markObjectChunksForHeightEdit(map, chunkIds);
-                    syncMapObjectPickIndex(map, mapId);
-
-                    const selected = this.host.selectedObject;
-                    if (selected?.mapId === mapId) {
-                        const loc = findLocForRef(map, selected);
-                        if (loc) {
-                            this.host.setSelectedObject(syncObjectRefFromLoc(selected, loc));
-                        }
-                    }
-                    const hovered = this.host.hoveredObject;
-                    if (hovered?.mapId === mapId) {
-                        const loc = findLocForRef(map, hovered);
-                        if (loc) {
-                            this.host.setHoveredObject(syncObjectRefFromLoc(hovered, loc));
-                        }
-                    }
-                }
-
-                map.heightUpdated = false;
-                map.heightRebuildMinLevel = undefined;
-            }
-
-            if (map.underlayUpdated) {
-                sceneBuilder.blendUnderlays(scene, selectedLevel, this.host.terrainSmoothingEnabled, true);
-
-                map.underlayUpdated = false;
-            }
-
-            if (map.overlayUpdated) {
-                map.overlayUpdated = false;
-            }
-
-            if (map.tileRenderFlagsUpdated) {
-                map.scene.setTileMinLevels();
-                map.updateTileRenderFlagsTexture(this.app);
-                map.tileRenderFlagsUpdated = false;
-            }
-
-            const heights = scene.tileHeights;
-            const underlayIds = scene.tileUnderlays;
-            const overlayIds = scene.tileOverlays;
-            const tileShapes = scene.tileShapes;
-            const tileRotations = scene.tileRotations;
-
-            for (const tileId of tileIds) {
-                const tileX = tileId >> 8;
-                const tileY = tileId & 0xff;
-                const sceneX = tileX + map.borderSize;
-                const sceneY = tileY + map.borderSize;
-
-                if (tileX < 0 || tileX >= 64 || tileY < 0 || tileY >= 64) {
+            for (const [mapId, tileIds] of this.affectedTilesMap) {
+                const map = this.mapManager.getMapById(mapId);
+                if (!map) {
                     continue;
                 }
 
-                for (let level = rebuildStartLevel; level < endLevel; level++) {
-                    const lights = scene.tileLights[level];
-                    const blendedColors = scene.tileBlendedColors[level];
+                const scene = map.scene;
+                const rebuildStartLevel = map.heightRebuildMinLevel ?? selectedLevel;
+                let endLevel = rebuildStartLevel + 1;
 
-                    scene.setTileModel(level, sceneX, sceneY, undefined);
-                    sceneBuilder.addTileModel(
-                        scene,
-                        heights,
-                        underlayIds,
-                        overlayIds,
-                        tileShapes,
-                        tileRotations,
-                        lights,
-                        blendedColors,
-                        level,
-                        sceneX,
-                        sceneY,
-                        this.host.terrainSmoothingEnabled,
-                    );
-                    const tile = scene.tiles[level][sceneX][sceneY];
-                    if (!tile) {
-                        continue;
-                    }
+                if (map.heightUpdated) {
+                    profile.measure("height.prepare", () => {
+                        map.heightMapTextureData = loadHeightMapTextureData(scene);
+                        map.updateHeightMapTexture(this.app);
 
-                    const vertexOffset = map.borderSize * -128;
-                    vertexBuf.clear();
-                    addTerrainTile(
-                        this.textureIndexMap,
-                        vertexBuf,
-                        tile,
-                        vertexOffset,
-                        vertexOffset,
-                    );
+                        for (let level = rebuildStartLevel; level < scene.levels; level++) {
+                            scene.calculateTileLights(level, true);
+                        }
+                        endLevel = scene.levels;
 
-                    const offset = getTileOffset(level, tileX, tileY);
-                    map.terrainVertexBuffer.data(
-                        vertexBuf.view,
-                        offset * TerrainVertexBuffer.STRIDE,
-                    );
+                        const heightChangedTiles = this.heightChangedTilesMap.get(mapId);
+                        if (heightChangedTiles && heightChangedTiles.size > 0) {
+                            const chunkIds = syncSceneLocHeightsForHeightEdit(
+                                map,
+                                rebuildStartLevel,
+                                heightChangedTiles,
+                            );
+                            markObjectChunksForHeightEdit(map, chunkIds);
+                            syncMapObjectPickIndex(map, mapId);
+
+                            const selected = this.host.selectedObject;
+                            if (selected?.mapId === mapId) {
+                                const loc = findLocForRef(map, selected);
+                                if (loc) {
+                                    this.host.setSelectedObject(syncObjectRefFromLoc(selected, loc));
+                                }
+                            }
+                            const hovered = this.host.hoveredObject;
+                            if (hovered?.mapId === mapId) {
+                                const loc = findLocForRef(map, hovered);
+                                if (loc) {
+                                    this.host.setHoveredObject(syncObjectRefFromLoc(hovered, loc));
+                                }
+                            }
+                        }
+
+                        map.heightUpdated = false;
+                        map.heightRebuildMinLevel = undefined;
+                    });
                 }
-            }
-        }
 
-        for (const [mapId, tileIds] of this.affectedTilesMap) {
-            const map = this.mapManager.getMapById(mapId);
-            if (map) {
-                this.host.accumulateMinimapDirtyFromEditedTiles(
-                    mapId,
-                    map.borderSize,
-                    tileIds,
-                    map.scene.sizeX,
-                    map.scene.sizeY,
-                );
-            }
-        }
+                if (map.underlayUpdated) {
+                    profile.measure("underlay.blend", () => {
+                        sceneBuilder.blendUnderlays(scene, selectedLevel, this.host.terrainSmoothingEnabled, true);
+                        map.underlayUpdated = false;
+                    });
+                }
 
-        this.affectedTilesMap.clear();
-        this.heightChangedTilesMap.clear();
+                if (map.overlayUpdated) {
+                    map.overlayUpdated = false;
+                }
+
+                if (map.tileRenderFlagsUpdated) {
+                    profile.measure("flags.update", () => {
+                        map.scene.setTileMinLevels();
+                        map.updateTileRenderFlagsTexture(this.app);
+                        map.tileRenderFlagsUpdated = false;
+                    });
+                }
+
+                const heights = scene.tileHeights;
+                const underlayIds = scene.tileUnderlays;
+                const overlayIds = scene.tileOverlays;
+                const tileShapes = scene.tileShapes;
+                const tileRotations = scene.tileRotations;
+
+                profile.measure("tiles.rebuild", () => {
+                    for (const tileId of tileIds) {
+                        const tileX = tileId >> 8;
+                        const tileY = tileId & 0xff;
+                        const sceneX = tileX + map.borderSize;
+                        const sceneY = tileY + map.borderSize;
+
+                        if (tileX < 0 || tileX >= 64 || tileY < 0 || tileY >= 64) {
+                            continue;
+                        }
+
+                        for (let level = rebuildStartLevel; level < endLevel; level++) {
+                            const lights = scene.tileLights[level];
+                            const blendedColors = scene.tileBlendedColors[level];
+
+                            scene.setTileModel(level, sceneX, sceneY, undefined);
+                            sceneBuilder.addTileModel(
+                                scene,
+                                heights,
+                                underlayIds,
+                                overlayIds,
+                                tileShapes,
+                                tileRotations,
+                                lights,
+                                blendedColors,
+                                level,
+                                sceneX,
+                                sceneY,
+                                this.host.terrainSmoothingEnabled,
+                            );
+                            const tile = scene.tiles[level][sceneX][sceneY];
+                            if (!tile) {
+                                continue;
+                            }
+
+                            const vertexOffset = map.borderSize * -128;
+                            vertexBuf.clear();
+                            addTerrainTile(
+                                this.textureIndexMap,
+                                vertexBuf,
+                                tile,
+                                vertexOffset,
+                                vertexOffset,
+                            );
+
+                            const offset = getTileOffset(level, tileX, tileY);
+                            map.terrainVertexBuffer.data(
+                                vertexBuf.view,
+                                offset * TerrainVertexBuffer.STRIDE,
+                            );
+                        }
+                    }
+                });
+            }
+
+            profile.measure("minimap.dirty", () => {
+                for (const [mapId, tileIds] of this.affectedTilesMap) {
+                    const map = this.mapManager.getMapById(mapId);
+                    if (map) {
+                        this.host.accumulateMinimapDirtyFromEditedTiles(
+                            mapId,
+                            map.borderSize,
+                            tileIds,
+                            map.scene.sizeX,
+                            map.scene.sizeY,
+                        );
+                    }
+                }
+            });
+
+            this.affectedTilesMap.clear();
+            this.heightChangedTilesMap.clear();
+        } finally {
+            profile.end();
+        }
     }
 
     clearMaps(): void {
