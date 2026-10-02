@@ -394,7 +394,13 @@ export class SceneBuffer {
                 }
 
                 const runLength = runEnd - modelIndex;
-                if (runLength > 1) {
+                // Micro-benchmarks show batching is reliably useful for small cached models,
+                // while larger models need enough repeated placements to amortize the
+                // larger returned counts array and one bigger wasm call. Stay conservative
+                // rather than regressing the common 2-4 placement case for heavy models.
+                const shouldBatchPlacements =
+                    runLength > 1 && (model.faceCount <= 64 || runLength >= 16);
+                if (shouldBatchPlacements) {
                     const offsets = new Int32Array(runLength * 3);
                     for (let i = 0; i < runLength; i++) {
                         const item = group.models[modelIndex + i]!;
