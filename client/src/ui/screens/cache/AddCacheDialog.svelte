@@ -29,7 +29,6 @@
     let locationNotes = $state("");
     let iconDataUrl = $state<string | undefined>();
     let systemCachePath = $state<string | undefined>();
-    let useSystemFolder = $state(false);
     let browserCacheFiles = $state<File[]>([]);
     let iconError = $state<string | null>(null);
     let confirmDeleteOpen = $state(false);
@@ -44,7 +43,6 @@
         locationNotes = profile?.locationNotes ?? "";
         iconDataUrl = profile?.iconDataUrl;
         systemCachePath = profile?.systemCachePath;
-        useSystemFolder = Boolean(profile?.useSystemFolder && profile.systemCachePath);
         browserCacheFiles = [];
         iconError = null;
     });
@@ -74,7 +72,6 @@
         if (!path) return;
         systemCachePath = path;
         locationNotes = path;
-        useSystemFolder = true;
     }
 
     function save(): void {
