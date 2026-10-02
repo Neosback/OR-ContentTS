@@ -21,7 +21,7 @@ npm run setup
 npm run start
 ```
 
-Open <http://localhost:3000>. The first start downloads the configured OSRS cache from OpenRS2 directly into `client/caches`. The committed `client/cache-target.json` currently tracks revision 240 to match OpenRune Server.
+Open <http://localhost:3000>, then use **Cache & Project Setup** to choose how Studio gets its data. A **Basic cache** points directly at a compatible cache directory. An **OpenRune project** points at the OpenRune Server repository root; Studio discovers its LIVE/SERVER caches and OpenRune-owned source trees from that root.
 
 | Route | What it opens |
 | --- | --- |
@@ -51,11 +51,18 @@ Run these from `client/`:
 | `npm run validate` | Run all blocking client gates: UI boundary, Svelte, TypeScript, tests and production build |
 | `npm run validate:types` | Run full-tree Svelte and TypeScript diagnostics |
 
-## Local cache configuration
+## Cache and OpenRune setup
 
-The committed `client/cache-target.json` controls the local development cache revision. `npm run ensure-cache` resolves that revision against OpenRS2 and writes it to the gitignored `client/caches` directory.
+Studio no longer downloads or pins a development cache during startup.
 
-The dev server sends COOP/COEP headers and serves `client/caches` at `/caches` with HTTP Range support. The client streams only the cache ranges it needs and keeps imported/profile caches in browser storage.
+Use the Cache & Project Setup screen:
+
+- **Basic cache:** cache-only operation. In Tauri, Studio reads the selected cache directory directly from disk. In the browser, the selected directory is imported into local browser storage.
+- **OpenRune project:** select the OpenRune Server repository root once in the desktop app. Studio validates the project and discovers `.data/cache/LIVE`, `.data/cache/SERVER`, GameVal DAT/RSCM/module mappings, raw map/server TOML, and pack resource roots from that project.
+
+OpenRune profiles keep the project root as the authoritative path. Studio does not ask for a separate LIVE-cache folder, so cache and source provenance cannot drift apart.
+
+The Vite range-cache source remains an internal development capability, but it is no longer a user-facing setup mode or an automatically downloaded revision preset.
 
 ## Studio backend and OpenRune compatibility
 
