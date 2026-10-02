@@ -34,7 +34,7 @@ jobs:
           cd client
           ( cd native && wasm-pack build openrune-core --target web --release --no-pack --out-dir ../../src/wasm/openrune-core --out-name openrune_core )
           rm -f src/wasm/openrune-core/.gitignore src/wasm/openrune-core/package.json src/wasm/openrune-core/README.md
-          wasm-opt -O3 src/wasm/openrune-core/openrune_core_bg.wasm -o src/wasm/openrune-core/openrune_core_bg.wasm
+          wasm-opt -O3 --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-multivalue --enable-reference-types src/wasm/openrune-core/openrune_core_bg.wasm -o src/wasm/openrune-core/openrune_core_bg.wasm
 
       - name: Commit generated bundle
         run: |
