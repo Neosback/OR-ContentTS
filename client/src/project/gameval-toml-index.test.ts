@@ -137,8 +137,8 @@ describe("buildGameValTomlIndex", () => {
         ]);
 
         expect(index.issues.map((issue) => issue.code)).toEqual([
-            "ID_CONFLICT",
             "DUPLICATE_SYMBOL",
+            "ID_CONFLICT",
             "SYMBOL_CONFLICT",
         ]);
         expect(findGameValTomlSymbol(index, "loc.a")).toHaveLength(2);
