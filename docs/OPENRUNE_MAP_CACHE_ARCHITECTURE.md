@@ -115,7 +115,9 @@ Must work without a backend:
 
 Where supported, a user-approved project directory can provide direct read/write access.
 
-Use this only as progressive enhancement. Import/download remains the universal fallback.
+Use this only as progressive enhancement. Import/download remains the universal fallback. Cache Repository's universal browser path imports a selected cache folder once into IndexedDB; the folder chosen while creating a profile is the same selection used for that initial import and must not be requested a second time.
+
+The shared `ProjectFileSystemCacheSource` can also consume a browser File System Access handle. Persisting/binding those cache-directory handles is an optional enhancement, not a requirement for browsers without `showDirectoryPicker`.
 
 ### 2.3 Tauri desktop
 
@@ -125,11 +127,15 @@ Tauri responsibilities:
 
 - native project/cache selection;
 - scoped `ProjectFileSystem` reads/writes;
+- direct cache loading through `ProjectFileSystemCacheSource`;
+- persisted user-approved filesystem scopes across launches;
 - atomic source-file updates;
 - optional file watching;
 - optional lazy Studio backend launch.
 
-Do not start Ktor merely to read or write TOML/RSCM/project files.
+A Tauri cache profile must not copy its cache into browser IndexedDB. The selected cache directory is the source of truth. The current synchronous cache decoder still materializes cache-store bytes into the webview's memory while the cache is open; eliminating that runtime memory copy would require an async/random-access cache-store refactor and is separate from persistence.
+
+Do not start Ktor merely to read cache files or write TOML/RSCM/project files.
 
 ### 2.4 Optional Studio backend
 

@@ -1,3 +1,8 @@
+import {
+  isCacheStoreFileName,
+  validateCacheStoreFileNames,
+} from "../cache/cache-store-files";
+
 const DB_NAME = "openrune-cache-files-v1";
 const DB_VERSION = 1;
 const STORE = "profile-cache-files";
@@ -72,40 +77,6 @@ function normalizeName(file: File): string {
   return parts[parts.length - 1];
 }
 
-/** Only persist Jagex cache store files (ignore loose maps folder noise when picking parent dirs). */
-function isCacheStoreFileName(name: string): boolean {
-  if (name === "keys.json" || name === "xteas.json") {
-    return true;
-  }
-  if (name === "main_file_cache.dat2" || name === "main_file_cache.dat") {
-    return true;
-  }
-  if (name === "main_file_cache.idx255") {
-    return true;
-  }
-  return /^main_file_cache\.idx\d+$/.test(name);
-}
-
-function validateImportedCacheFiles(files: Record<string, ArrayBuffer>): void {
-  const names = new Set(Object.keys(files));
-  const hasDat2 = names.has("main_file_cache.dat2");
-  const hasDat = names.has("main_file_cache.dat");
-  if (!hasDat2 && !hasDat) {
-    throw new Error(
-      "Import folder must contain main_file_cache.dat2 (OSRS) or main_file_cache.dat. Select the cache output folder, not a maps export subfolder.",
-    );
-  }
-  if (hasDat2 && !names.has("main_file_cache.idx255")) {
-    throw new Error("Missing main_file_cache.idx255 — import the full cache directory from your filestore build.");
-  }
-  const idxCount = [...names].filter((n) => /^main_file_cache\.idx\d+$/.test(n)).length;
-  if (hasDat2 && idxCount < 2) {
-    throw new Error(
-      "Too few index files (main_file_cache.idx*). Import the complete cache folder with all idx files.",
-    );
-  }
-}
-
 export async function saveProfileCacheFiles(profileId: string, files: FileList | File[]): Promise<void> {
   const fileArray = Array.from(files);
   const record: Record<string, ArrayBuffer> = {};
@@ -121,7 +92,7 @@ export async function saveProfileCacheFiles(profileId: string, files: FileList |
       "No cache files found. Choose the folder that contains main_file_cache.dat2 and main_file_cache.idx* files.",
     );
   }
-  validateImportedCacheFiles(record);
+  validateCacheStoreFileNames(Object.keys(record));
   const db = await openDb();
   try {
     try {

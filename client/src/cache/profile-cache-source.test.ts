@@ -97,6 +97,33 @@ describe("profile CacheSource resolution", () => {
         });
     });
 
+    it("maps Tauri system-folder profiles to a direct filesystem source", async () => {
+        const systemSource = source("project-filesystem-cache:local-disk", [importedInfo]);
+        const createSystemSource = vi.fn(() => systemSource);
+        const createImportedSource = vi.fn(() => source("indexeddb-profile:should-not-run", []));
+
+        const profile: LocalCacheProfile = {
+            id: "local-disk",
+            name: "OpenRune LIVE",
+            revision: "240",
+            locationNotes: "C:/openrune/.data/cache/LIVE",
+            systemCachePath: "C:/openrune/.data/cache/LIVE",
+            useSystemFolder: true,
+        };
+
+        const binding = await resolveProfileCacheSource(profile, {
+            createSystemSource,
+            createImportedSource,
+        });
+
+        expect(createSystemSource).toHaveBeenCalledWith(profile);
+        expect(createImportedSource).not.toHaveBeenCalled();
+        expect(binding).toEqual({
+            source: systemSource,
+            info: importedInfo,
+        });
+    });
+
     it("reports an unavailable imported profile without throwing", async () => {
         const profile: LocalCacheProfile = {
             id: "missing",
@@ -109,6 +136,29 @@ describe("profile CacheSource resolution", () => {
             hasResolvedProfileCache(profile, {
                 staticSource: source("static-range", []),
                 createImportedSource: () => source("indexeddb-profile:missing", []),
+            }),
+        ).resolves.toBe(false);
+    });
+
+    it("treats direct filesystem access failures as unavailable during repository probing", async () => {
+        const profile: LocalCacheProfile = {
+            id: "disk-denied",
+            name: "Disk cache",
+            revision: "240",
+            locationNotes: "/cache",
+            systemCachePath: "/cache",
+            useSystemFolder: true,
+        };
+
+        await expect(
+            hasResolvedProfileCache(profile, {
+                createSystemSource: () => ({
+                    id: "disk",
+                    listCaches: async () => {
+                        throw new Error("scope expired");
+                    },
+                    loadCache: async () => loaded(importedInfo),
+                }),
             }),
         ).resolves.toBe(false);
     });

@@ -17,7 +17,7 @@
     }: {
         open?: boolean;
         editing: LocalCacheProfile | null;
-        onSave: (profile: LocalCacheProfile) => void;
+        onSave: (profile: LocalCacheProfile, importFiles?: File[]) => void;
         onDelete?: (id: string) => void;
     } = $props();
 
@@ -29,7 +29,7 @@
     let locationNotes = $state("");
     let iconDataUrl = $state<string | undefined>();
     let systemCachePath = $state<string | undefined>();
-    let useSystemFolder = $state(false);
+    let browserCacheFiles = $state<File[]>([]);
     let iconError = $state<string | null>(null);
     let confirmDeleteOpen = $state(false);
 
@@ -43,7 +43,7 @@
         locationNotes = profile?.locationNotes ?? "";
         iconDataUrl = profile?.iconDataUrl;
         systemCachePath = profile?.systemCachePath;
-        useSystemFolder = Boolean(profile?.useSystemFolder && profile.systemCachePath);
+        browserCacheFiles = [];
         iconError = null;
     });
 
@@ -60,8 +60,11 @@
 
     function onBrowserFolderFiles(files: FileList | null): void {
         if (!files?.length) return;
+        browserCacheFiles = Array.from(files);
         const first = files[0]!;
-        locationNotes = first.webkitRelativePath || first.name || "Browser folder selected";
+        const relative = first.webkitRelativePath || first.name || "";
+        const root = relative.split(/[\\/]/g).filter(Boolean)[0];
+        locationNotes = root || "Browser cache folder selected";
     }
 
     async function onPickSystemFolder(): Promise<void> {
@@ -69,7 +72,6 @@
         if (!path) return;
         systemCachePath = path;
         locationNotes = path;
-        useSystemFolder = true;
     }
 
     function save(): void {
@@ -81,9 +83,14 @@
             locationNotes: locationNotes.trim(),
             iconDataUrl,
             systemCachePath,
-            useSystemFolder: tauri && useSystemFolder && Boolean(systemCachePath),
-        });
+            useSystemFolder: tauri && Boolean(systemCachePath),
+        }, tauri ? undefined : [...browserCacheFiles]);
     }
+
+    const sourceReady = $derived(
+        editing !== null ||
+        (tauri ? Boolean(systemCachePath) : browserCacheFiles.length > 0),
+    );
 
     const directoryInput = { webkitdirectory: "" } as Record<string, string>;
     const fieldClass = "w-full rounded-md border border-input bg-background px-2 py-1.5";
@@ -128,10 +135,22 @@
                     <textarea rows="3" class={fieldClass} bind:value={description}></textarea>
                 </label>
                 <div class="space-y-2 sm:col-span-2">
-                    <div class="flex flex-col gap-2">
-                        <label class="inline-flex cursor-pointer">
+                    <span class="block text-sm font-medium">Cache folder</span>
+                    {#if tauri}
+                        <button
+                            type="button"
+                            class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm"
+                            onclick={() => void onPickSystemFolder()}
+                        >
+                            {systemCachePath ? "Change cache folder" : "Choose cache folder"}
+                        </button>
+                        <p class="text-xs text-muted-foreground">
+                            Desktop reads this folder directly from disk. The cache is not copied into IndexedDB.
+                        </p>
+                    {:else}
+                        <label class="inline-flex w-full cursor-pointer">
                             <span class="inline-flex h-9 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-sm">
-                                Cache Location
+                                {browserCacheFiles.length > 0 ? "Change cache folder" : "Choose cache folder"}
                             </span>
                             <input
                                 type="file"
@@ -141,19 +160,11 @@
                                 onchange={(e) => onBrowserFolderFiles(e.currentTarget.files)}
                             />
                         </label>
-                        {#if tauri}
-                            <button type="button" class="h-9 rounded-md border border-input bg-secondary px-3 text-sm" onclick={() => void onPickSystemFolder()}>
-                                System Cache Location
-                            </button>
-                        {/if}
-                    </div>
-                    {#if locationNotes}<p class="text-xs text-muted-foreground">{locationNotes}</p>{/if}
-                    {#if tauri && systemCachePath}
-                        <label class="flex items-start gap-2 text-sm">
-                            <input type="checkbox" class="mt-1" bind:checked={useSystemFolder} />
-                            <span>Load from disk only (desktop only, skip IndexedDB mirror)</span>
-                        </label>
+                        <p class="text-xs text-muted-foreground">
+                            Browser mode imports the selected cache once into local browser storage.
+                        </p>
                     {/if}
+                    {#if locationNotes}<p class="text-xs text-muted-foreground">{locationNotes}</p>{/if}
                 </div>
             </div>
         </div>
@@ -164,7 +175,12 @@
                     Delete
                 </button>
             {/if}
-            <button type="button" class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground" onclick={save}>
+            <button
+                type="button"
+                disabled={!sourceReady}
+                class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                onclick={save}
+            >
                 {editing ? "Save changes" : "Add cache"}
             </button>
         </div>

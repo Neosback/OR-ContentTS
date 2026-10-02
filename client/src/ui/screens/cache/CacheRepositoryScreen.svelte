@@ -93,20 +93,40 @@
         await saveLocalCacheProfilesAsync($state.snapshot(next) as LocalCacheProfile[]);
     }
 
-    async function onSaveProfile(profile: LocalCacheProfile): Promise<void> {
+    async function onSaveProfile(
+        profile: LocalCacheProfile,
+        importFiles: File[] = [],
+    ): Promise<void> {
         const exists = profiles.some((p) => p.id === profile.id);
-        await persist(exists ? profiles.map((p) => (p.id === profile.id ? profile : p)) : [...profiles, profile]);
+        const next = exists
+            ? profiles.map((p) => (p.id === profile.id ? profile : p))
+            : [...profiles, profile];
+
+        await persist(next);
         activeProfileId = profile.id;
         await setActiveProfileIdAsync(profile.id);
         addOpen = false;
         editingProfile = null;
-        if (exists) {
-            notifySuccess(`Updated "${profile.name}".`);
+
+        try {
+            if (importFiles.length > 0) {
+                await saveProfileCacheFiles(profile.id, importFiles);
+                savedMap = { ...savedMap, [profile.id]: true };
+            }
+
+            if (profile.useSystemFolder || importFiles.length > 0) {
+                await loadProfile(profile.id, next);
+            }
+        } catch (error) {
+            notifyError(errorMessage(error));
             return;
         }
-        notifySuccess(`Added "${profile.name}".`);
-        // New profiles continue straight into the import flow.
-        startImport(profile.id);
+
+        notifySuccess(
+            exists
+                ? `Updated "${profile.name}".`
+                : `Added "${profile.name}".`,
+        );
     }
 
     async function onDeleteProfile(id: string): Promise<void> {
@@ -144,7 +164,9 @@
         const profile = profiles.find((p) => p.id === id);
         if (!profile) return;
         if (!savedMap[id]) {
-            notifyError(`"${profile.name}" is not imported in browser storage yet. Import it once first.`);
+            notifyError(
+                `"${profile.name}" is not currently available. Re-open its folder in Manage or update the imported cache.`,
+            );
             return;
         }
         pendingSwitchProfileId = id;
@@ -378,6 +400,15 @@
                                         {/if}
                                         {#if p.id.startsWith(SERVER_PROFILE_PREFIX)}
                                             <span class="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-300">Local source</span>
+                                        {:else if p.useSystemFolder}
+                                            <span class={cn(
+                                                "rounded px-1.5 py-0.5 text-xs",
+                                                saved
+                                                    ? "bg-emerald-500/15 text-emerald-300"
+                                                    : "bg-amber-500/10 text-amber-300",
+                                            )}>
+                                                {saved ? "Direct disk" : "Disk access needed"}
+                                            </span>
                                         {:else if saved}
                                             <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-xs text-emerald-300">Saved in browser</span>
                                         {:else}
@@ -402,9 +433,13 @@
                                     <Pencil class="size-3.5" />
                                     Manage
                                 </button>
-                                <button type="button" class={actionButton} onclick={() => startImport(p.id)}>
+                                <button
+                                    type="button"
+                                    class={actionButton}
+                                    onclick={() => p.useSystemFolder ? void loadProfile(p.id) : startImport(p.id)}
+                                >
                                     <FolderOpen class="size-3.5" />
-                                    Update cache
+                                    {p.useSystemFolder ? "Reload from disk" : "Update cache"}
                                 </button>
                             </div>
                         </div>
@@ -415,7 +450,12 @@
     </section>
 </div>
 
-<AddCacheDialog bind:open={addOpen} editing={editingProfile} onSave={(p) => void onSaveProfile(p)} onDelete={(id) => void onDeleteProfile(id)} />
+<AddCacheDialog
+    bind:open={addOpen}
+    editing={editingProfile}
+    onSave={(p, files) => void onSaveProfile(p, files)}
+    onDelete={(id) => void onDeleteProfile(id)}
+/>
 
 <input
     bind:this={folderInput}
