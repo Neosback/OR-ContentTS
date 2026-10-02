@@ -87,6 +87,10 @@ function pathDepth(path: string): number {
     return path ? path.split("/").length : 0;
 }
 
+function comparePaths(a: string, b: string): number {
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function moduleFamily(path: string): OpenRuneModuleFamily {
     const first = path.split("/")[0] ?? "";
     switch (first) {
@@ -196,7 +200,7 @@ async function collectFiles(
     };
 
     await visit(root);
-    return files.sort((a, b) => a.localeCompare(b));
+    return files.sort(comparePaths);
 }
 
 type SourceWalk = {
@@ -284,16 +288,16 @@ export async function indexOpenRuneProject(
             const name = projectPathName(path);
             return name === "build.gradle.kts" || name === "build.gradle";
         })
-        .sort((a, b) => a.localeCompare(b));
+        .sort(comparePaths);
 
     const modulePaths = buildFiles
         .map((path) => projectParentPath(path))
         .filter((path) => path !== "")
-        .sort((a, b) => pathDepth(a) - pathDepth(b) || a.localeCompare(b));
+        .sort((a, b) => pathDepth(a) - pathDepth(b) || comparePaths(a, b));
 
     const gameValTomlFiles = [...source.files]
         .filter((path) => projectPathName(path) === "gamevals.toml")
-        .sort((a, b) => a.localeCompare(b));
+        .sort(comparePaths);
 
     const modules: OpenRuneModuleIndexEntry[] = modulePaths.map((modulePath) => {
         const buildFile =
