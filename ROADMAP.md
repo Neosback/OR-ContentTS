@@ -163,7 +163,9 @@ Done:
 
 Next:
 
-- [x] Add a `ProjectFileSystem`-backed `CacheSource`; Tauri cache profiles now read selected disk folders directly without an IndexedDB mirror.
+- [x] Add a `ProjectFileSystem`-backed `CacheSource`; Tauri basic-cache profiles now read selected disk folders directly without an IndexedDB mirror.
+- [x] Split Cache & Project Setup into Basic cache and OpenRune project modes. OpenRune mode stores one repository root and discovers LIVE/SERVER plus OpenRune source trees from that root.
+- [x] Remove the pinned OpenRS2 startup cache target/bootstrap and the user-facing Studio-local-cache preset path.
 - [ ] Bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement; IndexedDB import remains the universal browser fallback.
 - [ ] Move remaining Interface/CS2 cache-proxy lookups (for example enum definitions) behind local CacheSystem loaders first, with proxy/backend only as optional fallback.
 - [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
