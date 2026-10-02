@@ -1,0 +1,27 @@
+name: Temporary terrain pack benchmark
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temporary-terrain-bench.yml"
+      - "client/src/wasm/terrain-packer*"
+      - "client/src/mapeditor/webgl/loader/EditorMapDataLoader.ts"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - name: Terrain packer micro-benchmark
+        run: BENCH=1 npx vitest run src/wasm/terrain-packer.bench.test.ts --reporter=verbose
