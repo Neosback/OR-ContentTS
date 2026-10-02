@@ -1,4 +1,4 @@
-name: Temporary tile-light benchmark
+name: Temporary mesh-placement benchmark
 
 on:
   pull_request:
@@ -6,8 +6,8 @@ on:
       - main
     paths:
       - ".github/workflows/temporary-terrain-bench.yml"
-      - "client/src/wasm/tile-lights*"
-      - "client/src/rs/scene/Scene.ts"
+      - "client/src/wasm/mesh-packer*"
+      - "client/src/mapviewer/webgl/buffer/SceneBuffer.ts"
 
 jobs:
   bench:
@@ -23,5 +23,5 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      - name: Tile-light micro-benchmark
-        run: BENCH=1 npx vitest run src/wasm/tile-lights.bench.test.ts --reporter=verbose
+      - name: Mesh placement micro-benchmark
+        run: BENCH=1 npx vitest run src/wasm/mesh-packer.bench.test.ts --reporter=verbose
