@@ -162,7 +162,8 @@ Done:
 
 Next:
 
-- [ ] Add a ProjectFileSystem-backed CacheSource so Tauri and capable browsers can open an OpenRune checkout's `.data/cache/LIVE` without an IndexedDB import copy.
+- [x] Add a `ProjectFileSystem`-backed `CacheSource`; Tauri cache profiles now read selected disk folders directly without an IndexedDB mirror.
+- [ ] Bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement; IndexedDB import remains the universal browser fallback.
 - [ ] Move remaining Interface/CS2 cache-proxy lookups (for example enum definitions) behind local CacheSystem loaders first, with proxy/backend only as optional fallback.
 - [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [ ] Add a framework-neutral Interface metadata source backed first by the TypeScript GameValRegistry/project index.
