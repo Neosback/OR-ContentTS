@@ -124,6 +124,24 @@ The parser retains source path and line number for every mapping. The aggregate 
 
 This layer is read-only. RSCM assignment/writes remain OpenRune-owned workflow behavior, and the future unified GameVal registry should merge this provenance with module `gamevals.toml` and generated/base DAT mappings under explicit precedence and validation rules.
 
+
+## GameVal DAT parser and baseline validation
+
+`gameval-dat-index.ts` decodes OpenRune's binary `GameValDat` format directly in TypeScript. The format is big-endian and consists of an int32 table count, UTF-8 table names prefixed by uint16 byte lengths, int32 entry counts, and UTF-8 `key=id` entry strings prefixed by uint16 lengths.
+
+The parser mirrors OpenRune's current source behavior:
+
+- `gamevals.dat` is the base/cache mapping source and defines the maximum reserved OSRS id per table;
+- `gamevals_generated.dat` contributes generated mappings such as components/db columns but does not raise the base id ceiling;
+- grouped keys containing `:` are preserved verbatim;
+- `-1` is retained as an unassigned value;
+- malformed/truncated/invalid UTF-8 data is reported as structured diagnostics rather than producing partial silent corruption;
+- count fields are bounded against remaining bytes before iteration so malformed files cannot force enormous attacker-controlled loops.
+
+The aggregate DAT index retains base/generated provenance and provides symbol plus table/id lookups. It also reports duplicate/conflicting DAT mappings.
+
+`validateCustomGameVals()` applies the OpenRune reservation rule to project-owned mappings: assigned custom ids must be strictly greater than the maximum id present in the base `gamevals.dat` table. Generated DAT mappings participate in symbol/id collision checks but not in base-range reservation. Unassigned `-1` declarations remain valid for OpenRune's normal assignment workflow.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
