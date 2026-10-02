@@ -106,6 +106,16 @@ Generated cache contents are deliberately not traversed. LIVE and SERVER are ind
 
 Module discovery follows the checkout structure rather than a hard-coded plugin list, which matches OpenRune's recursive Gradle subproject convention. Source provenance is retained by path and module association so later GameVal/RSCM/TOML parsers can layer semantic indexes on top without flattening ownership.
 
+## OpenRune project session
+
+`openrune-project-session.ts` is the framework-neutral runtime context above project discovery and the source indexes. One session owns one `ProjectFileSystem` root and builds a coherent snapshot containing the OpenRune project index, unified GameVal registry, PackConfig index, raw map-source index, and server TOML index.
+
+`refresh()` is atomic. A new snapshot is published only after project discovery, GameVal indexing, and every GameVal-dependent source index complete successfully. If a rescan fails because files changed or became unreadable, consumers keep the previous complete snapshot instead of observing mixed generations.
+
+The snapshot also exposes explicit local capabilities such as LIVE/SERVER presence, GameVals, RSCM, pack configs, map/server source roots, and project write access, plus aggregate diagnostic counts. UI/editor integrations should retain one session for the active OpenRune setup rather than independently rescanning the same repository.
+
+`openOpenRuneProjectSession()` creates and performs the initial refresh. Platform code remains responsible for constructing the selected-root `ProjectFileSystem`; the session itself contains no Svelte, Tauri, browser, or backend dependency.
+
 
 ## RSCM parser and index
 
