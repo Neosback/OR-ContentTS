@@ -8,8 +8,6 @@
 mod mesh_pack;
 
 mod slot_mesh;
-mod tile_lights;
 
 pub use mesh_pack::MeshPacker;
 pub use slot_mesh::SlotMeshOutput;
-pub use tile_lights::calculate_tile_lights;
