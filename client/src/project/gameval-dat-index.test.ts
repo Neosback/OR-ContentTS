@@ -290,6 +290,37 @@ describe("validateCustomGameVals", () => {
         ]);
     });
 
+    it("detects conflicts between custom project mappings", () => {
+        const issues = validateCustomGameVals(index, [
+            {
+                table: "loc",
+                key: "first",
+                id: 1000,
+                sourcePath: "content/a/gamevals.toml",
+                line: 1,
+            },
+            {
+                table: "loc",
+                key: "first",
+                id: 1001,
+                sourcePath: "content/b/gamevals.toml",
+                line: 1,
+            },
+            {
+                table: "loc",
+                key: "second",
+                id: 1000,
+                sourcePath: "content/c/gamevals.toml",
+                line: 1,
+            },
+        ]);
+
+        expect(issues.map((issue) => [issue.code, issue.symbol])).toEqual([
+            ["SYMBOL_CONFLICT", "loc.first"],
+            ["ID_CONFLICT", "loc.second"],
+        ]);
+    });
+
     it("allows -1 as an unassigned custom value", () => {
         expect(
             validateCustomGameVals(index, [
