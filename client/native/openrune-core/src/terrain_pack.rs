@@ -3,7 +3,7 @@
 //! The TypeScript renderer stores each terrain tile in a fixed 36-vertex slot.
 //! Every vertex is four little-endian u16 words: x, z, hsl/light, texture index + 1.
 //! Unused vertices in each slot remain zero so replacing a shorter tile clears stale geometry.
-//! The kernel is deliberately stateless so the TypeScript fallback can remain the reference implementation.
+//! The kernel is deliberately stateless; the TypeScript path remains the reference implementation.
 
 use wasm_bindgen::prelude::*;
 
