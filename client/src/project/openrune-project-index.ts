@@ -204,6 +204,18 @@ async function collectFiles(
     return files.sort(comparePaths);
 }
 
+async function collectDirectFiles(
+    fs: ProjectFileSystem,
+    root: string,
+    predicate: (path: string) => boolean,
+): Promise<string[]> {
+    if (!(await directoryExists(fs, root))) return [];
+    return (await fs.list(root))
+        .filter((entry) => entry.kind === "file" && predicate(entry.path))
+        .map((entry) => entry.path)
+        .sort(comparePaths);
+}
+
 type SourceWalk = {
     files: Set<string>;
     directories: Set<string>;
@@ -370,14 +382,16 @@ export async function indexOpenRuneProject(
             npcRoot,
             objRoot,
             areaRoot,
+            // OpenRune's current MapNpcPacker/MapObjPacker/MapAreaPacker use
+            // Files.list(), so only direct TOML children participate in packing.
             npcTomlFiles: npcRoot
-                ? await collectFiles(fs, npcRoot, (path) => path.toLowerCase().endsWith(".toml"))
+                ? await collectDirectFiles(fs, npcRoot, (path) => path.toLowerCase().endsWith(".toml"))
                 : [],
             objTomlFiles: objRoot
-                ? await collectFiles(fs, objRoot, (path) => path.toLowerCase().endsWith(".toml"))
+                ? await collectDirectFiles(fs, objRoot, (path) => path.toLowerCase().endsWith(".toml"))
                 : [],
             areaTomlFiles: areaRoot
-                ? await collectFiles(fs, areaRoot, (path) => path.toLowerCase().endsWith(".toml"))
+                ? await collectDirectFiles(fs, areaRoot, (path) => path.toLowerCase().endsWith(".toml"))
                 : [],
         },
         rawServerSources: {

@@ -114,7 +114,7 @@ Portable/source work next:
 - [x] Add a unified GameVal registry across base/generated DAT, module `gamevals.toml`, and RSCM with explicit OpenRune loader-order provenance and conflict diagnostics.
 - [x] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
 - [x] Add source-aware OpenRune config TOML adapters for definitions, including PackConfig block discovery, GameVal-backed id/inherit resolution, provenance, duplicate-target diagnostics, and guarded top-level scalar writes.
-- [ ] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters.
+- [x] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters with GameVal resolution, map-square indexing, Area relationship/polygon parsing, canonical generation, and guarded whole-file replacement.
 - [ ] Add server TOML adapters for future server-content/shop tooling.
 - [ ] Implement TypeScript terrain map-file-0 encoder.
 - [ ] Implement TypeScript static-loc map-file-1 encoder.
