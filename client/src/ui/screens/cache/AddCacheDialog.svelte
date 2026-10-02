@@ -18,7 +18,6 @@
     } from "../../../lib/tauri/desktop-cache";
     import { isTauriRuntime } from "../../../lib/tauri/is-tauri";
     import {
-        BrowserProjectFileSystem,
         getBrowserProjectAccessMode,
         selectBrowserProjectDirectory,
         type BrowserDirectoryHandle,
