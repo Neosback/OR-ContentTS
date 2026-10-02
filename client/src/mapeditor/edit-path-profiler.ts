@@ -7,7 +7,7 @@ type EditPathPhase = {
 
 export interface EditPathProfile {
     measure<T>(phase: string, run: () => T): T;
-    measureAsync<T>(phase: string, run: () => Promise<T>): Promise<T>;
+    measureAsync<T>(phase: string, run: () => PromiseLike<T>): Promise<T>;
     annotate(details: EditPathProfileDetails): void;
     end(): void;
 }
@@ -79,7 +79,7 @@ export function beginEditPathProfile(
     if (!enabled) {
         return {
             measure: (_phase, run) => run(),
-            measureAsync: (_phase, run) => run(),
+            measureAsync: async (_phase, run) => await run(),
             annotate: () => undefined,
             end: () => undefined,
         };
@@ -109,7 +109,7 @@ export function beginEditPathProfile(
                 addPhase(phase, now() - phaseStartedAt);
             }
         },
-        async measureAsync<T>(phase: string, run: () => Promise<T>): Promise<T> {
+        async measureAsync<T>(phase: string, run: () => PromiseLike<T>): Promise<T> {
             const phaseStartedAt = now();
             try {
                 return await run();
