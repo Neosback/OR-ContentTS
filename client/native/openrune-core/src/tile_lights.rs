@@ -28,8 +28,8 @@ pub fn calculate_tile_lights(
 ) -> Result<Vec<i32>, JsError> {
     let size_x = size_x as usize;
     let size_y = size_y as usize;
-    let source_stride_y = size_y + 1;
-    let expected_source = (size_x + 1) * source_stride_y;
+    let source_stride_y = size_y;
+    let expected_source = size_x * size_y;
 
     if heights.len() != expected_source {
         return Err(JsError::new("tile light height plane has the wrong size"));
