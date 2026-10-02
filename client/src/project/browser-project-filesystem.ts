@@ -176,7 +176,15 @@ export class BrowserProjectFileSystem implements ProjectFileSystem {
             return { name: "", path: "", kind: "directory" };
         }
 
-        const handle = await this.findEntry(normalized);
+        let handle: BrowserEntryHandle | undefined;
+        try {
+            handle = await this.findEntry(normalized);
+        } catch (error) {
+            if (error instanceof ProjectFileSystemError && error.code === "NOT_FOUND") {
+                return undefined;
+            }
+            throw error;
+        }
         if (!handle) return undefined;
 
         if (handle.kind === "directory") {
