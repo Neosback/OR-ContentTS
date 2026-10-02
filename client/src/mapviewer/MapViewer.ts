@@ -27,6 +27,7 @@ import { RenderDataWorkerPool } from "./worker/RenderDataWorkerPool";
 const DEFAULT_RENDER_DISTANCE = isWallpaperEngine ? 512 : 128;
 
 const CACHED_MAP_IMAGE_PREFIX = "/map-images/";
+const MAX_MINIMAP_IMAGE_URLS = 64;
 
 export class MapViewer {
     inputManager: InputManager = new InputManager();
@@ -455,6 +456,7 @@ export class MapViewer {
         const old = urls.get(mapId);
         if (old) {
             URL.revokeObjectURL(old);
+            urls.delete(mapId);
         }
         if (cache) {
             fetch(url).then((resp) => {
@@ -469,6 +471,17 @@ export class MapViewer {
             });
         }
         urls.set(mapId, url);
+
+        if (minimap) {
+            while (urls.size > MAX_MINIMAP_IMAGE_URLS) {
+                const oldest = urls.entries().next().value as
+                    | [number, string]
+                    | undefined;
+                if (!oldest) break;
+                urls.delete(oldest[0]);
+                URL.revokeObjectURL(oldest[1]);
+            }
+        }
     }
 
     clearMapImageUrls(): void {
