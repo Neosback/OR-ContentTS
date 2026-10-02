@@ -5,17 +5,14 @@
     import Package from "@lucide/svelte/icons/package";
     import Pencil from "@lucide/svelte/icons/pencil";
     import Plus from "@lucide/svelte/icons/plus";
-    import Server from "@lucide/svelte/icons/server";
 
     import {
         hasResolvedProfileCache,
         loadResolvedProfileCache,
-        SERVER_PROFILE_PREFIX,
-        serverProfileId,
     } from "../../../cache/profile-cache-source";
-    import { staticRangeCacheSource } from "../../../cache/static-range-cache-source";
     import { clearRuntimeLoadedCache, setRuntimeLoadedCache } from "../../../lib/active-cache-runtime";
     import {
+        cacheSetupKind,
         getActiveProfileIdAsync,
         loadLocalCacheProfilesAsync,
         saveLocalCacheProfilesAsync,
@@ -26,7 +23,6 @@
         deleteProfileCache,
         saveProfileCacheFiles,
     } from "../../../lib/profile-cache-store";
-    import type { CacheInfo } from "../../../rs/cache/CacheInfo";
     import ConfirmationDialog from "../../components/confirmation/ConfirmationDialog.svelte";
     import { errorMessage, notifyError, notifySuccess } from "../../lib/notify";
     import { router } from "../../lib/router.svelte";
@@ -46,7 +42,6 @@
     let autoloadProgress = $state<number | null>(null);
     let autoloadLabel = $state("Loading cache...");
     let autoloadStarted = false;
-    let serverCaches = $state<CacheInfo[]>([]);
     let folderInput = $state<HTMLInputElement>();
     let importProfileId: string | null = null;
 
@@ -56,14 +51,6 @@
 
     onMount(() => {
         let cancelled = false;
-        // Studio-owned caches served from /caches with Range support.
-        staticRangeCacheSource.listCaches()
-            .then((list) => {
-                if (!cancelled) serverCaches = Array.isArray(list) ? list : [];
-            })
-            .catch(() => {
-                if (!cancelled) serverCaches = [];
-            });
         void (async () => {
             const list = await loadLocalCacheProfilesAsync();
             const active = await getActiveProfileIdAsync();
@@ -114,7 +101,11 @@
                 savedMap = { ...savedMap, [profile.id]: true };
             }
 
-            if (profile.useSystemFolder || importFiles.length > 0) {
+            if (
+                cacheSetupKind(profile) === "openrune" ||
+                profile.useSystemFolder ||
+                importFiles.length > 0
+            ) {
                 await loadProfile(profile.id, next);
             }
         } catch (error) {
@@ -165,32 +156,14 @@
         if (!profile) return;
         if (!savedMap[id]) {
             notifyError(
-                `"${profile.name}" is not currently available. Re-open its folder in Manage or update the imported cache.`,
+                cacheSetupKind(profile) === "openrune"
+                    ? `"${profile.name}" is not currently available. Re-open its OpenRune project root in Manage and make sure LIVE exists.`
+                    : `"${profile.name}" is not currently available. Re-open its cache folder in Manage or update the imported cache.`,
             );
             return;
         }
         pendingSwitchProfileId = id;
         switchOpen = true;
-    }
-
-    /** Adds (once) and activates a profile that streams a dev-server cache instead of importing it. */
-    async function selectServerCache(info: CacheInfo): Promise<void> {
-        const id = serverProfileId(info.name);
-        let next = profiles;
-        if (!profiles.some((p) => p.id === id)) {
-            next = [
-                ...profiles,
-                {
-                    id,
-                    name: `${info.name} (local)`,
-                    revision: String(info.revision),
-                    locationNotes: `Streams from /caches/${info.name}`,
-                },
-            ];
-            await persist(next);
-        }
-        savedMap = { ...savedMap, [id]: true };
-        await loadProfile(id, next);
     }
 
     function startImport(profileId: string): void {
@@ -287,10 +260,10 @@
         <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">OpenRune</p>
         <h1 class="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight">
             <Package class="size-6" />
-            Cache repository
+            Cache & project setup
         </h1>
         <p class="mt-2 text-sm text-muted-foreground">
-            Add cache profiles (icon, revision, description, location), mark one active, and keep your cache catalog ready.
+            Use a basic cache by itself, or connect an OpenRune Server project root for cache plus source-aware Studio features.
         </p>
         <div class="mt-4 flex flex-wrap gap-2">
             <button
@@ -302,7 +275,7 @@
                 }}
             >
                 <Plus class="size-4" />
-                Add cache
+                Add setup
             </button>
             {#if activeProfile}
                 <span class="inline-flex items-center rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -312,42 +285,11 @@
         </div>
     </section>
 
-    {#if serverCaches.length > 0}
-        <section class="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 class="flex items-center gap-2 text-sm font-semibold">
-                <Server class="size-4" />
-                Studio local caches
-            </h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-                Served from <code class="font-mono text-xs">client/caches</code> through <code class="font-mono text-xs">/caches</code> with Range support. These stream directly; nothing is copied into browser storage.
-            </p>
-            <div class="mt-3 space-y-2">
-                {#each serverCaches as info (info.name)}
-                    {@const active = serverProfileId(info.name) === activeProfileId}
-                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 p-3">
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-medium">{info.name}</p>
-                            <p class="text-xs text-muted-foreground">{info.game} · revision {info.revision}</p>
-                        </div>
-                        <button
-                            type="button"
-                            disabled={active}
-                            class="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
-                            onclick={() => void selectServerCache(info)}
-                        >
-                            {active ? "Active" : "Use"}
-                        </button>
-                    </div>
-                {/each}
-            </div>
-        </section>
-    {/if}
-
     <section class="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div class="space-y-2">
             {#if profiles.length === 0}
                 <div class="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-                    No caches yet. Click Add cache to create your first cache profile.
+                    No setups yet. Add a basic cache or connect an OpenRune project.
                 </div>
             {:else}
                 {#each profiles as p (p.id)}
@@ -398,8 +340,16 @@
                                         {#if p.revision}
                                             <span class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">rev {p.revision}</span>
                                         {/if}
-                                        {#if p.id.startsWith(SERVER_PROFILE_PREFIX)}
-                                            <span class="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-300">Local source</span>
+                                        {#if cacheSetupKind(p) === "openrune"}
+                                            <span class="rounded bg-violet-500/15 px-1.5 py-0.5 text-xs text-violet-300">OpenRune project</span>
+                                            <span class={cn(
+                                                "rounded px-1.5 py-0.5 text-xs",
+                                                saved
+                                                    ? "bg-emerald-500/15 text-emerald-300"
+                                                    : "bg-amber-500/10 text-amber-300",
+                                            )}>
+                                                {saved ? "LIVE ready" : "LIVE unavailable"}
+                                            </span>
                                         {:else if p.useSystemFolder}
                                             <span class={cn(
                                                 "rounded px-1.5 py-0.5 text-xs",
@@ -436,10 +386,17 @@
                                 <button
                                     type="button"
                                     class={actionButton}
-                                    onclick={() => p.useSystemFolder ? void loadProfile(p.id) : startImport(p.id)}
+                                    onclick={() =>
+                                        cacheSetupKind(p) === "openrune" || p.useSystemFolder
+                                            ? void loadProfile(p.id)
+                                            : startImport(p.id)}
                                 >
                                     <FolderOpen class="size-3.5" />
-                                    {p.useSystemFolder ? "Reload from disk" : "Update cache"}
+                                    {cacheSetupKind(p) === "openrune"
+                                        ? "Reload project"
+                                        : p.useSystemFolder
+                                          ? "Reload from disk"
+                                          : "Update cache"}
                                 </button>
                             </div>
                         </div>

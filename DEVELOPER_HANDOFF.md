@@ -21,10 +21,10 @@ As of the PR #54 cache-repository checkpoint:
 - Raw map source discovery now mirrors OpenRune's current packers exactly: only direct `.toml` children of `.data/raw-cache/map/npcs`, `objs`, and `area` are active because the packers use non-recursive `Files.list()`.
 - OpenRune server TOML support now mirrors `PackServerConfig`'s registered table families across both `.data/raw-cache/server/**/*.toml` and pack-owned `pack/configs/**/*.toml`. It preserves raw/nested source, resolves symbolic ids through the GameVal registry, surfaces duplicate resolved targets instead of inventing precedence, and provides a typed inventory/shop stock view plus guarded source writes.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
-- Cache Repository now has explicit platform behavior:
-  - browser fallback: choose a cache folder once when creating a profile, then import that same selection into IndexedDB;
-  - Tauri: choose a native cache directory and read it directly through `ProjectFileSystemCacheSource`, with no IndexedDB cache mirror;
-  - Studio local range caches remain direct streamed development sources.
+- Cache & Project Setup now has two explicit user-facing modes:
+  - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
+  - **OpenRune project:** Tauri stores one OpenRune Server repository root, validates/indexes it with `indexOpenRuneProject()`, and rediscovers LIVE/SERVER plus GameVal/RSCM/raw-map/server/pack sources from that root. The user is never asked for a second LIVE-cache path.
+- The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
 - Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
 - The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
 - The Kotlin backend is still intentionally **not** the universal cache/project transport. It should start lazily only for JVM/OpenRune-only operations such as Gradle build/test, FileStore map publication, and parity verification.
@@ -277,6 +277,7 @@ These PRs establish the current baseline:
 | #56 | Added source-aware OpenRune PackConfig TOML indexing and guarded definition-source writes |
 | #57 | Added OpenRune NPC/ground-Obj/Area map-source TOML parse/index/generate/write adapters and aligned source discovery with the packers |
 | #58 | Added OpenRune PackServerConfig TOML indexing, shop/inventory stock support, provenance/conflict diagnostics, and guarded source writes |
+| #59 | Split Cache & Project Setup into Basic cache vs OpenRune project-root modes and removed the pinned development-cache bootstrap |
 
 Do not reintroduce systems replaced by these PRs.
 
