@@ -1,9 +1,10 @@
 name: Temporary Tauri validation
 
 on:
-  push:
-    branches:
-      - feat/tauri-project-filesystem
+  pull_request:
+    paths:
+      - "client/src-tauri/**"
+      - ".github/workflows/temporary-tauri-validation.yml"
   workflow_dispatch:
 
 permissions:
