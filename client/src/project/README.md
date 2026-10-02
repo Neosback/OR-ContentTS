@@ -183,6 +183,18 @@ Every effective entry retains the declarations that contributed to that symbol, 
 
 `indexProjectGameValRegistry()` builds the DAT, TOML, and RSCM indexes through one project-level API while keeping the underlying indexes available for detailed diagnostics.
 
+## OpenRune PackConfig TOML adapter
+
+`openrune-config-toml.ts` is the framework-neutral source adapter for client/config definitions owned by OpenRune pack modules under `src/main/resources/pack/configs`.
+
+It mirrors the current OpenRune-FileStore `PackConfig` block names, recursively discovers TOML under each indexed pack root, and records block type, source path, module/pack provenance, source line range, top-level scalar fields, `isServerOnly`, and both raw and resolved `id`/`inherit` identities. Quoted GameVal identities resolve through the unified `GameValRegistry`; numeric ids remain usable directly.
+
+The adapter deliberately does **not** normalize or regenerate arbitrary TOML. Nested subtables such as `[item.params]`, inline tables, comments, and unknown definition fields remain in the authoritative source text. This avoids a lossy Studio-side TOML rewrite and keeps OpenRune's mapper as the semantic authority.
+
+`updateOpenRuneConfigField()` supports guarded top-level scalar updates, insertions, and removals. Before writing, it re-reads the source and requires the indexed block text to still match. If another editor/process changed the block, the operation fails with `STALE_SOURCE` and requires a re-index instead of overwriting external changes. Nested field paths are rejected so future item/NPC/object-specific editors must add explicit source adapters for those structures.
+
+The aggregate index also reports duplicate resolved cache targets, including the `graphic`/`graphics` alias pair, so source conflicts can be surfaced before an OpenRune build.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
