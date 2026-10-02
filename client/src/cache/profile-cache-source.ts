@@ -4,6 +4,10 @@ import {
 } from "../lib/local-cache-profiles";
 import { isTauriRuntime } from "../lib/tauri/is-tauri";
 import { getActiveOpenRuneProjectRuntime } from "../lib/active-openrune-project-runtime";
+import {
+    openRuneProjectRootIdentity,
+    resolveOpenRuneProfileFileSystem,
+} from "../lib/openrune-profile-project-filesystem";
 import type {
     CacheLoadOptions,
     CacheSource,
@@ -42,13 +46,12 @@ async function createTauriSystemSource(
     );
 }
 
-async function createTauriOpenRuneSource(
+async function createOpenRuneSource(
     profile: LocalCacheProfile,
 ): Promise<CacheSource | undefined> {
-    if (!isTauriRuntime() || !profile.openRuneRootPath) return undefined;
-
+    const rootKey = openRuneProjectRootIdentity(profile);
     const active = getActiveOpenRuneProjectRuntime(profile.id);
-    if (active?.rootPath === profile.openRuneRootPath) {
+    if (active?.rootKey === rootKey) {
         const liveCachePath = active.snapshot.project.liveCachePath;
         if (!liveCachePath) return undefined;
         return new ProjectFileSystemCacheSource(
@@ -58,14 +61,14 @@ async function createTauriOpenRuneSource(
         );
     }
 
-    // Availability probes must not mutate the globally active project runtime.
-    // Build a temporary project view only when this profile is not active.
-    const [{ TauriProjectFileSystem }, { indexOpenRuneProject }] =
-        await Promise.all([
-            import("../project/tauri-project-filesystem"),
-            import("../project/openrune-project-index"),
-        ]);
-    const fileSystem = new TauriProjectFileSystem(profile.openRuneRootPath);
+    // Availability probes must not mutate the globally active project runtime
+    // or prompt for browser permissions.
+    const fileSystem = await resolveOpenRuneProfileFileSystem(profile);
+    if (!fileSystem) return undefined;
+
+    const { indexOpenRuneProject } = await import(
+        "../project/openrune-project-index"
+    );
     const project = await indexOpenRuneProject(fileSystem);
     if (!project.isOpenRuneProject || !project.liveCachePath) return undefined;
 
@@ -88,7 +91,7 @@ export async function resolveProfileCacheSource(
     if (cacheSetupKind(profile) === "openrune") {
         const source = options.createOpenRuneSource
             ? await options.createOpenRuneSource(profile)
-            : await createTauriOpenRuneSource(profile);
+            : await createOpenRuneSource(profile);
         if (!source) return undefined;
 
         const [info] = await source.listCaches();
@@ -136,7 +139,7 @@ export async function loadResolvedProfileCache(
     if (!binding) {
         if (cacheSetupKind(profile) === "openrune") {
             throw new Error(
-                `OpenRune project "${profile.name}" is unavailable or does not currently contain .data/cache/LIVE. Re-open the OpenRune project root in Manage.`,
+                `OpenRune project "${profile.name}" does not currently contain .data/cache/LIVE. The project may still be valid but needs OpenRune bootstrap before Map can load a cache.`,
             );
         }
         if (profile.useSystemFolder && profile.systemCachePath) {
