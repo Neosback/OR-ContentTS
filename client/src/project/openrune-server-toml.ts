@@ -70,7 +70,7 @@ export type OpenRuneServerDefinitionBlock = {
 };
 
 export type OpenRuneInventoryStock = {
-    obj: string;
+    obj: string | number;
     resolvedObjId?: number;
     count: number;
     restockCycles: number;
@@ -147,7 +147,7 @@ export type ParseOpenRuneServerTomlOptions = {
 };
 
 export type SerializableOpenRuneInventoryStock = {
-    obj: string;
+    obj: string | number;
     count: number;
     restockCycles: number;
 };
@@ -376,32 +376,43 @@ function sourceBlocks(text: string): Array<{
     end: number;
 }> {
     const lines = text.split(/\r?\n/);
-    const headers: Array<{
-        table: OpenRuneServerTable;
-        start: number;
-    }> = [];
+    const rootHeaders: Array<{ name: string; start: number }> = [];
 
     for (let index = 0; index < lines.length; index++) {
         const match = ARRAY_HEADER.exec(lines[index]!);
         const name = match?.[1]?.trim();
-        if (name && TABLE_SET.has(name)) {
-            headers.push({
-                table: name as OpenRuneServerTable,
-                start: index,
-            });
+        // Nested arrays such as [[inventory.stock]] and [[npc.waypoints]]
+        // belong to the current root definition. Any array header without a
+        // dot is a root boundary, including server/slayer tables that
+        // PackServerConfig itself ignores.
+        if (name && !name.includes(".")) {
+            rootHeaders.push({ name, start: index });
         }
     }
 
     const ordinals = new Map<string, number>();
-    return headers.map((header, index) => {
-        const ordinal = ordinals.get(header.table) ?? 0;
-        ordinals.set(header.table, ordinal + 1);
-        return {
-            ...header,
+    const blocks: Array<{
+        table: OpenRuneServerTable;
+        ordinal: number;
+        start: number;
+        end: number;
+    }> = [];
+
+    for (let index = 0; index < rootHeaders.length; index++) {
+        const header = rootHeaders[index]!;
+        if (!TABLE_SET.has(header.name)) continue;
+
+        const table = header.name as OpenRuneServerTable;
+        const ordinal = ordinals.get(table) ?? 0;
+        ordinals.set(table, ordinal + 1);
+        blocks.push({
+            table,
             ordinal,
-            end: headers[index + 1]?.start ?? lines.length,
-        };
-    });
+            start: header.start,
+            end: rootHeaders[index + 1]?.start ?? lines.length,
+        });
+    }
+    return blocks;
 }
 
 function nestedSections(
@@ -468,6 +479,15 @@ function issueIdentity(
     gameVals: GameValRegistry | undefined,
 ): OpenRuneServerTomlIssue | undefined {
     const source = field(block.fields, which);
+    if (which === "id" && !source) {
+        return {
+            code: "INVALID_ID",
+            message: `OpenRune server definition at ${block.sourcePath}:${block.startLine} is missing its id field.`,
+            sourcePath: block.sourcePath,
+            line: block.startLine,
+            table: block.table,
+        };
+    }
     if (source && value === undefined) {
         return {
             code: which === "id" ? "INVALID_ID" : "INVALID_INHERIT",
@@ -527,7 +547,11 @@ function parseInventoryStock(
         const line = start + 1;
 
         if (
-            typeof obj?.value !== "string" ||
+            (typeof obj?.value !== "string" &&
+                (typeof obj?.value !== "number" ||
+                    !Number.isSafeInteger(obj.value) ||
+                    obj.value < 0 ||
+                    obj.value > 0x7fffffff)) ||
             typeof count?.value !== "number" ||
             !Number.isSafeInteger(count.value) ||
             count.value < 0 ||
@@ -549,10 +573,17 @@ function parseInventoryStock(
             continue;
         }
 
-        const resolvedObjId = gameVals
-            ? findGameValSymbol(gameVals, obj.value)?.id
-            : undefined;
-        if (gameVals && resolvedObjId === undefined) {
+        const resolvedObjId =
+            typeof obj.value === "number"
+                ? obj.value
+                : gameVals
+                  ? findGameValSymbol(gameVals, obj.value)?.id
+                  : undefined;
+        if (
+            gameVals &&
+            typeof obj.value === "string" &&
+            resolvedObjId === undefined
+        ) {
             issues.push({
                 code: "UNRESOLVED_STOCK_OBJ",
                 message: `OpenRune inventory stock obj "${obj.value}" at ${block.sourcePath}:${obj.line} is not present in the selected GameVal registry.`,
@@ -1001,9 +1032,15 @@ export function serializeOpenRuneInventoryToml(
             `isServerOnly = ${inventory.isServerOnly ?? true}`,
             `id = ${serializeScalar(inventory.id)}`,
         ];
-        pushOptional(lines, "name", inventory.name, JSON.stringify);
-        pushOptional(lines, "scope", inventory.scope, JSON.stringify);
-        pushOptional(lines, "stack", inventory.stack, JSON.stringify);
+        pushOptional(lines, "name", inventory.name, (value) =>
+            JSON.stringify(value),
+        );
+        pushOptional(lines, "scope", inventory.scope, (value) =>
+            JSON.stringify(value),
+        );
+        pushOptional(lines, "stack", inventory.stack, (value) =>
+            JSON.stringify(value),
+        );
         pushOptional(lines, "sellMultiplier", inventory.sellMultiplier);
         pushOptional(lines, "buyMultiplier", inventory.buyMultiplier);
         pushOptional(lines, "delta", inventory.delta);
@@ -1031,7 +1068,7 @@ export function serializeOpenRuneInventoryToml(
             lines.push(
                 "",
                 "[[inventory.stock]]",
-                `obj = ${JSON.stringify(entry.obj)}`,
+                `obj = ${serializeScalar(entry.obj)}`,
                 `count = ${entry.count}`,
                 `restockCycles = ${entry.restockCycles}`,
             );
