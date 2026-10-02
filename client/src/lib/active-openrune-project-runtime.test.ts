@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { InMemoryProjectFileSystem } from "../project/in-memory-project-filesystem";
-import type { ProjectFileSystem } from "../project/project-filesystem";
+import type {
+    ProjectFileEntry,
+    ProjectFileSystem,
+    ProjectFileSystemCapabilities,
+} from "../project/project-filesystem";
 import type { LocalCacheProfile } from "./local-cache-profiles";
 import {
     clearActiveOpenRuneProjectRuntime,
@@ -21,6 +25,50 @@ function seed(name: string): Record<string, string | Uint8Array> {
         ".data/gamevals/npc.rscm": "imp=100",
         ".data/cache/LIVE/main_file_cache.dat2": new Uint8Array([0]),
     };
+}
+
+class ToggleReadFailureFileSystem implements ProjectFileSystem {
+    failPath: string | null = null;
+
+    constructor(private readonly inner: ProjectFileSystem) {}
+
+    get capabilities(): ProjectFileSystemCapabilities {
+        return this.inner.capabilities;
+    }
+
+    list(path?: string): Promise<ProjectFileEntry[]> {
+        return this.inner.list(path);
+    }
+
+    stat(path: string): Promise<ProjectFileEntry | undefined> {
+        return this.inner.stat(path);
+    }
+
+    exists(path: string): Promise<boolean> {
+        return this.inner.exists(path);
+    }
+
+    readText(path: string): Promise<string> {
+        if (path === this.failPath) {
+            return Promise.reject(new Error("simulated project read failure"));
+        }
+        return this.inner.readText(path);
+    }
+
+    readBytes(path: string): Promise<Uint8Array> {
+        if (path === this.failPath) {
+            return Promise.reject(new Error("simulated project read failure"));
+        }
+        return this.inner.readBytes(path);
+    }
+
+    writeText(path: string, text: string): Promise<void> {
+        return this.inner.writeText(path, text);
+    }
+
+    writeBytes(path: string, data: Uint8Array): Promise<void> {
+        return this.inner.writeBytes(path, data);
+    }
 }
 
 function profile(
@@ -76,7 +124,9 @@ describe("active OpenRune project runtime", () => {
             createFileSystem: () => fsOne,
         });
 
-        let resolveTwo!: (value: ProjectFileSystem) => void;
+        let resolveTwo:
+            | ((value: ProjectFileSystem) => void)
+            | undefined;
         const pendingTwo = new Promise<ProjectFileSystem>((resolve) => {
             resolveTwo = resolve;
         });
@@ -86,7 +136,8 @@ describe("active OpenRune project runtime", () => {
 
         expect(getActiveOpenRuneProjectRuntime()).toBeNull();
 
-        resolveTwo(fsTwo);
+        expect(resolveTwo).toBeDefined();
+        resolveTwo!(fsTwo);
         const active = await switching;
 
         expect(active?.profileId).toBe("two");
@@ -136,27 +187,22 @@ describe("active OpenRune project runtime", () => {
 
     it("keeps the prior published runtime when refresh fails", async () => {
         clearActiveOpenRuneProjectRuntime();
-        const fs = new InMemoryProjectFileSystem(seed("One"));
+        const inner = new InMemoryProjectFileSystem(seed("One"));
+        const fs = new ToggleReadFailureFileSystem(inner);
         const candidate = profile("one", "/projects/one");
         const first = await syncActiveOpenRuneProjectRuntime(candidate, {
             createFileSystem: () => fs,
         });
 
-        // Replacing the OpenRune marker file with a directory is impossible in
-        // the in-memory filesystem, so make a source index fail by deleting its
-        // semantic content through an invalid RSCM mapping.
-        await fs.writeText(".data/gamevals/npc.rscm", "imp=not-an-id");
+        fs.failPath = ".data/gamevals/npc.rscm";
 
-        const before = getActiveOpenRuneProjectRuntime();
-        await refreshActiveOpenRuneProjectRuntime(candidate);
+        await expect(
+            refreshActiveOpenRuneProjectRuntime(candidate),
+        ).rejects.toThrow("simulated project read failure");
+
         const after = getActiveOpenRuneProjectRuntime();
-
-        // Parser diagnostics do not make refresh fail; they publish atomically
-        // as a complete new generation.
-        expect(after?.snapshot.generation).toBe(2);
-        expect(after?.snapshot.diagnostics.gameVals).toBeGreaterThan(0);
-        expect(before?.session).toBe(first?.session);
-        expect(after?.session).toBe(first?.session);
+        expect(after).toBe(first);
+        expect(after?.snapshot.generation).toBe(1);
     });
 
     it("notifies framework-neutral subscribers on activate, refresh, and clear", async () => {
