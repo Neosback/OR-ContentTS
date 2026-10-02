@@ -115,7 +115,7 @@ Portable/source work next:
 - [x] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
 - [x] Add source-aware OpenRune config TOML adapters for definitions, including PackConfig block discovery, GameVal-backed id/inherit resolution, provenance, duplicate-target diagnostics, and guarded top-level scalar writes.
 - [x] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters with GameVal resolution, map-square indexing, Area relationship/polygon parsing, canonical generation, and guarded whole-file replacement.
-- [ ] Add server TOML adapters for future server-content/shop tooling.
+- [x] Add server TOML adapters for server-content/shop tooling, including PackServerConfig table indexing, raw-server + pack-config provenance, inventory stock parsing, GameVal resolution, duplicate-target diagnostics, guarded scalar writes, and canonical inventory generation.
 - [ ] Implement TypeScript terrain map-file-0 encoder.
 - [ ] Implement TypeScript static-loc map-file-1 encoder.
 - [ ] Add golden decode/encode round-trip fixtures.
