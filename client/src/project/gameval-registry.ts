@@ -102,16 +102,12 @@ function tomlRootRank(path: string): number {
     return 2;
 }
 
-function compareDeclarations(
+function compareDatDeclarations(
     a: GameValRegistryDeclaration,
     b: GameValRegistryDeclaration,
 ): number {
     return (
-        compareText(a.table, b.table) ||
-        compareText(a.key, b.key) ||
-        a.id - b.id ||
         compareText(a.sourcePath, b.sourcePath) ||
-        (a.line ?? 0) - (b.line ?? 0) ||
         (a.tableIndex ?? 0) - (b.tableIndex ?? 0) ||
         (a.entryIndex ?? 0) - (b.entryIndex ?? 0)
     );
@@ -124,9 +120,15 @@ function compareTomlDeclarations(
     return (
         tomlRootRank(a.sourcePath) - tomlRootRank(b.sourcePath) ||
         compareText(a.sourcePath, b.sourcePath) ||
-        (a.line ?? 0) - (b.line ?? 0) ||
-        compareDeclarations(a, b)
+        (a.line ?? 0) - (b.line ?? 0)
     );
+}
+
+function compareRscmDeclarations(
+    a: GameValRegistryDeclaration,
+    b: GameValRegistryDeclaration,
+): number {
+    return compareText(a.sourcePath, b.sourcePath) || (a.line ?? 0) - (b.line ?? 0);
 }
 
 function fromDat(entry: GameValDatEntry): GameValRegistryDeclaration {
@@ -171,13 +173,13 @@ function collectDeclarations(indexes: GameValRegistryIndexes): GameValRegistryDe
     const base = indexes.dat.files
         .filter((file) => file.sourceKind === "base")
         .flatMap((file) => file.entries.map(fromDat))
-        .sort(compareDeclarations);
+        .sort(compareDatDeclarations);
     const generated = indexes.dat.files
         .filter((file) => file.sourceKind === "generated")
         .flatMap((file) => file.entries.map(fromDat))
-        .sort(compareDeclarations);
+        .sort(compareDatDeclarations);
     const toml = indexes.toml.entries.map(fromToml).sort(compareTomlDeclarations);
-    const rscm = indexes.rscm.entries.map(fromRscm).sort(compareDeclarations);
+    const rscm = indexes.rscm.entries.map(fromRscm).sort(compareRscmDeclarations);
 
     return [...base, ...generated, ...toml, ...rscm];
 }
