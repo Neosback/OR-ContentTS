@@ -71,7 +71,9 @@ export async function selectTauriProjectDirectory(
         title: options.title ?? "Open OpenRune project",
     });
     if (!selected) return undefined;
-    return new TauriProjectFileSystem(selected);
+    const rootPath = Array.isArray(selected) ? selected[0] : selected;
+    if (!rootPath) return undefined;
+    return new TauriProjectFileSystem(rootPath);
 }
 
 /**
