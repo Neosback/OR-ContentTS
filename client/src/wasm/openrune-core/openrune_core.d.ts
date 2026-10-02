@@ -46,6 +46,8 @@ export class SlotMeshOutput {
     take_words(): Uint32Array;
 }
 
+export function calculate_tile_lights(size_x: number, size_y: number, heights: Int32Array, occlusions: Uint8Array, ignore_occlusion: boolean): Int32Array;
+
 /**
  * Packs flattened terrain vertices into fixed-size per-tile slots.
  *
@@ -62,6 +64,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_meshpacker_free: (a: number, b: number) => void;
     readonly __wbg_slotmeshoutput_free: (a: number, b: number) => void;
+    readonly calculate_tile_lights: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly meshpacker_add_model: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number, y: number, z: number, a1: number, b1: number, c1: number, d1: number, e1: number, f1: number, g1: number, h1: number, i1: number, j1: number, k1: number) => void;
     readonly meshpacker_build_slot_mesh: (a: number, b: number, c: number, d: number) => void;
     readonly meshpacker_index_count: (a: number) => number;
