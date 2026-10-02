@@ -105,7 +105,7 @@ Backend foundation already completed:
 
 Portable/source work next:
 
-- [ ] Add a framework-neutral `ProjectFileSystem` capability boundary.
+- [x] Add a framework-neutral `ProjectFileSystem` capability boundary.
 - [ ] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
 - [ ] Add optional browser File System Access adapter with import/download fallback.
 - [ ] Add pure TypeScript RSCM parsing/indexing.
