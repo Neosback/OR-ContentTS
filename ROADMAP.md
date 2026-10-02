@@ -108,7 +108,7 @@ Portable/source work next:
 - [x] Add a framework-neutral `ProjectFileSystem` capability boundary.
 - [x] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
 - [x] Add optional browser File System Access adapter with import/download fallback.
-- [ ] Add pure TypeScript RSCM parsing/indexing.
+- [x] Add pure TypeScript RSCM parsing/indexing.
 - [ ] Add pure TypeScript GameVal DAT parsing, provenance, and OpenRune validation rules.
 - [x] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
 - [ ] Add source-aware OpenRune config TOML adapters for definitions.
