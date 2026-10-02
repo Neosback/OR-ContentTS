@@ -158,9 +158,12 @@ Done:
 - [x] CS2 manual execution.
 - [x] Inventory/gameval simulation.
 - [x] Document Interface Editor cache/GameVal/RSCM data authority and backend enrichment path.
+- [x] Remove the Interface Editor's redundant cache-proxy interface load; selected interfaces now come directly from the active decoded cache.
 
 Next:
 
+- [ ] Add a ProjectFileSystem-backed CacheSource so Tauri and capable browsers can open an OpenRune checkout's `.data/cache/LIVE` without an IndexedDB import copy.
+- [ ] Move remaining Interface/CS2 cache-proxy lookups (for example enum definitions) behind local CacheSystem loaders first, with proxy/backend only as optional fallback.
 - [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [ ] Add a framework-neutral Interface metadata source backed first by the TypeScript GameValRegistry/project index.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.

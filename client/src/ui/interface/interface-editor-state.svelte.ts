@@ -6,7 +6,7 @@ import {
     STORAGE_KEY,
     type CacheType,
 } from "../../lib/cache-types";
-import { adaptInterfaceEntryFromApi, type InterfaceEntry } from "../../lib/interface-renderer/component-types";
+import type { InterfaceEntry } from "../../lib/interface-renderer/component-types";
 import { Cs1Interpreter, type Cs1SimState } from "../../lib/interface-renderer/cs1-interpreter";
 import {
     makeCs2LogLine,
@@ -342,19 +342,17 @@ export class InterfaceEditorState {
         this.loadController = controller;
 
         try {
-            const revision = encodeURIComponent(String(this.revision));
-            const response = await fetch(`/api/cache-proxy/interface/${selectedId}?rev=${revision}`, {
-                method: "GET",
-                headers: cacheProxyHeaders(this.selectedCacheType),
-                signal: controller.signal,
-                cache: "no-store",
-            });
-            if (!response.ok) throw new Error(`Failed to load interface (${response.status})`);
-
-            const payload = (await response.json()) as InterfaceEntry;
+            const data = this.viewer.getInterfaceEntry(
+                selectedId,
+                this.selectedName || null,
+            );
+            if (!data) {
+                throw new Error(
+                    `Interface ${selectedId} is not present in the selected cache.`,
+                );
+            }
             if (controller.signal.aborted || selectedId !== this.selectedId) return;
 
-            const data = adaptInterfaceEntryFromApi(payload);
             this.interfaceData = data;
             setCs1InterfaceEntry(data);
             applyCs2RuntimeFromSim(

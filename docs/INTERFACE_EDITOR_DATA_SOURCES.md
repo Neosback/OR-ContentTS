@@ -10,7 +10,7 @@ The key rule is:
 
 ## Current frontend data path
 
-The Interface Editor currently opens the active Studio cache through:
+The Interface Editor opens the active Studio cache and keeps interface selection on the same local decoded path:
 
 ```text
 active cache profile
@@ -20,7 +20,11 @@ active cache profile
        -> cache index 3
        -> ComponentDecoder
        -> decoded interface/component data
+       -> InterfaceViewer.getInterfaceEntry(id)
+       -> Interface Workbench / renderer
 ```
+
+Selecting an interface must not make a second HTTP request to a cache server. Earlier versions called `/api/cache-proxy/interface/:id` after already decoding index 3 locally; that made ordinary interface selection fail with HTTP 503 whenever the optional cache-server proxy was unavailable. The workbench now adapts the already-decoded cache object directly.
 
 Primary files:
 
@@ -172,6 +176,52 @@ Existing API capabilities include:
 - explicit index refresh.
 
 No OpenRune Server modification is required.
+
+## Runtime model: browser vs Tauri
+
+The cache/interface domain model should stay identical across platforms. The difference is only how bytes and project files enter the TypeScript layer.
+
+### Plain web
+
+Preferred order:
+
+```text
+selected cache
+    -> imported IndexedDB CacheSource
+       or browser File System Access CacheSource when available
+    -> CacheSystem / InterfaceViewer
+
+selected OpenRune project
+    -> BrowserProjectFileSystem when showDirectoryPicker is available
+       or import/download compatibility mode
+    -> TypeScript project/GameVal/RSCM/source adapters
+```
+
+The browser must not require a locally running OpenRune Server or Kotlin service just to browse interfaces, maps, GameVals, or project source. Browser deployments cannot spawn Gradle or a JVM sidecar themselves, so build/publish actions should either be unavailable or explicitly connect to an optional Studio backend.
+
+### Tauri desktop
+
+Preferred order:
+
+```text
+selected OpenRune checkout
+    -> TauriProjectFileSystem
+    -> direct source/GameVal/RSCM access
+    -> filesystem-backed CacheSource for .data/cache/LIVE
+    -> CacheSystem / InterfaceViewer
+
+explicit Build / Publish / Verify
+    -> lazy Studio backend sidecar
+    -> allowlisted OpenRune Gradle/FileStore operation
+```
+
+Tauri should therefore be the best local OpenRune experience: no cache import copy is necessary once a filesystem-backed CacheSource is added, and no backend process should start until the user invokes a JVM/OpenRune-only operation.
+
+### Shared invariant
+
+Svelte panels should not know whether the active cache came from IndexedDB, browser File System Access, Tauri filesystem access, or a static development range server. They should receive the same `LoadedCache` / `InterfaceViewer` contracts.
+
+The next platform improvement after the local interface-selection fix is a `ProjectFileSystem`-backed `CacheSource` so both Tauri and capable browsers can open `.data/cache/LIVE` directly from an OpenRune checkout. Tauri can then layer lazy backend build/publish actions on top without making the backend the read path.
 
 ## Recommended authority model
 

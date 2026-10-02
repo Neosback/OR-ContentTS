@@ -1,4 +1,6 @@
 import type { LoadedCache } from "../mapviewer/Caches";
+import type { InterfaceEntry } from "../lib/interface-renderer/component-types";
+import { interfaceEntryFromDecodedCache } from "./interface-entry-from-cache";
 import type { CacheIndex } from "../rs/cache/CacheIndex";
 import { CacheSystem } from "../rs/cache/CacheSystem";
 import { IndexType } from "../rs/cache/IndexType";
@@ -94,5 +96,14 @@ export class InterfaceViewer {
         const decoder = new ComponentDecoder(this.cacheSystem, decodeGameVals);
         this.interfaces = decoder.load();
         this.legacy = decoder.loadLegacyMap();
+    }
+
+    /**
+     * Returns a renderer-safe clone of an interface already decoded from the
+     * active cache. Selection never needs a cache-server HTTP round trip.
+     */
+    getInterfaceEntry(id: number, name: string | null = null): InterfaceEntry | undefined {
+        const decoded = this.interfaces[id];
+        return decoded ? interfaceEntryFromDecodedCache(decoded, name) : undefined;
     }
 }
