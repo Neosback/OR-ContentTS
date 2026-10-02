@@ -37,6 +37,7 @@ import {
     EditorMapObjectRebuildInput,
 } from "./EditorMapObjectChunkData";
 import { createMeshPacker } from "../../../wasm/openrune-core-loader";
+import { packTerrainVertexBatch } from "../../../wasm/terrain-packer";
 import { EditorMapTerrainData } from "./EditorMapTerrainData";
 import type { SceneLocData } from "../sceneLocData";
 
@@ -771,6 +772,59 @@ export function addTerrain(
     }
 
     return drawRanges;
+}
+
+export function packTerrainTileBatch(
+    textureIndexMap: Map<number, number>,
+    tiles: readonly SceneTile[],
+    offsetX: number,
+    offsetY: number,
+): Uint8Array {
+    const tileCounts = new Uint32Array(tiles.length);
+    let vertexCount = 0;
+
+    for (let tileIndex = 0; tileIndex < tiles.length; tileIndex++) {
+        const tileModel = tiles[tileIndex]!.tileModel;
+        if (!tileModel) {
+            continue;
+        }
+        let count = 0;
+        for (const face of tileModel.faces) {
+            count += face.vertices.length;
+        }
+        tileCounts[tileIndex] = count;
+        vertexCount += count;
+    }
+
+    const xs = new Int32Array(vertexCount);
+    const zs = new Int32Array(vertexCount);
+    const hsls = new Int32Array(vertexCount);
+    const textureIndices = new Int32Array(vertexCount);
+    let source = 0;
+
+    for (const tile of tiles) {
+        const tileModel = tile.tileModel;
+        if (!tileModel) {
+            continue;
+        }
+        for (const face of tileModel.faces) {
+            for (const vertex of face.vertices) {
+                xs[source] = vertex.x + offsetX;
+                zs[source] = vertex.z + offsetY;
+                hsls[source] = vertex.hsl;
+                textureIndices[source] = textureIndexMap.get(vertex.textureId) ?? -1;
+                source++;
+            }
+        }
+    }
+
+    return packTerrainVertexBatch({
+        tileCounts,
+        xs,
+        zs,
+        hsls,
+        textureIndices,
+    });
 }
 
 export function addTerrainTile(
