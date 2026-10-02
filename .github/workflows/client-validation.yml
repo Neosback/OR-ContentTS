@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: client-validation-${{ github.event.pull_request.number || github.ref }}
@@ -56,6 +56,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Install Linux Tauri dependencies
         run: |
@@ -71,9 +74,13 @@ jobs:
       - name: Cargo check locked
         run: cargo check --manifest-path client/src-tauri/Cargo.toml --locked
 
-      - name: Upload Cargo lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: tauri-cargo-lock
-          path: client/src-tauri/Cargo.lock
-          if-no-files-found: error
+      - name: Commit generated Cargo lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src-tauri/Cargo.lock
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(tauri): lock persisted scope dependency"
+          git push origin HEAD:${{ github.head_ref }}
