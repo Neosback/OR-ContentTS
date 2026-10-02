@@ -195,6 +195,24 @@ The adapter deliberately does **not** normalize or regenerate arbitrary TOML. Ne
 
 The aggregate index also reports duplicate resolved cache targets, including the `graphic`/`graphics` alias pair, so source conflicts can be surfaced before an OpenRune build.
 
+## OpenRune raw map-source TOML adapters
+
+`openrune-map-source-toml.ts` is the portable source layer for the authoring formats OpenRune already owns under `.data/raw-cache/map`:
+
+- `npcs/*.toml` → NPC spawn source, packed into modern map file 5;
+- `objs/*.toml` → ground-item/Obj spawn source, packed into file 6;
+- `area/*.toml` → Area membership/polygon source, packed into file 7.
+
+This layer deliberately does not represent terrain or static loc placements. Studio map-editor `map.objects` remain static locs for map file 1, not OpenRune ground Objs.
+
+NPC and Obj adapters mirror OpenRune's `[[spawn]]` records. Their `level_mapX_mapZ_localX_localZ` CoordGrid strings are validated and decomposed into level, map-square, local, and world coordinates. NPC/Obj GameVal symbols resolve through `GameValRegistry`, resolved ids are checked against the 16-bit packed map-source limit, Obj `count` follows OpenRune's default of 1, and aggregate indexes expose spawns by map-square id.
+
+The Area adapter mirrors `[[area]]` and nested `[[area.polygons]]` sources. It retains area name/id, levels, include/exclude relationships, polygon vertices, resolved GameVal ids, and source provenance. Invalid levels/references/polygons and duplicate area identities are surfaced as structured diagnostics.
+
+Canonical serializers are available for new/generated NPC, Obj, and Area source files. Whole-file replacement uses optimistic concurrency through `replaceOpenRuneMapSourceFile()`: an existing source is only replaced when its current text still matches the indexed text, preventing Studio from silently overwriting an external edit.
+
+One OpenRune behavior is intentionally reflected in project discovery: current `MapNpcPacker`, `MapObjPacker`, and `MapAreaPacker` use non-recursive `Files.list()`. Therefore only direct `.toml` children of each raw map source directory are indexed as active authoring sources; nested TOML files are not treated as pack inputs.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
