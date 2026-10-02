@@ -58,6 +58,15 @@ The initial contract supports list/stat/exists, text and byte reads, and text an
 
 `in-memory-project-filesystem.ts` is the deterministic test/development implementation. It is the intended first dependency for portable OpenRune project-index tests. Tauri and browser File System Access adapters should implement the same interface rather than leaking platform APIs into Svelte or source parsers.
 
+
+### Tauri adapter
+
+`tauri-project-filesystem.ts` implements the same contract for a user-selected native directory. The native picker is opened with recursive project access, and all later operations remain project-relative through `ProjectFileSystem`.
+
+The adapter deliberately grants only the fs write commands it needs in the Tauri capability. Runtime path scope still comes from the directory the user explicitly selected; write command permission alone does not grant access to arbitrary filesystem paths.
+
+Symlink access remains subject to Tauri's filesystem scope checks. The adapter does not turn symlinks into a way to bypass the selected project root.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:

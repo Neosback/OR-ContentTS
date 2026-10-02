@@ -106,7 +106,7 @@ Backend foundation already completed:
 Portable/source work next:
 
 - [x] Add a framework-neutral `ProjectFileSystem` capability boundary.
-- [ ] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
+- [x] Add a Tauri `ProjectFileSystem` adapter using native dialog + scoped filesystem access.
 - [ ] Add optional browser File System Access adapter with import/download fallback.
 - [ ] Add pure TypeScript RSCM parsing/indexing.
 - [ ] Add pure TypeScript GameVal DAT parsing, provenance, and OpenRune validation rules.

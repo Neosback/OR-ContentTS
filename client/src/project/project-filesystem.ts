@@ -20,7 +20,8 @@ export type ProjectFileSystemErrorCode =
     | "NOT_DIRECTORY"
     | "IS_DIRECTORY"
     | "READ_UNAVAILABLE"
-    | "WRITE_UNAVAILABLE";
+    | "WRITE_UNAVAILABLE"
+    | "IO_FAILED";
 
 export class ProjectFileSystemError extends Error {
     constructor(
