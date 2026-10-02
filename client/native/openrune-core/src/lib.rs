@@ -8,10 +8,8 @@
 mod mesh_pack;
 
 mod slot_mesh;
-mod terrain_pack;
 mod tile_lights;
 
 pub use mesh_pack::MeshPacker;
 pub use slot_mesh::SlotMeshOutput;
-pub use terrain_pack::pack_terrain_vertex_batch;
 pub use tile_lights::calculate_tile_lights;
