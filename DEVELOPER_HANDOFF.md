@@ -19,6 +19,7 @@ As of the PR #54 cache-repository checkpoint:
 - Source-aware OpenRune PackConfig TOML support now discovers config files under indexed pack roots, indexes supported definition blocks with module/source provenance, resolves symbolic `id`/`inherit` through the GameVal registry, diagnoses duplicate cache targets, and provides guarded top-level scalar writes through `ProjectFileSystem`. Nested subtables remain preserved and require explicit adapters rather than generic rewriting.
 - OpenRune raw map TOML support now parses, indexes, generates, and safely replaces NPC spawn, ground-Obj spawn, and Area sources. GameVal symbols resolve through the unified registry; CoordGrid strings are validated/decomposed; NPC/Obj records are indexed by map square; Area includes/excludes/polygons retain source provenance. These are OpenRune map files 5/6/7 and remain separate from Studio static loc edits in file 1.
 - Raw map source discovery now mirrors OpenRune's current packers exactly: only direct `.toml` children of `.data/raw-cache/map/npcs`, `objs`, and `area` are active because the packers use non-recursive `Files.list()`.
+- OpenRune server TOML support now mirrors `PackServerConfig`'s registered table families across both `.data/raw-cache/server/**/*.toml` and pack-owned `pack/configs/**/*.toml`. It preserves raw/nested source, resolves symbolic ids through the GameVal registry, surfaces duplicate resolved targets instead of inventing precedence, and provides a typed inventory/shop stock view plus guarded source writes.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
 - Cache Repository now has explicit platform behavior:
   - browser fallback: choose a cache folder once when creating a profile, then import that same selection into IndexedDB;
@@ -275,6 +276,7 @@ These PRs establish the current baseline:
 | #55 | Added the unified GameVal registry across DAT, module TOML, and RSCM with OpenRune loader-order precedence and provenance |
 | #56 | Added source-aware OpenRune PackConfig TOML indexing and guarded definition-source writes |
 | #57 | Added OpenRune NPC/ground-Obj/Area map-source TOML parse/index/generate/write adapters and aligned source discovery with the packers |
+| #58 | Added OpenRune PackServerConfig TOML indexing, shop/inventory stock support, provenance/conflict diagnostics, and guarded source writes |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -516,7 +518,7 @@ The portable filesystem/discovery/parser foundation is now substantially complet
 1. unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence — completed in PR #55;
 2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
 3. move remaining Interface/CS2 cache-proxy lookups, especially enum definitions, behind local `CacheSystem` loaders;
-4. OpenRune PackConfig definition TOML adapter — completed in PR #56; NPC/ground-Obj/Area map-source TOML adapter — completed in PR #57; add dedicated server TOML adapters next;
+4. OpenRune PackConfig definition TOML adapter — completed in PR #56; NPC/ground-Obj/Area map-source TOML adapter — completed in PR #57; PackServerConfig/server-shop TOML adapter — completed in PR #58;
 5. add TypeScript terrain file-0 and static-loc file-1 encoders;
 6. add portable raw/region package export;
 7. add bounded backend `PackMaps + PackWorldMap` publication into LIVE;
@@ -656,7 +658,7 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, and OpenRune NPC/ground-Obj/Area map-source adapters are now in place. The next source work is server-content TOML adapters, followed by TypeScript terrain/loc encoders.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, and PackServerConfig/server-shop TOML adapter are now in place. The next major source/publication work is the TypeScript terrain file-0 and static-loc file-1 encoders.
 
 For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
 
