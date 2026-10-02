@@ -2,19 +2,19 @@ import {
     cacheSetupKind,
     type LocalCacheProfile,
 } from "./local-cache-profiles";
-import { isTauriRuntime } from "./tauri/is-tauri";
+import {
+    openRuneProjectRootIdentity,
+    resolveOpenRuneProfileFileSystem,
+} from "./openrune-profile-project-filesystem";
 import {
     OpenRuneProjectSession,
     type OpenRuneProjectSessionSnapshot,
 } from "../project/openrune-project-session";
-import {
-    TauriProjectFileSystem,
-} from "../project/tauri-project-filesystem";
 import type { ProjectFileSystem } from "../project/project-filesystem";
 
 export type ActiveOpenRuneProjectRuntimeState = {
     profileId: string;
-    rootPath: string;
+    rootKey: string;
     session: OpenRuneProjectSession;
     snapshot: OpenRuneProjectSessionSnapshot;
 };
@@ -34,7 +34,7 @@ let activationSerial = 0;
 let inFlight:
     | {
           profileId: string;
-          rootPath: string;
+          rootKey: string;
           promise: Promise<ActiveOpenRuneProjectRuntimeState>;
       }
     | undefined;
@@ -48,28 +48,18 @@ function publish(state: ActiveOpenRuneProjectRuntimeState | null): void {
 async function createDefaultFileSystem(
     profile: LocalCacheProfile,
 ): Promise<ProjectFileSystem | undefined> {
-    if (
-        !isTauriRuntime() ||
-        cacheSetupKind(profile) !== "openrune" ||
-        !profile.openRuneRootPath
-    ) {
-        return undefined;
-    }
-    return new TauriProjectFileSystem(profile.openRuneRootPath);
+    return resolveOpenRuneProfileFileSystem(profile, {
+        requestBrowserPermission: true,
+    });
 }
 
-function requireOpenRuneRoot(profile: LocalCacheProfile): string {
+function requireOpenRuneRootKey(profile: LocalCacheProfile): string {
     if (cacheSetupKind(profile) !== "openrune") {
         throw new Error(
             `Profile "${profile.name}" is not an OpenRune project setup.`,
         );
     }
-    if (!profile.openRuneRootPath) {
-        throw new Error(
-            `OpenRune project "${profile.name}" does not have a project root. Re-open the project root in Manage.`,
-        );
-    }
-    return profile.openRuneRootPath;
+    return openRuneProjectRootIdentity(profile);
 }
 
 export function getActiveOpenRuneProjectRuntime(
@@ -122,13 +112,13 @@ export async function syncActiveOpenRuneProjectRuntime(
         return null;
     }
 
-    const rootPath = requireOpenRuneRoot(profile);
+    const rootKey = requireOpenRuneRootKey(profile);
     const current = getActiveOpenRuneProjectRuntime(profile.id);
-    if (current?.rootPath === rootPath) return current;
+    if (current?.rootKey === rootKey) return current;
 
     if (
         inFlight?.profileId === profile.id &&
-        inFlight.rootPath === rootPath
+        inFlight.rootKey === rootKey
     ) {
         return inFlight.promise;
     }
@@ -136,7 +126,7 @@ export async function syncActiveOpenRuneProjectRuntime(
     if (
         activeState &&
         (activeState.profileId !== profile.id ||
-            activeState.rootPath !== rootPath)
+            activeState.rootKey !== rootKey)
     ) {
         publish(null);
     }
@@ -148,7 +138,7 @@ export async function syncActiveOpenRuneProjectRuntime(
             : await createDefaultFileSystem(profile);
         if (!fileSystem) {
             throw new Error(
-                `OpenRune project "${profile.name}" cannot be opened in this runtime. Use the desktop app or re-open its project root.`,
+                `OpenRune project "${profile.name}" cannot be opened. Reconnect its project folder or check filesystem permission.`,
             );
         }
 
@@ -156,7 +146,7 @@ export async function syncActiveOpenRuneProjectRuntime(
         const snapshot = await session.refresh();
         const next = {
             profileId: profile.id,
-            rootPath,
+            rootKey,
             session,
             snapshot,
         };
@@ -167,7 +157,7 @@ export async function syncActiveOpenRuneProjectRuntime(
 
     inFlight = {
         profileId: profile.id,
-        rootPath,
+        rootKey,
         promise: build,
     };
 
@@ -187,10 +177,10 @@ export async function refreshActiveOpenRuneProjectRuntime(
     profile: LocalCacheProfile,
     options: ActiveOpenRuneProjectRuntimeOptions = {},
 ): Promise<ActiveOpenRuneProjectRuntimeState> {
-    const rootPath = requireOpenRuneRoot(profile);
+    const rootKey = requireOpenRuneRootKey(profile);
     const current = getActiveOpenRuneProjectRuntime(profile.id);
 
-    if (!current || current.rootPath !== rootPath) {
+    if (!current || current.rootKey !== rootKey) {
         const activated = await syncActiveOpenRuneProjectRuntime(
             profile,
             options,

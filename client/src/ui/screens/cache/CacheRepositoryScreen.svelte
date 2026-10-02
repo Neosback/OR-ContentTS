@@ -10,6 +10,10 @@
         hasResolvedProfileCache,
         loadResolvedProfileCache,
     } from "../../../cache/profile-cache-source";
+    import {
+        deleteBrowserProjectHandle,
+        saveBrowserProjectHandle,
+    } from "../../../lib/browser-project-handle-store";
     import { clearRuntimeLoadedCache, setRuntimeLoadedCache } from "../../../lib/active-cache-runtime";
     import {
         clearActiveOpenRuneProjectRuntime,
@@ -25,6 +29,11 @@
         type LocalCacheProfile,
     } from "../../../lib/local-cache-profiles";
     import {
+        inspectOpenRuneSetupHealth,
+        type OpenRuneSetupHealth,
+    } from "../../../lib/openrune-setup-health";
+    import type { BrowserDirectoryHandle } from "../../../project/browser-project-filesystem";
+    import {
         deleteProfileCache,
         saveProfileCacheFiles,
     } from "../../../lib/profile-cache-store";
@@ -39,6 +48,7 @@
     let editingProfile = $state<LocalCacheProfile | null>(null);
     let addOpen = $state(false);
     let savedMap = $state<Record<string, boolean>>({});
+    let openRuneHealthMap = $state<Record<string, OpenRuneSetupHealth | undefined>>({});
     let pendingSwitchProfileId = $state<string | null>(null);
     let pendingImportProfileId = $state<string | null>(null);
     let switchOpen = $state(false);
@@ -68,12 +78,36 @@
         };
     });
 
-    // Which profiles have their files imported into browser storage.
+    // Probe setup readiness without mutating/activating the shared OpenRune runtime.
     $effect(() => {
         const list = profiles;
         let cancelled = false;
-        void Promise.all(list.map(async (p) => [p.id, await hasResolvedProfileCache(p)] as const)).then((entries) => {
-            if (!cancelled) savedMap = { ...savedMap, ...Object.fromEntries(entries) };
+        void Promise.all(
+            list.map(async (p) => {
+                if (cacheSetupKind(p) === "openrune") {
+                    const health = await inspectOpenRuneSetupHealth(p);
+                    return {
+                        id: p.id,
+                        saved: health.liveCache,
+                        health,
+                    };
+                }
+                return {
+                    id: p.id,
+                    saved: await hasResolvedProfileCache(p),
+                    health: undefined,
+                };
+            }),
+        ).then((entries) => {
+            if (cancelled) return;
+            savedMap = {
+                ...savedMap,
+                ...Object.fromEntries(entries.map((entry) => [entry.id, entry.saved])),
+            };
+            openRuneHealthMap = {
+                ...openRuneHealthMap,
+                ...Object.fromEntries(entries.map((entry) => [entry.id, entry.health])),
+            };
         });
         return () => {
             cancelled = true;
@@ -88,8 +122,12 @@
     async function onSaveProfile(
         profile: LocalCacheProfile,
         importFiles: File[] = [],
+        browserProjectHandle?: BrowserDirectoryHandle,
     ): Promise<void> {
         const exists = profiles.some((p) => p.id === profile.id);
+        if (browserProjectHandle) {
+            await saveBrowserProjectHandle(profile.id, browserProjectHandle);
+        }
         const next = exists
             ? profiles.map((p) => (p.id === profile.id ? profile : p))
             : [...profiles, profile];
@@ -126,7 +164,10 @@
     }
 
     async function onDeleteProfile(id: string): Promise<void> {
-        await deleteProfileCache(id);
+        await Promise.all([
+            deleteProfileCache(id),
+            deleteBrowserProjectHandle(id),
+        ]);
         const deletingActive = activeProfileId === id;
         const next = profiles.filter((p) => p.id !== id);
         await persist(next);
@@ -153,13 +194,27 @@
         if (!profile) return;
         const snapshot = $state.snapshot(profile) as LocalCacheProfile;
         try {
+            const openRune = cacheSetupKind(snapshot) === "openrune";
+            const runtime =
+                refreshOpenRune && openRune
+                    ? await refreshActiveOpenRuneProjectRuntime(snapshot)
+                    : await syncActiveOpenRuneProjectRuntime(snapshot);
+
             if (
-                refreshOpenRune &&
-                cacheSetupKind(snapshot) === "openrune"
+                openRune &&
+                runtime &&
+                !runtime.snapshot.project.liveCachePath
             ) {
-                await refreshActiveOpenRuneProjectRuntime(snapshot);
-            } else {
-                await syncActiveOpenRuneProjectRuntime(snapshot);
+                clearRuntimeLoadedCache();
+                savedMap = { ...savedMap, [profile.id]: false };
+                openRuneHealthMap = {
+                    ...openRuneHealthMap,
+                    [profile.id]: await inspectOpenRuneSetupHealth(snapshot),
+                };
+                notifySuccess(
+                    `OpenRune project ready: "${profile.name}". LIVE has not been built yet, so source editing is available but Map needs bootstrap.`,
+                );
+                return;
             }
 
             clearRuntimeLoadedCache();
@@ -176,11 +231,12 @@
         if (id === activeProfileId) return;
         const profile = profiles.find((p) => p.id === id);
         if (!profile) return;
-        if (!savedMap[id]) {
+        if (
+            cacheSetupKind(profile) !== "openrune" &&
+            !savedMap[id]
+        ) {
             notifyError(
-                cacheSetupKind(profile) === "openrune"
-                    ? `"${profile.name}" is not currently available. Re-open its OpenRune project root in Manage and make sure LIVE exists.`
-                    : `"${profile.name}" is not currently available. Re-open its cache folder in Manage or update the imported cache.`,
+                `"${profile.name}" is not currently available. Re-open its cache folder in Manage or update the imported cache.`,
             );
             return;
         }
@@ -318,6 +374,7 @@
                 {#each profiles as p (p.id)}
                     {@const active = p.id === activeProfileId}
                     {@const saved = savedMap[p.id] === true}
+                    {@const openRuneHealth = openRuneHealthMap[p.id]}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
@@ -367,11 +424,19 @@
                                             <span class="rounded bg-violet-500/15 px-1.5 py-0.5 text-xs text-violet-300">OpenRune project</span>
                                             <span class={cn(
                                                 "rounded px-1.5 py-0.5 text-xs",
-                                                saved
+                                                openRuneHealth?.status === "ready"
                                                     ? "bg-emerald-500/15 text-emerald-300"
-                                                    : "bg-amber-500/10 text-amber-300",
+                                                    : openRuneHealth?.status === "invalid-project"
+                                                      ? "bg-destructive/15 text-destructive"
+                                                      : "bg-amber-500/10 text-amber-300",
                                             )}>
-                                                {saved ? "LIVE ready" : "LIVE unavailable"}
+                                                {openRuneHealth?.status === "ready"
+                                                    ? "LIVE ready"
+                                                    : openRuneHealth?.status === "needs-bootstrap"
+                                                      ? "Bootstrap needed"
+                                                      : openRuneHealth?.status === "invalid-project"
+                                                        ? "Invalid project"
+                                                        : "Reconnect access"}
                                             </span>
                                         {:else if p.useSystemFolder}
                                             <span class={cn(
@@ -418,7 +483,9 @@
                                 >
                                     <FolderOpen class="size-3.5" />
                                     {cacheSetupKind(p) === "openrune"
-                                        ? "Reload project"
+                                        ? openRuneHealth?.status === "unavailable"
+                                            ? "Reconnect project"
+                                            : "Reload project"
                                         : p.useSystemFolder
                                           ? "Reload from disk"
                                           : "Update cache"}
@@ -435,7 +502,8 @@
 <AddCacheDialog
     bind:open={addOpen}
     editing={editingProfile}
-    onSave={(p, files) => void onSaveProfile(p, files)}
+    onSave={(p, files, handle) =>
+        void onSaveProfile(p, files, handle)}
     onDelete={(id) => void onDeleteProfile(id)}
 />
 

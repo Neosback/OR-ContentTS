@@ -1,4 +1,5 @@
 export type CacheSetupKind = "basic" | "openrune";
+export type OpenRuneProjectAccessMode = "system-path" | "browser-handle";
 
 export type LocalCacheProfile = {
   id: string;
@@ -12,12 +13,21 @@ export type LocalCacheProfile = {
   /** Basic-cache direct disk path. */
   systemCachePath?: string;
   useSystemFolder?: boolean;
-  /** OpenRune Server checkout/project root. The LIVE cache and sources are rediscovered from here. */
+  /** OpenRune Server checkout/project root for native/Tauri access. */
   openRuneRootPath?: string;
+  /** How this profile reopens its OpenRune project. Missing legacy values infer from openRuneRootPath. */
+  openRuneAccessMode?: OpenRuneProjectAccessMode;
 };
 
 export function cacheSetupKind(profile: LocalCacheProfile): CacheSetupKind {
   return profile.setupKind === "openrune" ? "openrune" : "basic";
+}
+
+export function openRuneProjectAccessMode(
+  profile: LocalCacheProfile,
+): OpenRuneProjectAccessMode {
+  if (profile.openRuneAccessMode === "browser-handle") return "browser-handle";
+  return "system-path";
 }
 
 const LEGACY_PROFILES_KEY = "openrune-local-cache-profiles-v1";
@@ -52,6 +62,10 @@ function safeParse(json: string | null): LocalCacheProfile[] {
         systemCachePath: typeof p.systemCachePath === "string" ? p.systemCachePath : undefined,
         useSystemFolder: p.useSystemFolder === true,
         openRuneRootPath: typeof p.openRuneRootPath === "string" ? p.openRuneRootPath : undefined,
+        openRuneAccessMode:
+          p.openRuneAccessMode === "browser-handle"
+            ? "browser-handle"
+            : "system-path",
       }));
   } catch {
     return [];

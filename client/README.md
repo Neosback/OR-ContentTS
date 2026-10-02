@@ -48,7 +48,9 @@ See the repository [ARCHITECTURE.md](../ARCHITECTURE.md) and [ROADMAP.md](../ROA
 Studio does not download a pinned cache on startup.
 
 - **Basic cache** is the compatibility path for cache-only use. Desktop reads the selected cache directory directly; browser mode imports it into local browser storage.
-- **OpenRune project** is the enhanced path. In the desktop app, select the OpenRune Server repository root once. Studio discovers LIVE/SERVER caches, GameVal/RSCM/module mappings, raw map/server TOML, and pack roots from that project. The OpenRune root remains the single authoritative path.
+- **OpenRune project** is the enhanced path. In the desktop app, select the OpenRune Server repository root once. In Chromium browsers with File System Access, grant that same repository directory through the browser picker. Studio discovers LIVE/SERVER caches, GameVal/RSCM/module mappings, raw map/server TOML, and pack roots from that project. The selected root remains the single authoritative source.
+- Browser directory handles are persisted separately in IndexedDB and may require permission to be re-granted after reopening the site. Source editing uses the browser filesystem directly; JVM/Gradle/build/run operations remain native/Companion capabilities.
+- A valid fresh OpenRune checkout without `.data/cache/LIVE` is accepted as a project in **bootstrap needed** state. Source authoring remains available, while Map/cache-backed features wait for LIVE generation.
 
 The frontend is source-first when connected to an OpenRune checkout:
 

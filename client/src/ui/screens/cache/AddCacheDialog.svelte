@@ -7,15 +7,26 @@
     import {
         cacheSetupKind,
         newProfileId,
+        openRuneProjectAccessMode,
         type CacheSetupKind,
         type LocalCacheProfile,
+        type OpenRuneProjectAccessMode,
     } from "../../../lib/local-cache-profiles";
     import {
         pickOpenRuneProjectDirectory,
         pickSystemCacheDirectory,
     } from "../../../lib/tauri/desktop-cache";
     import { isTauriRuntime } from "../../../lib/tauri/is-tauri";
-    import { indexOpenRuneProject, type OpenRuneProjectIndex } from "../../../project/openrune-project-index";
+    import {
+        getBrowserProjectAccessMode,
+        selectBrowserProjectDirectory,
+        type BrowserDirectoryHandle,
+    } from "../../../project/browser-project-filesystem";
+    import {
+        indexOpenRuneProject,
+        type OpenRuneProjectIndex,
+    } from "../../../project/openrune-project-index";
+    import type { ProjectFileSystem } from "../../../project/project-filesystem";
     import { TauriProjectFileSystem } from "../../../project/tauri-project-filesystem";
     import ConfirmationDialog from "../../components/confirmation/ConfirmationDialog.svelte";
     import { Dialog, DialogContent, DialogTitle } from "../../components/ui/dialog";
@@ -30,11 +41,18 @@
     }: {
         open?: boolean;
         editing: LocalCacheProfile | null;
-        onSave: (profile: LocalCacheProfile, importFiles?: File[]) => void;
+        onSave: (
+            profile: LocalCacheProfile,
+            importFiles?: File[],
+            browserProjectHandle?: BrowserDirectoryHandle,
+        ) => void;
         onDelete?: (id: string) => void;
     } = $props();
 
     const tauri = isTauriRuntime();
+    const browserProjectAccess = getBrowserProjectAccessMode();
+    const openRuneFolderAccess =
+        tauri || browserProjectAccess === "filesystem";
 
     let setupKind = $state<CacheSetupKind>("basic");
     let name = $state("");
@@ -44,6 +62,8 @@
     let iconDataUrl = $state<string | undefined>();
     let systemCachePath = $state<string | undefined>();
     let openRuneRootPath = $state<string | undefined>();
+    let openRuneAccessMode = $state<OpenRuneProjectAccessMode>("system-path");
+    let pendingBrowserProjectHandle = $state<BrowserDirectoryHandle | undefined>();
     let openRuneProject = $state<OpenRuneProjectIndex | null>(null);
     let browserCacheFiles = $state<File[]>([]);
     let iconError = $state<string | null>(null);
@@ -62,6 +82,12 @@
         iconDataUrl = profile?.iconDataUrl;
         systemCachePath = profile?.systemCachePath;
         openRuneRootPath = profile?.openRuneRootPath;
+        openRuneAccessMode = profile
+            ? openRuneProjectAccessMode(profile)
+            : tauri
+              ? "system-path"
+              : "browser-handle";
+        pendingBrowserProjectHandle = undefined;
         openRuneProject = null;
         browserCacheFiles = [];
         iconError = null;
@@ -85,11 +111,13 @@
         sourceError = null;
         if (kind === "basic") {
             openRuneRootPath = undefined;
+            pendingBrowserProjectHandle = undefined;
             openRuneProject = null;
         } else {
             systemCachePath = undefined;
             browserCacheFiles = [];
             locationNotes = "";
+            openRuneAccessMode = tauri ? "system-path" : "browser-handle";
         }
     }
 
@@ -110,23 +138,33 @@
         sourceError = null;
     }
 
-    async function inspectOpenRuneRoot(path: string): Promise<void> {
+    async function inspectOpenRuneFileSystem(
+        fileSystem: ProjectFileSystem,
+        label: string,
+        accessMode: OpenRuneProjectAccessMode,
+        rootPath?: string,
+        browserHandle?: BrowserDirectoryHandle,
+    ): Promise<void> {
         inspectingOpenRune = true;
         sourceError = null;
         try {
-            const project = await indexOpenRuneProject(
-                new TauriProjectFileSystem(path),
-            );
+            const project = await indexOpenRuneProject(fileSystem);
             if (!project.isOpenRuneProject) {
                 openRuneProject = null;
                 sourceError =
-                    "That folder does not look like an OpenRune Server project root. Choose the repository root containing the Gradle/OpenRune project and .data tree.";
+                    "That folder does not look like an OpenRune Server project root. Choose the repository root containing the Gradle/OpenRune project.";
                 return;
             }
 
-            openRuneRootPath = path;
+            openRuneAccessMode = accessMode;
+            openRuneRootPath =
+                accessMode === "system-path" ? rootPath : undefined;
+            pendingBrowserProjectHandle =
+                accessMode === "browser-handle"
+                    ? browserHandle
+                    : undefined;
             openRuneProject = project;
-            locationNotes = path;
+            locationNotes = label;
             if (!name.trim()) {
                 name = project.gameConfig?.name?.trim() || "OpenRune project";
             }
@@ -142,9 +180,41 @@
     }
 
     async function onPickOpenRuneRoot(): Promise<void> {
-        const path = await pickOpenRuneProjectDirectory();
-        if (!path) return;
-        await inspectOpenRuneRoot(path);
+        if (tauri) {
+            const path = await pickOpenRuneProjectDirectory();
+            if (!path) return;
+            await inspectOpenRuneFileSystem(
+                new TauriProjectFileSystem(path),
+                path,
+                "system-path",
+                path,
+            );
+            return;
+        }
+
+        if (browserProjectAccess !== "filesystem") {
+            sourceError =
+                "This browser does not provide direct project-folder access. Use a Chromium browser with File System Access support or the desktop app.";
+            return;
+        }
+
+        try {
+            const fileSystem = await selectBrowserProjectDirectory({
+                id: editing
+                    ? `openrune-project-${editing.id}`
+                    : "openrune-project",
+            });
+            if (!fileSystem) return;
+            await inspectOpenRuneFileSystem(
+                fileSystem,
+                fileSystem.rootHandle.name || "OpenRune project",
+                "browser-handle",
+                undefined,
+                fileSystem.rootHandle,
+            );
+        } catch (error) {
+            sourceError = errorMessage(error);
+        }
     }
 
     function save(): void {
@@ -163,16 +233,27 @@
                 systemCachePath: openRune ? undefined : systemCachePath,
                 useSystemFolder:
                     !openRune && tauri && Boolean(systemCachePath),
-                openRuneRootPath: openRune ? openRuneRootPath : undefined,
+                openRuneRootPath:
+                    openRune && openRuneAccessMode === "system-path"
+                        ? openRuneRootPath
+                        : undefined,
+                openRuneAccessMode:
+                    openRune ? openRuneAccessMode : undefined,
             },
             openRune || tauri ? undefined : [...browserCacheFiles],
+            openRuneAccessMode === "browser-handle"
+                ? pendingBrowserProjectHandle
+                : undefined,
         );
     }
 
     const sourceReady = $derived(
         setupKind === "openrune"
-            ? Boolean(openRuneRootPath) &&
-                  (editing !== null || openRuneProject?.isOpenRuneProject === true)
+            ? editing !== null ||
+                  (openRuneProject?.isOpenRuneProject === true &&
+                      (openRuneAccessMode === "browser-handle"
+                          ? Boolean(pendingBrowserProjectHandle)
+                          : Boolean(openRuneRootPath)))
             : editing !== null ||
                   (tauri
                       ? Boolean(systemCachePath)
@@ -223,13 +304,14 @@
                     </button>
                     <button
                         type="button"
-                        disabled={editing !== null || !tauri}
+                        disabled={editing !== null || !openRuneFolderAccess}
                         class={cn(
                             kindCard,
                             setupKind === "openrune"
                                 ? "border-primary bg-primary/10"
                                 : "border-border bg-background",
-                            (!tauri || editing) && "cursor-default opacity-70",
+                            (!openRuneFolderAccess || editing) &&
+                                "cursor-default opacity-70",
                         )}
                         onclick={() => selectKind("openrune")}
                     >
@@ -239,9 +321,13 @@
                             <span class="mt-1 block text-xs text-muted-foreground">
                                 Choose the OpenRune Server repository root once. Studio discovers LIVE/SERVER, GameVals, RSCM, map/server TOML, and pack sources from it.
                             </span>
-                            {#if !tauri}
+                            {#if !tauri && browserProjectAccess === "filesystem"}
+                                <span class="mt-1 block text-xs text-emerald-400">
+                                    Direct project read/write is available in this browser. Build/run operations will still require native execution later.
+                                </span>
+                            {:else if !tauri}
                                 <span class="mt-1 block text-xs text-amber-400">
-                                    Persistent OpenRune root access is currently available in the desktop app.
+                                    This browser cannot grant direct project-folder access. Use a Chromium browser or the desktop app for OpenRune projects.
                                 </span>
                             {/if}
                         </span>
@@ -296,9 +382,7 @@
                                 ? "Read from game.yml"
                                 : "Optional"}
                         />
-                        <span
-                            class="mt-1 block text-xs text-muted-foreground"
-                        >
+                        <span class="mt-1 block text-xs text-muted-foreground">
                             {setupKind === "openrune"
                                 ? "OpenRune revision is discovered from the project when available."
                                 : "Optional cache metadata. Studio still detects the cache storage format from its files."}
@@ -322,20 +406,20 @@
                         </span>
                         <button
                             type="button"
-                            disabled={!tauri || inspectingOpenRune}
+                            disabled={!openRuneFolderAccess || inspectingOpenRune}
                             class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm disabled:opacity-60"
                             onclick={() => void onPickOpenRuneRoot()}
                         >
                             {inspectingOpenRune
                                 ? "Inspecting OpenRune project..."
-                                : openRuneRootPath
+                                : locationNotes
                                   ? "Change OpenRune project root"
                                   : "Choose OpenRune project root"}
                         </button>
 
-                        {#if openRuneRootPath}
+                        {#if locationNotes}
                             <p class="break-all text-xs text-muted-foreground">
-                                {openRuneRootPath}
+                                {locationNotes}
                             </p>
                         {/if}
 
@@ -344,9 +428,24 @@
                                 class="grid gap-2 rounded-md border border-border bg-background/50 p-3 text-xs sm:grid-cols-2"
                             >
                                 <div>
+                                    <span class="text-muted-foreground">Project</span>
+                                    <p class="font-medium text-emerald-400">
+                                        Valid OpenRune project
+                                    </p>
+                                </div>
+                                <div>
+                                    <span class="text-muted-foreground">Authoring access</span>
+                                    <p class="font-medium">
+                                        {openRuneAccessMode === "browser-handle"
+                                            ? "Browser read/write"
+                                            : "Direct disk read/write"}
+                                    </p>
+                                </div>
+                                <div>
                                     <span class="text-muted-foreground">LIVE cache</span>
                                     <p class="font-medium">
-                                        {openRuneProject.liveCachePath ?? "Not built yet"}
+                                        {openRuneProject.liveCachePath ??
+                                            "Not built yet — bootstrap needed"}
                                     </p>
                                 </div>
                                 <div>
@@ -376,6 +475,11 @@
                                     </p>
                                 </div>
                             </div>
+                            {#if !openRuneProject.liveCachePath}
+                                <p class="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
+                                    This is a valid OpenRune project. Source editing is available, but Map cannot load until OpenRune generates LIVE. Bootstrap will be added as a separate native/Companion capability.
+                                </p>
+                            {/if}
                         {/if}
                     </div>
                 {:else}
@@ -415,7 +519,7 @@
                                 />
                             </label>
                             <p class="text-xs text-muted-foreground">
-                                Browser mode imports the selected basic cache into local browser storage.
+                                Browser basic-cache mode imports the selected cache into local browser storage.
                             </p>
                         {/if}
                         {#if locationNotes}
@@ -436,9 +540,7 @@
             </div>
         </div>
 
-        <div
-            class="flex justify-end gap-2 border-t border-border px-6 py-4"
-        >
+        <div class="flex justify-end gap-2 border-t border-border px-6 py-4">
             <button
                 type="button"
                 class="rounded-md border border-input px-3 py-2 text-sm"
@@ -470,7 +572,7 @@
 <ConfirmationDialog
     bind:open={confirmDeleteOpen}
     title="Delete setup?"
-    description="This removes the setup profile and any imported browser cache files."
+    description="This removes the setup profile and any imported browser cache/project handle."
     confirmLabel="Delete"
     destructive
     onConfirm={() => {

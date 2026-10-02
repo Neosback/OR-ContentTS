@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #60 OpenRune project-session checkpoint:
+As of the PR #63 browser/OpenRune setup checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -21,12 +21,13 @@ As of the PR #60 OpenRune project-session checkpoint:
 - Raw map source discovery now mirrors OpenRune's current packers exactly: only direct `.toml` children of `.data/raw-cache/map/npcs`, `objs`, and `area` are active because the packers use non-recursive `Files.list()`.
 - OpenRune server TOML support now mirrors `PackServerConfig`'s registered table families across both `.data/raw-cache/server/**/*.toml` and pack-owned `pack/configs/**/*.toml`. It preserves raw/nested source, resolves symbolic ids through the GameVal registry, surfaces duplicate resolved targets instead of inventing precedence, and provides a typed inventory/shop stock view plus guarded source writes.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
-- Cache & Project Setup now has two explicit user-facing modes:
+- Cache & Project Setup has two explicit user-facing modes:
   - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
-  - **OpenRune project:** Tauri stores one OpenRune Server repository root, validates/indexes it with `indexOpenRuneProject()`, and rediscovers LIVE/SERVER plus GameVal/RSCM/raw-map/server/pack sources from that root. The user is never asked for a second LIVE-cache path.
+  - **OpenRune project:** both desktop and Chromium File System Access environments can open one OpenRune Server repository root. Desktop stores the native path; browser mode stores the granted `FileSystemDirectoryHandle` separately in IndexedDB and keeps only serializable access metadata in the profile. Both feed the same `ProjectFileSystem` / `OpenRuneProjectSession` layers.
 - `OpenRuneProjectSession` now composes that project root into one framework-neutral runtime snapshot: `ProjectFileSystem`, project discovery, unified GameVals, PackConfig, raw map sources, server TOML, local capabilities, and diagnostic counts. Refresh is atomic, so a failed rescan does not publish a partially updated source graph.
 - The active setup runtime now retains one `OpenRuneProjectSession` per active OpenRune profile/root. Actual profile activation binds the runtime, Basic-cache activation clears it, switching roots hides the old session before the replacement finishes, and framework-neutral getters/subscriptions expose the current snapshot to future editors.
 - OpenRune LIVE cache resolution reuses the retained session filesystem/project index when that profile is active. Repository availability probes remain side-effect free and cannot silently switch the active project runtime.
+- OpenRune setup health distinguishes unavailable access, invalid project roots, valid fresh projects that still need LIVE bootstrap, and fully cache-ready projects. A missing `.data/cache/LIVE` is no longer treated as an invalid OpenRune workspace; source editing can remain available while Map waits for bootstrap.
 - Cache Repository's **Reload project** action now refreshes the retained OpenRune session before reloading LIVE, so one user action rescans GameVals/config/map/server sources as a coherent generation.
 - The 2D world map now uses virtualized canvas rendering with bounded decoded-bitmap residency. Full-resolution 256×256 region PNGs remain persisted in Cache Storage, but cached tiles are no longer eagerly turned into permanent blob URLs. Visible tiles decode only to the physical pixel size they can actually occupy (capped at the original source resolution), use a weighted LRU budget, and are explicitly closed on eviction/close. This removes the previous runaway decoded-image/GPU residency loop without reducing visible map quality.
 - The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
@@ -286,6 +287,7 @@ These PRs establish the current baseline:
 | #60 | Added the framework-neutral OpenRune project session with atomic full-project source/index refresh |
 | #61 | Bound the active OpenRune setup to one retained project session, reused it for LIVE cache resolution, and made Reload project refresh the shared source graph |
 | #62 | Reworked the 2D world map into a virtualized canvas tile renderer with on-demand Cache Storage reads, display-resolution decoding, bounded bitmap residency, and explicit disposal |
+| #63 | Enabled capability-based OpenRune project setup in Chromium browsers, persisted directory handles, unified browser/desktop project resolution, and added fresh-checkout bootstrap health states |
 
 Do not reintroduce systems replaced by these PRs.
 

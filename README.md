@@ -58,9 +58,11 @@ Studio no longer downloads or pins a development cache during startup.
 Use the Cache & Project Setup screen:
 
 - **Basic cache:** cache-only operation. In Tauri, Studio reads the selected cache directory directly from disk. In the browser, the selected directory is imported into local browser storage.
-- **OpenRune project:** select the OpenRune Server repository root once in the desktop app. Studio validates the project and discovers `.data/cache/LIVE`, `.data/cache/SERVER`, GameVal DAT/RSCM/module mappings, raw map/server TOML, and pack resource roots from that project.
+- **OpenRune project:** select the OpenRune Server repository root once. The desktop app keeps a native path; Chromium browsers with File System Access keep the user-granted directory handle in IndexedDB. Both use the same `ProjectFileSystem` / `OpenRuneProjectSession` pipeline to discover `.data/cache/LIVE`, `.data/cache/SERVER`, GameVal DAT/RSCM/module mappings, raw map/server TOML, and pack resource roots.
 
-OpenRune profiles keep the project root as the authoritative path. Studio does not ask for a separate LIVE-cache folder, so cache and source provenance cannot drift apart.
+OpenRune profiles keep the project root as the authoritative source. Studio does not ask for a separate LIVE-cache folder, so cache and source provenance cannot drift apart. A valid fresh checkout is accepted even when LIVE has not been generated yet: source authoring remains available and the setup reports **Bootstrap needed** until cache-backed Map features can run.
+
+Browser project access is capability-based rather than desktop-only. Chromium File System Access can read/write OpenRune source directly; native/JVM operations such as Gradle build, map publication, server launch, and future bootstrap remain desktop/Companion capabilities.
 
 The Vite range-cache source remains an internal development capability, but it is no longer a user-facing setup mode or an automatically downloaded revision preset.
 
