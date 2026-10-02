@@ -15,6 +15,7 @@ As of the PR #54 cache-repository checkpoint:
 - The portable project layer now includes `ProjectFileSystem` plus in-memory, Tauri, and browser File System Access adapters.
 - TypeScript OpenRune project discovery is implemented for Gradle modules, pack roots, `gamevals.toml`, RSCM, raw map/server sources, and LIVE/SERVER cache locations.
 - Pure TypeScript RSCM, GameVal DAT, and module `gamevals.toml` parsers/indexes are implemented with source provenance and conflict diagnostics.
+- A unified TypeScript GameVal registry now applies OpenRune's source phases across base DAT, generated DAT, module TOML, and RSCM while retaining every declaration, effective-source provenance, the base-ID reservation ceiling, and cross-source conflict diagnostics.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
 - Cache Repository now has explicit platform behavior:
   - browser fallback: choose a cache folder once when creating a profile, then import that same selection into IndexedDB;
@@ -268,6 +269,7 @@ These PRs establish the current baseline:
 | #52 | Added module `gamevals.toml` parsing/indexing and generated-output exclusion |
 | #53 | Removed the Interface Workbench's redundant cache-proxy load; selected interfaces now come from the active decoded cache |
 | #54 | Cache Repository platform-source cleanup: direct Tauri disk cache source, one-pick browser import, persisted Tauri scope, and shared cache-store validation |
+| #55 | Added the unified GameVal registry across DAT, module TOML, and RSCM with OpenRune loader-order precedence and provenance |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -506,7 +508,7 @@ Important OpenRune map findings:
 
 The portable filesystem/discovery/parser foundation is now substantially complete. Continue in this order:
 
-1. build the unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence;
+1. unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence — completed in PR #55;
 2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
 3. move remaining Interface/CS2 cache-proxy lookups, especially enum definitions, behind local `CacheSystem` loaders;
 4. add source-aware OpenRune config/server/map TOML adapters;
@@ -649,7 +651,7 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer is now in place. The immediate next source work should be the unified GameVal registry, then source-aware TOML adapters and TypeScript terrain/loc encoders.
+The portable filesystem/discovery layer and unified GameVal registry are now in place. The immediate next source work is source-aware TOML adapters, followed by TypeScript terrain/loc encoders.
 
 For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
 

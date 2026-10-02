@@ -164,6 +164,25 @@ Project discovery also skips generated `build/`, `out/`, and `target/` trees so 
 
 This remains a read-only semantic layer. Cross-source precedence between base DAT, generated DAT, module TOML, and RSCM belongs in the unified GameVal registry rather than being hidden inside the individual parsers.
 
+## Unified GameVal registry
+
+`gameval-registry.ts` is the portable project-level lookup layer above the three source indexes. It follows OpenRune's current load phases: base `gamevals.dat`, generated DAT, module `gamevals.toml` under content/API sources, then RSCM.
+
+The registry deliberately separates **all declarations** from the **effective mapping**:
+
+- base DAT establishes the reserved upstream-id ceiling;
+- generated DAT fills mappings without raising that ceiling;
+- module TOML and RSCM can become the effective source for an identical custom mapping;
+- an assigned mapping cannot be silently overridden by a later conflicting source;
+- custom ids at or below the base DAT ceiling are diagnosed and not applied;
+- table-local id reuse by another symbol is diagnosed;
+- `-1` remains an unassigned declaration and cannot mask an already-assigned DAT mapping;
+- parser/index diagnostics remain available separately from cross-source registry conflicts.
+
+Every effective entry retains the declarations that contributed to that symbol, including source path, line/module provenance where available, and DAT table/entry positions. Consumers such as Interface metadata, definitions tooling, and source-aware TOML adapters should use this registry instead of independently picking one GameVal source.
+
+`indexProjectGameValRegistry()` builds the DAT, TOML, and RSCM indexes through one project-level API while keeping the underlying indexes available for detailed diagnostics.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
