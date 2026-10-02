@@ -1,9 +1,9 @@
 name: Temporary Rust/WASM branch build
 
 on:
-  push:
+  pull_request:
     branches:
-      - perf/rust-terrain-pack
+      - main
     paths:
       - "client/native/openrune-core/**"
 
