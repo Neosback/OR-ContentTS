@@ -29,9 +29,14 @@ export async function inspectOpenRuneSetupHealth(
     profile: LocalCacheProfile,
     options: InspectOpenRuneSetupHealthOptions = {},
 ): Promise<OpenRuneSetupHealth> {
-    const fileSystem =
-        options.fileSystem ??
-        (await resolveOpenRuneProfileFileSystem(profile));
+    let fileSystem: ProjectFileSystem | undefined;
+    try {
+        fileSystem =
+            options.fileSystem ??
+            (await resolveOpenRuneProfileFileSystem(profile));
+    } catch {
+        fileSystem = undefined;
+    }
     if (!fileSystem) {
         return {
             status: "unavailable",
@@ -47,7 +52,21 @@ export async function inspectOpenRuneSetupHealth(
         };
     }
 
-    const project = await indexOpenRuneProject(fileSystem);
+    let project: OpenRuneProjectIndex;
+    try {
+        project = await indexOpenRuneProject(fileSystem);
+    } catch {
+        return {
+            status: "unavailable",
+            fileSystem,
+            projectRead: fileSystem.capabilities.read,
+            projectWrite: fileSystem.capabilities.write,
+            liveCache: false,
+            serverCache: false,
+            sourceEditing: false,
+            message: "OpenRune project access is unavailable or needs to be reconnected.",
+        };
+    }
     if (!project.isOpenRuneProject) {
         return {
             status: "invalid-project",
