@@ -110,7 +110,7 @@ Portable/source work next:
 - [x] Add optional browser File System Access adapter with import/download fallback.
 - [ ] Add pure TypeScript RSCM parsing/indexing.
 - [ ] Add pure TypeScript GameVal DAT parsing, provenance, and OpenRune validation rules.
-- [ ] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
+- [x] Add TypeScript OpenRune project discovery/indexing for modules, pack roots, GameVals, RSCM, raw map/server sources, LIVE, and SERVER.
 - [ ] Add source-aware OpenRune config TOML adapters for definitions.
 - [ ] Add OpenRune NPC/ground-Obj/Area TOML parse/generate adapters.
 - [ ] Add server TOML adapters for future server-content/shop tooling.
