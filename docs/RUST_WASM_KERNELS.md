@@ -104,7 +104,10 @@ submission, not the load path.
 
 ## wgpu
 
-`wgpu` compiled to wasm *is* WebGPU: it brings no CPU advantage over TS calling WebGPU, and the editor's cost is
-GPU draw submission, which the per-map merged slot mesh already fixed on WebGL2. wgpu is therefore a rendering-backend
-decision, not a CPU one. Plan: a standalone WebGPU/wgpu objects-pass harness fed by one chunk's slot mesh
-(`EditorMapObjectChunkData`), compared on this Mac for frame time and memory, before any editor change.
+`wgpu` compiled to wasm *is* WebGPU: it brings no CPU advantage over TS calling WebGPU. It is a rendering-backend
+decision, not another CPU-kernel optimization.
+
+The first candidate is a standalone object slot-mesh pass fed by the editor's existing packed object data, followed
+only by broader renderer integration if measurements justify it.
+
+See `docs/WGPU_RENDERER_PLAN.md` for the ranked targets, benchmark gates, backend boundary, and staged migration plan.
