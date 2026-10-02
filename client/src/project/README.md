@@ -41,6 +41,23 @@ A local cache `profileId` may be retained as a binding hint, but it is not suffi
 
 Imports are strictly validated before persistence. Importing a project whose stable id already exists fails with a conflict instead of silently overwriting the existing project.
 
+## ProjectFileSystem
+
+`project-filesystem.ts` defines the framework-neutral capability boundary for a user-selected project checkout. It is separate from `ProjectStore`: `ProjectStore` persists Studio project/edit documents, while `ProjectFileSystem` reads and writes files inside an external project tree such as an OpenRune checkout.
+
+Path rules are intentionally strict:
+
+- every path is relative to the selected project root;
+- the root is represented as `""`;
+- separators normalize to `/`;
+- `..` traversal is rejected instead of resolved;
+- absolute, drive/protocol, UNC/network, NUL-bearing, and colon-bearing paths are rejected;
+- platform adapters must preserve root confinement even when their backing filesystem contains symlinks.
+
+The initial contract supports list/stat/exists, text and byte reads, and text and byte writes. `walkProjectDirectory()` provides shared deterministic recursive traversal above `list()`, so adapters do not invent different walking semantics.
+
+`in-memory-project-filesystem.ts` is the deterministic test/development implementation. It is the intended first dependency for portable OpenRune project-index tests. Tauri and browser File System Access adapters should implement the same interface rather than leaking platform APIs into Svelte or source parsers.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
