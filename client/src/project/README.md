@@ -83,6 +83,29 @@ The `import-download` mode is the compatibility path: existing Studio import/exp
 
 Picker cancellation is not an error. Permission/security failures are surfaced as typed `ProjectFileSystemError` values, and binary reads/writes use defensive copies so callers cannot mutate backing file data accidentally.
 
+
+## OpenRune project index
+
+`openrune-project-index.ts` provides the portable, read-only discovery layer above `ProjectFileSystem`. It intentionally indexes paths and provenance without parsing RSCM, GameVal DAT, or TOML payloads yet.
+
+The index discovers:
+
+- OpenRune/Gradle project markers;
+- `game.yml` with `game.example.yml` fallback and top-level name/revision/environment/world metadata;
+- Gradle modules discovered structurally from build files;
+- dedicated content `pack` modules;
+- `src/main/resources/pack` roots and known pack subdirectories;
+- module/project `gamevals.toml` files;
+- `.data/gamevals/*.rscm`;
+- `.data/gamevals-binary/*`;
+- NPC, ground-Obj, and area raw map TOML roots/files;
+- raw server TOML sources;
+- generated LIVE and SERVER cache locations.
+
+Generated cache contents are deliberately not traversed. LIVE and SERVER are indexed as generated-output locations, not treated as authoring source.
+
+Module discovery follows the checkout structure rather than a hard-coded plugin list, which matches OpenRune's recursive Gradle subproject convention. Source provenance is retained by path and module association so later GameVal/RSCM/TOML parsers can layer semantic indexes on top without flattening ownership.
+
 ## Local ProjectStore
 
 `IndexedDbProjectStore` currently provides offline:
