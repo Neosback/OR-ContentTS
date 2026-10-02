@@ -1,4 +1,7 @@
-import type { LocalCacheProfile } from "../lib/local-cache-profiles";
+import {
+    cacheSetupKind,
+    type LocalCacheProfile,
+} from "../lib/local-cache-profiles";
 import { isTauriRuntime } from "../lib/tauri/is-tauri";
 import type {
     CacheLoadOptions,
@@ -33,6 +36,9 @@ export type ProfileCacheSourceResolverOptions = {
     createSystemSource?: (
         profile: LocalCacheProfile,
     ) => CacheSource | undefined | Promise<CacheSource | undefined>;
+    createOpenRuneSource?: (
+        profile: LocalCacheProfile,
+    ) => CacheSource | undefined | Promise<CacheSource | undefined>;
 };
 
 async function createTauriSystemSource(
@@ -49,6 +55,27 @@ async function createTauriSystemSource(
     );
 }
 
+async function createTauriOpenRuneSource(
+    profile: LocalCacheProfile,
+): Promise<CacheSource | undefined> {
+    if (!isTauriRuntime() || !profile.openRuneRootPath) return undefined;
+
+    const [{ TauriProjectFileSystem }, { indexOpenRuneProject }] =
+        await Promise.all([
+            import("../project/tauri-project-filesystem"),
+            import("../project/openrune-project-index"),
+        ]);
+    const fileSystem = new TauriProjectFileSystem(profile.openRuneRootPath);
+    const project = await indexOpenRuneProject(fileSystem);
+    if (!project.isOpenRuneProject || !project.liveCachePath) return undefined;
+
+    return new ProjectFileSystemCacheSource(
+        profile,
+        fileSystem,
+        project.liveCachePath,
+    );
+}
+
 export async function resolveProfileCacheSource(
     profile: LocalCacheProfile,
     options: ProfileCacheSourceResolverOptions = {},
@@ -58,6 +85,17 @@ export async function resolveProfileCacheSource(
         options.createImportedSource ??
         ((candidate: LocalCacheProfile) =>
             new IndexedDbProfileCacheSource(candidate));
+
+    if (cacheSetupKind(profile) === "openrune") {
+        const source = options.createOpenRuneSource
+            ? await options.createOpenRuneSource(profile)
+            : await createTauriOpenRuneSource(profile);
+        if (!source) return undefined;
+
+        const [info] = await source.listCaches();
+        if (!info) return undefined;
+        return { source, info };
+    }
 
     const staticCacheName = serverCacheName(profile.id);
     if (staticCacheName) {
@@ -117,6 +155,11 @@ export async function loadResolvedProfileCache(
         if (staticCacheName) {
             throw new Error(
                 `The local cache source no longer serves "${staticCacheName}".`,
+            );
+        }
+        if (cacheSetupKind(profile) === "openrune") {
+            throw new Error(
+                `OpenRune project "${profile.name}" is unavailable or does not currently contain .data/cache/LIVE. Re-open the OpenRune project root in Manage.`,
             );
         }
         if (profile.useSystemFolder && profile.systemCachePath) {
