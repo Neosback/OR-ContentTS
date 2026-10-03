@@ -26,11 +26,13 @@ function enumLoader(): EnumTypeLoader {
     keys: [7],
     intValues: [42],
     stringValues: [],
-  } as EnumType;
+  } as unknown as EnumType;
 
   return {
     load(id: number): EnumType {
-      return id === 12 ? def : ({ ...def, outputCount: 0, keys: [], intValues: [] } as EnumType);
+      return id === 12
+        ? def
+        : ({ ...def, outputCount: 0, keys: [], intValues: [] } as unknown as EnumType);
     },
     getCount(): number {
       return 1;
