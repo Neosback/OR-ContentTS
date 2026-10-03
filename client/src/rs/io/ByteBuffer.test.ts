@@ -22,6 +22,19 @@ describe("ByteBuffer DB encodings", () => {
         expect(buffer.offset).toBe(buffer.length);
     });
 
+    it("reads OpenRune signed 64-bit long values", () => {
+        const buffer = bytes(
+            0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        );
+
+        expect(buffer.readLong()).toBe(0x7fffffffffffffffn);
+        expect(buffer.readLong()).toBe(-1n);
+        expect(buffer.readLong()).toBe(-0x8000000000000000n);
+        expect(buffer.offset).toBe(buffer.length);
+    });
+
     it("reads OpenRune little-endian 7-bit continuation varints", () => {
         const buffer = bytes(
             0x00,
