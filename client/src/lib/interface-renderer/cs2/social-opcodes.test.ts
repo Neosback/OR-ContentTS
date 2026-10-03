@@ -82,6 +82,7 @@ describe("CS2 social state opcodes", () => {
 
     Interpreter.Interpreter_intStackSize = 1;
     Interpreter.Interpreter_intStack[0] = 0;
+    Interpreter.Interpreter_stringStackSize = 0;
     expect(handleSocialOpcode(ScriptOpcodes.FRIEND_GETNAME)).toBe(1);
     expect(Interpreter.Interpreter_stringStack.slice(0, 2)).toEqual(["Friend", "OldFriend"]);
   });
