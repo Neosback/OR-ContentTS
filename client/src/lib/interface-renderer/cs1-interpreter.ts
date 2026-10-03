@@ -1,29 +1,22 @@
 import type { ComponentType, InterfaceEntry } from "./component-types";
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import { experienceForMaxLevel } from "./osrs-experience-table";
+import {
+  createMockClientState,
+  DEFAULT_MOCK_COMBAT_LEVEL,
+  DEFAULT_MOCK_RUN_ENERGY,
+  DEFAULT_MOCK_TILE_X,
+  DEFAULT_MOCK_TILE_Y,
+  DEFAULT_MOCK_WEIGHT,
+  MOCK_CLIENT_SKILL_COUNT,
+  type MockClientInventory,
+  type MockClientState,
+} from "./mock-client-state";
 import { Varps } from "./varps";
 
 export { DEFAULT_VARP_MAIN_LENGTH, Varps } from "./varps";
-
-export type Cs1SimInventory = {
-  itemIds: number[];
-  itemQuantities: number[];
-};
-
-export type Cs1SimState = {
-  combatLevel: number;
-  runEnergy: number;
-  weight: number;
-  currentLevels: number[];
-  maximumLevels: number[];
-  currentExp: number[];
-  isMembersWorld: boolean;
-  membersOnlyItemIds?: ReadonlySet<number> | null;
-  simulatedInventories: Record<number, Cs1SimInventory>;
-  varps: Varps;
-  localTileX: number;
-  localTileY: number;
-};
+export type Cs1SimInventory = MockClientInventory;
+export type Cs1SimState = MockClientState;
 
 export type Cs1InterpreterContext = {
   interfaceEntry: InterfaceEntry | null;
@@ -31,15 +24,15 @@ export type Cs1InterpreterContext = {
 };
 
 export class Cs1Interpreter {
-  static readonly SKILL_COUNT = 25;
+  static readonly SKILL_COUNT = MOCK_CLIENT_SKILL_COUNT;
   static readonly VISIBLE_SKILL_COUNT = 24;
   static readonly XP_AT_99 = 13_034_431;
   static readonly DEFAULT_INV_SLOTS = 28;
-  static readonly DEFAULT_COMBAT_LEVEL = 3;
-  static readonly DEFAULT_RUN_ENERGY = 89;
-  static readonly DEFAULT_WEIGHT = 30;
-  static readonly DEFAULT_TILE_X = 0;
-  static readonly DEFAULT_TILE_Y = 0;
+  static readonly DEFAULT_COMBAT_LEVEL = DEFAULT_MOCK_COMBAT_LEVEL;
+  static readonly DEFAULT_RUN_ENERGY = DEFAULT_MOCK_RUN_ENERGY;
+  static readonly DEFAULT_WEIGHT = DEFAULT_MOCK_WEIGHT;
+  static readonly DEFAULT_TILE_X = DEFAULT_MOCK_TILE_X;
+  static readonly DEFAULT_TILE_Y = DEFAULT_MOCK_TILE_Y;
 
   static readonly WIDGET_ITEM_FOUND_SENTINEL = 999_999_999;
 
@@ -93,21 +86,7 @@ export class Cs1Interpreter {
   ]);
 
   static defaultState(): Cs1SimState {
-    const n = Cs1Interpreter.SKILL_COUNT;
-    return {
-      combatLevel: Cs1Interpreter.DEFAULT_COMBAT_LEVEL,
-      runEnergy: Cs1Interpreter.DEFAULT_RUN_ENERGY,
-      weight: Cs1Interpreter.DEFAULT_WEIGHT,
-      currentLevels: Array.from({ length: n }, () => 1),
-      maximumLevels: Array.from({ length: n }, () => 99),
-      currentExp: Array.from({ length: n }, () => 0),
-      isMembersWorld: true,
-      membersOnlyItemIds: null,
-      simulatedInventories: {},
-      varps: Varps.createDefault(),
-      localTileX: Cs1Interpreter.DEFAULT_TILE_X,
-      localTileY: Cs1Interpreter.DEFAULT_TILE_Y,
-    };
+    return createMockClientState();
   }
 
   static itemSlotEncoding(definitionId: number): number {

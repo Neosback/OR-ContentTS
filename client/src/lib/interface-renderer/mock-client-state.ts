@@ -1,0 +1,336 @@
+import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
+
+import { Varps, Varps_masks } from "./varps";
+import { Varcs } from "./cs2/varcs";
+
+export type MockClientInventory = {
+  /** Widget inventory ids use the cache/widget wire encoding (definition id + 1, 0 = empty). */
+  itemIds: number[];
+  itemQuantities: number[];
+};
+
+export type MockClientItemContainer = {
+  /** Client item-container ids use definition ids directly (-1 = empty). */
+  itemIds: number[];
+  itemQuantities: number[];
+  /** Optional logical capacity when the populated slot arrays are sparse or truncated. */
+  capacity?: number;
+};
+
+export type MockClientSocialUser = {
+  name: string;
+  previousName?: string;
+  world?: number;
+  rank?: number;
+  isOnline?: boolean;
+  isFriend?: boolean;
+  isIgnored?: boolean;
+  isSelf?: boolean;
+};
+
+export type MockClientFriendsChatState = {
+  displayName: string;
+  ownerName: string;
+  minKick: number;
+  rank: number;
+  members: readonly MockClientSocialUser[];
+};
+
+export type MockClientSocialState = {
+  friends: readonly MockClientSocialUser[];
+  ignores: readonly MockClientSocialUser[];
+  friendsChat: MockClientFriendsChatState | null;
+  localPlayerName?: string;
+};
+
+export type MockClientChangeJournal = {
+  varps: Set<number>;
+  varbits: Set<number>;
+  varcInts: Set<number>;
+  varcStrings: Set<number>;
+  inventories: Set<number>;
+  skills: Set<number>;
+  social: boolean;
+};
+
+export type MockClientState = {
+  combatLevel: number;
+  runEnergy: number;
+  weight: number;
+  currentLevels: number[];
+  maximumLevels: number[];
+  currentExp: number[];
+  isMembersWorld: boolean;
+  membersOnlyItemIds?: ReadonlySet<number> | null;
+  simulatedInventories: Record<number, MockClientInventory>;
+  itemContainers: Record<number, MockClientItemContainer>;
+  varps: Varps;
+  varcs: Varcs;
+  social: MockClientSocialState;
+  localTileX: number;
+  localTileY: number;
+  localPlane: number;
+  clientCycle: number;
+  worldId: number;
+  staffModLevel: number;
+  rebootTimer: number;
+  playerMod: boolean;
+  worldFlags: number;
+  changes: MockClientChangeJournal;
+};
+
+export type MockClientChangeSnapshot = {
+  varps: readonly number[];
+  varbits: readonly number[];
+  varcInts: readonly number[];
+  varcStrings: readonly number[];
+  inventories: readonly number[];
+  skills: readonly number[];
+  social: boolean;
+};
+
+export const MOCK_CLIENT_SKILL_COUNT = 25;
+export const DEFAULT_MOCK_COMBAT_LEVEL = 3;
+export const DEFAULT_MOCK_RUN_ENERGY = 89;
+export const DEFAULT_MOCK_WEIGHT = 30;
+export const DEFAULT_MOCK_TILE_X = 0;
+export const DEFAULT_MOCK_TILE_Y = 0;
+
+function emptyJournal(): MockClientChangeJournal {
+  return {
+    varps: new Set(),
+    varbits: new Set(),
+    varcInts: new Set(),
+    varcStrings: new Set(),
+    inventories: new Set(),
+    skills: new Set(),
+    social: false,
+  };
+}
+
+export function createMockClientState(): MockClientState {
+  return {
+    combatLevel: DEFAULT_MOCK_COMBAT_LEVEL,
+    runEnergy: DEFAULT_MOCK_RUN_ENERGY,
+    weight: DEFAULT_MOCK_WEIGHT,
+    currentLevels: Array.from({ length: MOCK_CLIENT_SKILL_COUNT }, () => 1),
+    maximumLevels: Array.from({ length: MOCK_CLIENT_SKILL_COUNT }, () => 99),
+    currentExp: Array.from({ length: MOCK_CLIENT_SKILL_COUNT }, () => 0),
+    isMembersWorld: true,
+    membersOnlyItemIds: null,
+    simulatedInventories: {},
+    itemContainers: {},
+    varps: Varps.createDefault(),
+    varcs: new Varcs(),
+    social: {
+      friends: [],
+      ignores: [],
+      friendsChat: null,
+    },
+    localTileX: DEFAULT_MOCK_TILE_X,
+    localTileY: DEFAULT_MOCK_TILE_Y,
+    localPlane: 0,
+    clientCycle: 0,
+    worldId: 301,
+    staffModLevel: 0,
+    rebootTimer: -1,
+    playerMod: false,
+    worldFlags: 0,
+    changes: emptyJournal(),
+  };
+}
+
+export function snapshotMockClientChanges(state: MockClientState): MockClientChangeSnapshot {
+  const sorted = (values: ReadonlySet<number>): number[] => [...values].sort((a, b) => a - b);
+  return {
+    varps: sorted(state.changes.varps),
+    varbits: sorted(state.changes.varbits),
+    varcInts: sorted(state.changes.varcInts),
+    varcStrings: sorted(state.changes.varcStrings),
+    inventories: sorted(state.changes.inventories),
+    skills: sorted(state.changes.skills),
+    social: state.changes.social,
+  };
+}
+
+export function clearMockClientChanges(state: MockClientState): void {
+  state.changes.varps.clear();
+  state.changes.varbits.clear();
+  state.changes.varcInts.clear();
+  state.changes.varcStrings.clear();
+  state.changes.inventories.clear();
+  state.changes.skills.clear();
+  state.changes.social = false;
+}
+
+export function consumeMockClientChanges(state: MockClientState): MockClientChangeSnapshot {
+  const snapshot = snapshotMockClientChanges(state);
+  clearMockClientChanges(state);
+  return snapshot;
+}
+
+export function setMockClientVarp(state: MockClientState, id: number, value: number): void {
+  const previous = state.varps.getVarp(id);
+  state.varps.setVarp(id, value);
+  if (state.varps.getVarp(id) !== previous) state.changes.varps.add(id);
+}
+
+export function setMockClientVarbit(
+  state: MockClientState,
+  id: number,
+  value: number,
+  lookup: VarbitDefinitionLookup | null | undefined,
+): void {
+  if (!lookup) return;
+  const def = lookup(id);
+  if (!def) return;
+
+  const span = def.endBit - def.startBit;
+  if (span < 0 || span >= Varps_masks.length) return;
+
+  const mask = Varps_masks[span]! >>> 0;
+  let nextValue = Math.trunc(value);
+  if (nextValue < 0 || nextValue > mask) nextValue = 0;
+
+  const baseVar = def.baseVar;
+  const before = state.varps.getVarp(baseVar);
+  const shiftedMask = mask << def.startBit;
+  const after = (before & ~shiftedMask) | ((nextValue << def.startBit) & shiftedMask);
+  state.varps.setVarp(baseVar, after);
+
+  if (state.varps.getVarp(baseVar) !== before) {
+    state.changes.varps.add(baseVar);
+    state.changes.varbits.add(id);
+  }
+}
+
+export function setMockClientVarcInt(state: MockClientState, id: number, value: number): void {
+  const before = state.varcs.getInt(id);
+  state.varcs.setInt(id, value);
+  if (state.varcs.getInt(id) !== before) state.changes.varcInts.add(id);
+}
+
+export function setMockClientVarcString(state: MockClientState, id: number, value: string): void {
+  const before = state.varcs.getString(id);
+  state.varcs.setString(id, value);
+  if (state.varcs.getString(id) !== before) state.changes.varcStrings.add(id);
+}
+
+export function setMockClientItemContainer(
+  state: MockClientState,
+  containerId: number,
+  container: MockClientItemContainer,
+): void {
+  state.itemContainers[containerId] = {
+    itemIds: [...container.itemIds],
+    itemQuantities: [...container.itemQuantities],
+    capacity: container.capacity,
+  };
+  state.changes.inventories.add(containerId);
+}
+
+export function getMockClientItemId(state: MockClientState, containerId: number, slot: number): number {
+  const container = state.itemContainers[containerId];
+  if (!container || slot < 0 || slot >= container.itemIds.length) return -1;
+  return container.itemIds[slot] ?? -1;
+}
+
+export function getMockClientItemQuantity(state: MockClientState, containerId: number, slot: number): number {
+  const container = state.itemContainers[containerId];
+  if (!container || slot < 0 || slot >= container.itemQuantities.length) return 0;
+  return container.itemQuantities[slot] ?? 0;
+}
+
+export function getMockClientItemTotal(state: MockClientState, containerId: number, itemId: number): number {
+  if (itemId < 0) return 0;
+  const container = state.itemContainers[containerId];
+  if (!container) return 0;
+  const limit = Math.min(container.itemIds.length, container.itemQuantities.length);
+  let total = 0;
+  for (let slot = 0; slot < limit; slot++) {
+    if (container.itemIds[slot] === itemId) total += container.itemQuantities[slot] ?? 0;
+  }
+  return total;
+}
+
+export function getMockClientInventorySize(state: MockClientState, containerId: number): number {
+  const container = state.itemContainers[containerId];
+  const explicit = container?.capacity ?? container?.itemIds.length;
+  if (explicit !== undefined) return explicit;
+
+  const commonCapacities: Readonly<Record<number, number>> = {
+    90: 28,
+    93: 28,
+    94: 14,
+    95: 1410,
+    516: 300,
+  };
+  return commonCapacities[containerId] ?? 0;
+}
+
+export function setMockClientSkill(
+  state: MockClientState,
+  skillId: number,
+  values: { currentLevel?: number; maximumLevel?: number; experience?: number },
+): void {
+  if (!Number.isInteger(skillId) || skillId < 0 || skillId >= MOCK_CLIENT_SKILL_COUNT) return;
+  if (values.currentLevel !== undefined) state.currentLevels[skillId] = Math.trunc(values.currentLevel);
+  if (values.maximumLevel !== undefined) state.maximumLevels[skillId] = Math.trunc(values.maximumLevel);
+  if (values.experience !== undefined) state.currentExp[skillId] = Math.trunc(values.experience);
+  state.changes.skills.add(skillId);
+}
+
+export function setMockClientSocialState(state: MockClientState, social: MockClientSocialState): void {
+  state.social = {
+    friends: [...social.friends],
+    ignores: [...social.ignores],
+    friendsChat: social.friendsChat
+      ? { ...social.friendsChat, members: [...social.friendsChat.members] }
+      : null,
+    localPlayerName: social.localPlayerName,
+  };
+  state.changes.social = true;
+}
+
+/**
+ * Preserve the shared runtime stores/change journal while accepting immutable UI updates
+ * to the legacy CS1-shaped state object. This lets existing simulator panels migrate
+ * incrementally without creating a second source of client truth.
+ */
+export function mergeMockClientState(previous: MockClientState, next: MockClientState): MockClientState {
+  const changes = previous.changes;
+
+  if (previous.varps !== next.varps) {
+    const limit = Math.max(previous.varps.Varps_main.length, next.varps.Varps_main.length);
+    for (let id = 0; id < limit; id++) {
+      if ((previous.varps.Varps_main[id] ?? 0) !== (next.varps.Varps_main[id] ?? 0)) changes.varps.add(id);
+    }
+  }
+
+  const skillLimit = Math.max(
+    previous.currentLevels.length,
+    next.currentLevels.length,
+    previous.maximumLevels.length,
+    next.maximumLevels.length,
+    previous.currentExp.length,
+    next.currentExp.length,
+  );
+  for (let id = 0; id < skillLimit; id++) {
+    if (
+      (previous.currentLevels[id] ?? 0) !== (next.currentLevels[id] ?? 0)
+      || (previous.maximumLevels[id] ?? 0) !== (next.maximumLevels[id] ?? 0)
+      || (previous.currentExp[id] ?? 0) !== (next.currentExp[id] ?? 0)
+    ) {
+      changes.skills.add(id);
+    }
+  }
+
+  if (previous.social !== next.social) changes.social = true;
+
+  return {
+    ...next,
+    varcs: next.varcs ?? previous.varcs,
+    social: next.social ?? previous.social,
+    changes,
+  };
+}

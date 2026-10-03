@@ -29,8 +29,12 @@ function sameName(a: string | undefined, b: string | undefined): boolean {
   return (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
 }
 
-function handleSocialStateOpcode(opcode: number, runtime: Cs2SocialRuntime | null): number {
-  const state = runtime?.state;
+function handleSocialStateOpcode(
+  opcode: number,
+  runtime: Cs2SocialRuntime | null,
+  fallbackState: ReturnType<typeof getCs2RuntimeContext>["clientState"]["social"],
+): number {
+  const state = runtime?.state ?? fallbackState;
   const friends = state?.friends ?? [];
   const ignores = state?.ignores ?? [];
   const chat = state?.friendsChat ?? null;
@@ -276,7 +280,7 @@ export function handleSocialComparatorOpcode(opcode: number): number {
  * deterministic empty-client model instead of treating valid client opcodes as errors.
  */
 export function handleSocialOpcode(opcode: number): number {
-  const { socialRuntime } = getCs2RuntimeContext();
-  const stateResult = handleSocialStateOpcode(opcode, socialRuntime);
+  const { socialRuntime, clientState } = getCs2RuntimeContext();
+  const stateResult = handleSocialStateOpcode(opcode, socialRuntime, clientState.social);
   return stateResult === 2 ? handleSocialComparatorOpcode(opcode) : stateResult;
 }

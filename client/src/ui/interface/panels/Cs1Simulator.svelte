@@ -111,7 +111,22 @@
     }
 
     function resetAll(): void {
-        editor.cs1SimState = Cs1Interpreter.defaultState();
+        const defaults = Cs1Interpreter.defaultState();
+        editor.setCs1SimState((previous) => ({
+            ...previous,
+            combatLevel: defaults.combatLevel,
+            runEnergy: defaults.runEnergy,
+            weight: defaults.weight,
+            currentLevels: defaults.currentLevels,
+            maximumLevels: defaults.maximumLevels,
+            currentExp: defaults.currentExp,
+            isMembersWorld: defaults.isMembersWorld,
+            membersOnlyItemIds: defaults.membersOnlyItemIds,
+            simulatedInventories: defaults.simulatedInventories,
+            varps: defaults.varps,
+            localTileX: defaults.localTileX,
+            localTileY: defaults.localTileY,
+        }));
     }
 
     function generalSprite(id: number): string {

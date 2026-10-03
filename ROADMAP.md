@@ -176,8 +176,8 @@ Next:
 - [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
 - [x] Stabilize the Interface preview in PR #72: isolate renderer mutations from Svelte effect tracking, preserve cache-backed enum/object CS2 loaders across redraws, model social queries 3600-3627 against deterministic mock state, and virtualize large interface lists.
-- [ ] Build a framework-neutral Mock Client State Harness for script-visible varps/varbits, varcs, skills, inventories, social state and client/player flags.
-- [ ] Dispatch real Interface CS2 hooks from the harness: on-load, var/inventory/stat transmit, timer, mouse-over/leave, click and related listeners.
+- [x] Build a framework-neutral Mock Client State Harness for script-visible varps/varbits, varcs, skills, item containers, social state and core client/player flags; PR #73 also wires the existing 3300 client-state CS2 family to that shared state.
+- [ ] Dispatch real Interface CS2 hooks from the PR #73 harness: on-load, var/inventory/stat transmit, timer, mouse-over/leave, click and related listeners, using the harness change journal to honor trigger lists.
 - [ ] Add explicit Interface Edit vs Simulation modes plus a State Debugger for changing mock state and retriggering hooks without a live game server.
 - [ ] Add an optional declarative mock network harness for IF_BUTTON-style round trips; do not require a full game server for ordinary Interface preview.
 - [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
