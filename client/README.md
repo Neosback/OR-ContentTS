@@ -64,4 +64,4 @@ See [OPENRUNE_MAP_CACHE_ARCHITECTURE.md](../docs/OPENRUNE_MAP_CACHE_ARCHITECTURE
 
 ## Current engineering checkpoint
 
-Through PR #69, the client has local-cache Interface/CS2 object+enum support, project-aware Interface GameVal/RSCM metadata, and rev-240 core NPC/Obj/Param decoder parity. The next decoder slice is DBTable/DBRow/DBColumn using the shared `src/rs/config/CacheVarLiteral.ts` mapping. See the root `DEVELOPER_HANDOFF.md` before starting that work.
+Through PR #71, the client has local-cache Interface/CS2 object+enum support, project-aware Interface GameVal/RSCM metadata, rev-240 core NPC/Obj/Param parity, and selected-cache DBTable/DBRow/DBColumn decoding using the shared `src/rs/config/CacheVarLiteral.ts` mapping. The next decoder slice is the remaining lossy/missing-type audit. See the root `DEVELOPER_HANDOFF.md` before starting that work.

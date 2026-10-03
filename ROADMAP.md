@@ -176,8 +176,8 @@ Next:
 - [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
 - [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
-- [ ] Add DBTable/DBRow/DBColumn decoding using the shared `CacheVarLiteral` mapping, with byte-alignment/golden fixtures against OpenRune FileStore.
-- [ ] Continue the remaining decoder-lossiness/missing-type audit after DBTable/DBRow.
+- [x] Add DBTable/DBRow/DBColumn decoding using the shared `CacheVarLiteral` mapping, selected-cache archive loaders, and byte-alignment fixtures against OpenRune FileStore.
+- [ ] Continue the remaining decoder-lossiness/missing-type audit now that DBTable/DBRow decoding is in place.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.

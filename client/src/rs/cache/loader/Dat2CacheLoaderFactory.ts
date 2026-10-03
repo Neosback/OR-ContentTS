@@ -4,6 +4,11 @@ import {
     DummyBasTypeLoader,
 } from "../../config/bastype/BasTypeLoader";
 import { GraphicsDefaults } from "../../config/defaults/GraphicsDefaults";
+import { ArchiveDbRowTypeLoader, DbRowTypeLoader } from "../../config/db/DbRowTypeLoader";
+import {
+    ArchiveDbTableTypeLoader,
+    DbTableTypeLoader,
+} from "../../config/db/DbTableTypeLoader";
 import { ArchiveEnumTypeLoader, EnumTypeLoader } from "../../config/enumtype/EnumTypeLoader";
 import {
     ArchiveOverlayFloorTypeLoader,
@@ -176,6 +181,30 @@ export class Dat2CacheLoaderFactory implements CacheLoaderFactory {
             }
         }
         return undefined;
+    }
+
+    getDbRowTypeLoader(): DbRowTypeLoader | undefined {
+        if (this.cacheInfo.game !== "oldschool") {
+            return undefined;
+        }
+        const configIndex = this.cacheSystem.getIndex(IndexType.DAT2.configs);
+        if (!configIndex.archiveExists(ConfigType.OSRS.dbRow)) {
+            return undefined;
+        }
+        const archive = configIndex.getArchive(ConfigType.OSRS.dbRow);
+        return new ArchiveDbRowTypeLoader(this.cacheInfo, archive);
+    }
+
+    getDbTableTypeLoader(): DbTableTypeLoader | undefined {
+        if (this.cacheInfo.game !== "oldschool") {
+            return undefined;
+        }
+        const configIndex = this.cacheSystem.getIndex(IndexType.DAT2.configs);
+        if (!configIndex.archiveExists(ConfigType.OSRS.dbTable)) {
+            return undefined;
+        }
+        const archive = configIndex.getArchive(ConfigType.OSRS.dbTable);
+        return new ArchiveDbTableTypeLoader(this.cacheInfo, archive);
     }
 
     getTextureLoader(): TextureLoader {

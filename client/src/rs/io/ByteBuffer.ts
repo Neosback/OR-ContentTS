@@ -95,7 +95,7 @@ export class ByteBuffer {
     readLong(): bigint {
         const high = BigInt(this.readInt()) & 0xffffffffn;
         const low = BigInt(this.readInt()) & 0xffffffffn;
-        return (high << 32n) | low;
+        return BigInt.asIntN(64, (high << 32n) | low);
     }
 
     readFloat(): number {
@@ -120,6 +120,33 @@ export class ByteBuffer {
         } else {
             return this.readUnsignedShort() - 0x8000;
         }
+    }
+
+    /**
+     * OpenRune's unsigned-short-smart format used by DB table/row type ids and tuple counts.
+     * Values below 128 use one byte; larger values use an unsigned short with bit 15 set.
+     */
+    readUnsignedShortSmart(): number {
+        const peek = this.getUnsignedByte(this.offset);
+        if ((peek & 0x80) === 0) {
+            return this.readUnsignedByte();
+        }
+        return this.readUnsignedShort() & 0x7fff;
+    }
+
+    /**
+     * Little-endian 7-bit continuation varint used by OpenRune DBRow opcode 4.
+     */
+    readVarInt(): number {
+        let value = 0;
+        let bits = 0;
+        let read: number;
+        do {
+            read = this.readUnsignedByte();
+            value |= (read & 0x7f) << bits;
+            bits += 7;
+        } while (read > 0x7f);
+        return value;
     }
 
     readUnsignedSmartMin1(): number {

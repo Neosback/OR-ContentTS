@@ -259,7 +259,7 @@ Completed:
 
 Current order:
 
-1. DBTable/DBRow/DBColumn decoding and remaining decoder parity;
+1. remaining decoder-lossiness/missing-type parity after PR #71 DBTable/DBRow/DBColumn decoding;
 2. TypeScript terrain/static-loc encoders plus portable package export;
 3. explicit `StudioBackendClient` build bridge for allowlisted OpenRune build/test/verification actions;
 4. bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication into LIVE;

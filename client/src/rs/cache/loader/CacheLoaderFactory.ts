@@ -1,4 +1,6 @@
 import { BasTypeLoader } from "../../config/bastype/BasTypeLoader";
+import { DbRowTypeLoader } from "../../config/db/DbRowTypeLoader";
+import { DbTableTypeLoader } from "../../config/db/DbTableTypeLoader";
 import { FloorTypeLoader, OverlayFloorTypeLoader } from "../../config/floortype/FloorTypeLoader";
 import { LocTypeLoader } from "../../config/loctype/LocTypeLoader";
 import { NpcTypeLoader } from "../../config/npctype/NpcTypeLoader";
@@ -36,6 +38,8 @@ export interface CacheLoaderFactory {
     getBasTypeLoader(): BasTypeLoader;
 
     getQuestTypeLoader(): QuestTypeLoader | undefined;
+    getDbRowTypeLoader(): DbRowTypeLoader | undefined;
+    getDbTableTypeLoader(): DbTableTypeLoader | undefined;
 
     getTextureLoader(): TextureLoader;
 
