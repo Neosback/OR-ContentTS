@@ -80,8 +80,9 @@ describe("WidgetEventDispatcher", () => {
     expect(transmitTriggersMatch(null, [5])).toBe(true);
     expect(transmitTriggersMatch([5, 7], [7])).toBe(true);
     expect(transmitTriggersMatch([5], [7])).toBe(false);
-    expect(transmitTriggersMatch([], [7])).toBe(false);
+    expect(transmitTriggersMatch([], [7])).toBe(true);
     expect(transmitTriggersMatch([7], [])).toBe(false);
+    expect(transmitTriggersMatch([999], Array.from({ length: 33 }, (_, index) => index))).toBe(true);
   });
 
   it("dispatches only transmit listeners whose trigger ids changed", async () => {
@@ -135,6 +136,24 @@ describe("WidgetEventDispatcher", () => {
     expect(changes.skills).toEqual([3]);
     expect(state.varcs.getInt(910)).toBe(1);
     expect(state.varcs.getInt(911)).toBe(1);
+  });
+
+  it("fires initial var transmit listeners with trigger lists when simulation starts", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+    markerScript(115, 915, 7);
+    markerScript(116, 916, 8);
+
+    const dispatcher = new WidgetEventDispatcher();
+    await dispatcher.dispatchInitialVarTransmit(
+      entry(
+        component(1, { onVarTransmit: [115], onVarTransmitList: [42] }),
+        component(2, { onVarTransmit: [116], onVarTransmitList: null }),
+      ),
+    );
+
+    expect(state.varcs.getInt(915)).toBe(7);
+    expect(state.varcs.getInt(916)).toBe(-1);
   });
 
   it("dispatches timer listeners through the serialized clientscript queue", async () => {
