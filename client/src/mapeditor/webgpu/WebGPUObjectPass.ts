@@ -1,5 +1,9 @@
 import { getFaceDepthSource, type FaceDepthSource } from "../../rs/model/face-depth-source";
 import { buildPrioritySortGpuData, GPU_PRIORITY_GROUP_WORDS } from "./face-priority-gpu";
+import {
+    comparePrioritySortReadback,
+    type PrioritySortValidation,
+} from "./face-priority-validation";
 import prioritySortShaderSource from "./face-priority-sort.wgsl?raw";
 import type { StaticObjectMesh } from "./object-mesh-merge";
 import shaderSource from "./object-pass.wgsl?raw";
@@ -74,6 +78,7 @@ interface GpuMap {
     priorityOrdinalBuffer: GPUBuffer;
     priorityGroupBuffer: GPUBuffer;
     priorityScratchBuffer: GPUBuffer;
+    priorityScratchFaces: number;
     priorityGroupCount: number;
     priorityBindGroup: GPUBindGroup;
     slotBuffer: GPUBuffer;
@@ -353,7 +358,11 @@ export class WebGPUObjectPass {
         const indexBuffer = device.createBuffer({
             label: `map ${id} indices`,
             size: mesh.indices.byteLength,
-            usage: GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage:
+                GPUBufferUsage.INDEX |
+                GPUBufferUsage.STORAGE |
+                GPUBufferUsage.COPY_DST |
+                GPUBufferUsage.COPY_SRC,
         });
         device.queue.writeBuffer(indexBuffer, 0, mesh.indices as Uint32Array<ArrayBuffer>);
 
@@ -395,7 +404,7 @@ export class WebGPUObjectPass {
             label: `map ${id} face priority scratch`,
             // ScratchFace is { triangle: u32, depth: i32 } = 8 bytes.
             size: Math.max(priorityData.scratchFaces * 8, 8),
-            usage: GPUBufferUsage.STORAGE,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
         });
         const slotBuffer = device.createBuffer({
             label: `map ${id} slots`,
@@ -469,6 +478,7 @@ export class WebGPUObjectPass {
             priorityOrdinalBuffer,
             priorityGroupBuffer,
             priorityScratchBuffer,
+            priorityScratchFaces: priorityData.scratchFaces,
             priorityGroupCount: priorityData.groups.length / GPU_PRIORITY_GROUP_WORDS,
             priorityBindGroup,
             slotBuffer,
@@ -499,6 +509,49 @@ export class WebGPUObjectPass {
 
     get mapCount(): number {
         return this.maps.size;
+    }
+
+    /**
+     * Debug/validation hook. Call after at least one render so the compute pass has populated the sorted and scratch
+     * buffers. The returned comparison uses the CPU RuneLite reference fed by the exact depths computed in WGSL.
+     */
+    async validatePrioritySort(id: number): Promise<PrioritySortValidation | undefined> {
+        const map = this.maps.get(id);
+        if (!map || map.priorityGroupCount === 0) return undefined;
+
+        const indexBytes = map.data.mesh.indices.byteLength;
+        const scratchBytes = Math.max(map.priorityScratchFaces * 8, 8);
+        const indexReadback = this.device.createBuffer({
+            label: `map ${id} priority index readback`,
+            size: indexBytes,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        const scratchReadback = this.device.createBuffer({
+            label: `map ${id} priority scratch readback`,
+            size: scratchBytes,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+
+        const encoder = this.device.createCommandEncoder({ label: `map ${id} priority validation` });
+        encoder.copyBufferToBuffer(map.sortedIndexBuffer, 0, indexReadback, 0, indexBytes);
+        encoder.copyBufferToBuffer(map.priorityScratchBuffer, 0, scratchReadback, 0, scratchBytes);
+        this.device.queue.submit([encoder.finish()]);
+
+        try {
+            await Promise.all([
+                indexReadback.mapAsync(GPUMapMode.READ),
+                scratchReadback.mapAsync(GPUMapMode.READ),
+            ]);
+            const actual = new Uint32Array(indexReadback.getMappedRange().slice(0));
+            const scratchWords = new Int32Array(scratchReadback.getMappedRange().slice(0));
+            const groups = buildPrioritySortGpuData(map.data.mesh).groups;
+            return comparePrioritySortReadback(map.data.mesh, groups, scratchWords, actual);
+        } finally {
+            if (indexReadback.mapState === "mapped") indexReadback.unmap();
+            if (scratchReadback.mapState === "mapped") scratchReadback.unmap();
+            indexReadback.destroy();
+            scratchReadback.destroy();
+        }
     }
 
     private ensureDepth(width: number, height: number): GPUTextureView {
