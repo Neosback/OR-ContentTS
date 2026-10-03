@@ -4,6 +4,19 @@ import { ParamsMap, Type } from "../Type";
 import { ObjStackability } from "./ObjStackability";
 import { ObjTypeLoader } from "./ObjTypeLoader";
 
+export type ObjConditionalOp = {
+    index: number;
+    varpId: number;
+    varbitId: number;
+    minValue: number;
+    maxValue: number;
+    text: string;
+};
+
+export type ObjConditionalSubOp = ObjConditionalOp & {
+    subId: number;
+};
+
 export class ObjType extends Type {
     model?: number;
 
@@ -74,6 +87,10 @@ export class ObjType extends Type {
     team: number;
 
     isTradable: boolean;
+    stockMarket: boolean;
+    category: number;
+    recolAll: number;
+    weight: number;
 
     op75: number;
 
@@ -82,6 +99,13 @@ export class ObjType extends Type {
 
     placeholder: number;
     placeholderTemplate: number;
+
+    subops?: Array<Array<string | null> | null>;
+    entitySubops: Array<{ index: number; subId: number; text: string }>;
+    conditionalActions: ObjConditionalOp[];
+    conditionalSubActions: ObjConditionalSubOp[];
+    keepOnlyDuringSeqs?: number[];
+    unlockable: boolean;
 
     params?: ParamsMap;
 
@@ -123,12 +147,21 @@ export class ObjType extends Type {
         this.ambient = 0;
         this.contrast = 0;
         this.team = 0;
-        this.isTradable = false;
+        this.isTradable =
+            this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240;
+        this.stockMarket = false;
+        this.category = -1;
+        this.recolAll = -1;
+        this.weight = 0;
         this.op75 = 0;
         this.unnotedId = -1;
         this.notedId = -1;
         this.placeholder = -1;
         this.placeholderTemplate = -1;
+        this.entitySubops = [];
+        this.conditionalActions = [];
+        this.conditionalSubActions = [];
+        this.unlockable = false;
 
         this.model = 0;
     }
@@ -177,6 +210,12 @@ export class ObjType extends Type {
             this.op13 = buffer.readUnsignedByte();
         } else if (opcode === 14) {
             this.op14 = buffer.readUnsignedByte();
+        } else if (
+            opcode === 15 &&
+            this.cacheInfo.game === "oldschool" &&
+            this.cacheInfo.revision >= 240
+        ) {
+            this.isTradable = false;
         } else if (opcode === 16) {
             this.isMembers = true;
         } else if (opcode === 23) {
@@ -222,6 +261,17 @@ export class ObjType extends Type {
             }
         } else if (opcode === 42) {
             this.shiftClickIndex = buffer.readByte();
+        } else if (opcode === 43) {
+            const opId = buffer.readUnsignedByte();
+            if (!this.subops) this.subops = [];
+            const subops = this.subops[opId] ?? [];
+            while (true) {
+                const encodedSubId = buffer.readUnsignedByte();
+                if (encodedSubId === 0) break;
+                const subId = encodedSubId - 1;
+                subops[subId] = buffer.readString();
+            }
+            this.subops[opId] = subops;
         } else if (opcode === 44) {
             if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 237) {
                 this.model = buffer.readInt();
@@ -255,9 +305,18 @@ export class ObjType extends Type {
         } else if (opcode === 54) {
             this.femaleHeadModel2 = buffer.readInt();
         } else if (opcode === 65) {
-            this.isTradable = true;
+            if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240) {
+                this.stockMarket = true;
+            } else {
+                this.isTradable = true;
+            }
         } else if (opcode === 75) {
-            this.op75 = buffer.readShort();
+            if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240) {
+                this.weight = buffer.readUnsignedShort();
+                this.op75 = this.weight;
+            } else {
+                this.op75 = buffer.readShort();
+            }
         } else if (opcode === 78) {
             this.maleModel2 = this.readModelId(buffer);
         } else if (opcode === 79) {
@@ -271,7 +330,7 @@ export class ObjType extends Type {
         } else if (opcode === 93) {
             this.femaleHeadModel2 = this.readModelId(buffer);
         } else if (opcode === 94) {
-            buffer.readUnsignedShort();
+            this.category = buffer.readUnsignedShort();
         } else if (opcode === 95) {
             this.zan2d = buffer.readUnsignedShort();
         } else if (opcode === 96) {
@@ -280,6 +339,8 @@ export class ObjType extends Type {
             this.note = buffer.readUnsignedShort();
         } else if (opcode === 98) {
             this.noteTemplate = buffer.readUnsignedShort();
+        } else if (opcode === 99) {
+            this.recolAll = buffer.readUnsignedShort();
         } else if (opcode >= 100 && opcode < 110) {
             if (!this.countObj) {
                 this.countObj = new Array(10);
@@ -341,30 +402,48 @@ export class ObjType extends Type {
             this.placeholderTemplate = buffer.readUnsignedShort();
         } else if (opcode >= 150 && opcode < 155) {
             buffer.readUnsignedShort();
+        } else if (opcode === 160) {
+            this.stackability = ObjStackability.NEVER;
+        } else if (opcode === 161) {
+            const count = buffer.readUnsignedShort();
+            this.keepOnlyDuringSeqs = new Array<number>(count);
+            for (let i = 0; i < count; i++) {
+                this.keepOnlyDuringSeqs[i] = buffer.readUnsignedShort();
+            }
         } else if (opcode === 200) {
-            // subop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedByte();
-            buffer.readString();
+            const index = buffer.readUnsignedByte();
+            while (true) {
+                const encodedSubId = buffer.readUnsignedByte();
+                if (encodedSubId === 0) break;
+                this.entitySubops.push({
+                    index,
+                    subId: encodedSubId - 1,
+                    text: buffer.readString(),
+                });
+            }
         } else if (opcode === 201) {
-            // multiop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readInt();
-            buffer.readInt();
-            buffer.readNullString();
+            this.conditionalActions.push({
+                index: buffer.readUnsignedByte(),
+                varpId: buffer.readUnsignedShort(),
+                varbitId: buffer.readUnsignedShort(),
+                minValue: buffer.readInt(),
+                maxValue: buffer.readInt(),
+                text: buffer.readString(),
+            });
         } else if (opcode === 202) {
-            // multisubop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readInt();
-            buffer.readInt();
-            buffer.readNullString();
+            this.conditionalSubActions.push({
+                index: buffer.readUnsignedByte(),
+                subId: buffer.readUnsignedShort(),
+                varpId: buffer.readUnsignedShort(),
+                varbitId: buffer.readUnsignedShort(),
+                minValue: buffer.readInt(),
+                maxValue: buffer.readInt(),
+                text: buffer.readString(),
+            });
         } else if (opcode === 249) {
             this.params = Type.readParamsMap(buffer, this.params);
+        } else if (opcode === 251) {
+            this.unlockable = true;
         } else {
             throw new Error("ObjType: Opcode " + opcode + " not implemented.");
         }

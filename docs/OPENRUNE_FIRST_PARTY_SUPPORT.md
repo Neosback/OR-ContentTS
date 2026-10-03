@@ -10,7 +10,7 @@ Findings from three read-only audits (TS decoders vs `OpenRune-FileStore-main`, 
 | Gap | Detail |
 |---|---|
 | No write path | No Container/Archive/ReferenceTable encode, no CRC / whirlpool, no `idx255` rebuild, no `encode()` on any config type (FileStore has encoders for every codec, except `UnderlayCodec.encode` which is a TODO there). |
-| Revision | The bundled cache is rev 237; the server targets rev 240. NPC opcodes 124/126/148-152 are missing and NPC opcode 150 is read in the wrong (non-OSRS) format; ObjType 43 and 160 throw "not implemented"; ObjType 200-202 and NPC 251-253 use the pre-237 entity-ops layout; ParamType 7/8 missing (type stays undefined on 237+). |
+| Revision | Core NPC/Obj/Param rev-240 parity is implemented in PR #69: modern NPC sound/overlap/height fields, Obj subops/stackability/entity-ops, and Param 7/8 CacheVarLiteral handling now match the current OpenRune FileStore. Remaining parity work is the broader lossy/missing-type audit below. |
 | Lossy decode | Fields are read and dropped (Loc 69/91/93/95/96, Seq 16/18, NPC sound/fade ops, SpotAnim 9/10, Idk 5), so decode-edit-encode cannot round-trip. |
 | Missing types | DBTable, DBRow, DBTableIndex (the server stores its content tables there), HitSplat, HealthBar, Ambience, WorldEntity, VarClan(Settings), StringVector, BugTemplate, Font, WorldMapArea, midi/vorbis. |
 | Server custom archives | Index 2 groups 58-87 (npc 58, item 59, inv 60, mesanim 61, stat 63, projanim 64, bas 65, varp 67, walktrigger 68, varn 82, varnbit 83, varconbit 84, varcon 85, varobj 86, hunt 87) and custom var literals 253/254 have no TS model. |
@@ -39,7 +39,7 @@ changes to the server. The audits support keeping that:
 5. **File watching**: the `notify` crate in Tauri with debounce, wired to `OpenRuneProjectSession.refresh()`; mtime polling in the browser.
 6. **Rebuild through the existing path**: after TOML edits call the backend's allowlisted `:or-cache:buildCache`, then reload `LIVE` read-only; warn that the running server needs a restart.
 7. **No new file-server backend.** If a headless/web deployment is ever needed, a thin companion exposing the same `ProjectFileSystem` contract with Origin and token checks, not StudioService.
-8. **Decoders**: bring TS to rev 240 first (NPC 124/126/148-152, Obj 43/160, entity-ops, Param 7/8), stop discarding fields, then add DBTable/DBRow and the server's custom config archives as read-only; encoders come with the first feature that writes the binary cache (it likely will not: the server packs it).
+8. **Decoders**: core rev-240 NPC/Obj/Param parity is complete in PR #69. Add DBTable/DBRow next, then continue eliminating lossy reads and add the server's custom config archives as read-only; encoders come with the first feature that writes the binary cache (it likely will not: the server packs it).
 
 ## 4. Suggested first milestone (desktop)
 
@@ -65,5 +65,5 @@ through the existing source-aware writers; detect external changes; trigger `bui
   Logic lives in `project/openrune-server-content.ts`.
 - **Verified:** `cargo test` (14, including a real watcher on a temp folder), vitest (writer races, session/runtime watch), and the screen driven in the browser
   pane against an in-memory project. Not yet driven in the native app against a real server checkout (needs the native folder dialog).
-- **Still open:** Build cache button (`StudioBackendClient` + `:or-cache:buildCache`), decoder parity to rev 240 + DBTable/DBRow, browser-only mtime polling.
+- **Still open:** Build cache button (`StudioBackendClient` + `:or-cache:buildCache`), DBTable/DBRow plus the remaining decoder-lossiness audit, browser-only mtime polling.
 

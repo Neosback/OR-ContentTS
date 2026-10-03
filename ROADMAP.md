@@ -175,6 +175,7 @@ Next:
 - [x] Move Interface/CS2 enum lookups behind the selected cache: `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now use a local `EnumTypeLoader`; the old enum cache-proxy path is removed.
 - [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
+- [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
