@@ -159,6 +159,21 @@ export class WidgetEventDispatcher {
     return this.enqueue(component, pointerArgs(component, kind), coordinates);
   }
 
+  dispatchOnLoad(entry: InterfaceEntry, interfaceId: number): Promise<void> {
+    const groupId = interfaceId & 0xffff;
+    const components = collectComponents(entry).sort((a, b) => a.id - b.id);
+    for (const component of components) {
+      if (
+        typeof component.packedId === "number"
+        && ((component.packedId >>> 16) & 0xffff) !== groupId
+      ) {
+        continue;
+      }
+      if (component.onLoad) void this.enqueue(component, component.onLoad);
+    }
+    return this.tail;
+  }
+
   dispatchInitialVarTransmit(entry: InterfaceEntry): Promise<void> {
     for (const component of collectVisibleComponents(entry)) {
       if (
