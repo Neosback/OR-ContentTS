@@ -188,8 +188,7 @@ export class WidgetEventDispatcher {
   }
 
   dispatchTimer(entry: InterfaceEntry): Promise<void> {
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
+    for (const component of collectVisibleComponents(entry)) {
       if (component.onTimer) void this.enqueue(component, component.onTimer);
     }
     return this.tail;
@@ -198,9 +197,7 @@ export class WidgetEventDispatcher {
   dispatchTransmits(entry: InterfaceEntry, state: MockClientState): Promise<MockClientChangeSnapshot> {
     const changes = consumeMockClientChanges(state);
 
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
-
+    for (const component of collectVisibleComponents(entry)) {
       if (
         component.onVarTransmit
         && transmitTriggersMatch(component.onVarTransmitList, changes.varps, changes.varpEventCount)
