@@ -85,6 +85,24 @@ describe("WidgetEventDispatcher", () => {
     expect(transmitTriggersMatch([999], [1], 33)).toBe(true);
   });
 
+  it("dispatches on-load listeners for the active interface group", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+
+    markerScript(80, 880, 1);
+    markerScript(81, 881, 1);
+    const data = entry(
+      component(1, { packedId: (100 << 16) | 1, onLoad: [80] }),
+      component(2, { packedId: (101 << 16) | 2, onLoad: [81] }),
+    );
+
+    const dispatcher = new WidgetEventDispatcher();
+    await dispatcher.dispatchOnLoad(data, 100);
+
+    expect(state.varcs.getInt(880)).toBe(1);
+    expect(state.varcs.getInt(881)).toBe(-1);
+  });
+
   it("fires initial var-transmit listeners that declare trigger ids", async () => {
     const state = createMockClientState();
     applyCs2RuntimeFromSim(state, "test", {}, null);
