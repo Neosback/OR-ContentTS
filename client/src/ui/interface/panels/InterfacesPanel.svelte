@@ -4,6 +4,7 @@
 
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
+    import VirtualList from "../../components/VirtualList.svelte";
     import InterfaceSettings from "../InterfaceSettings.svelte";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
@@ -66,29 +67,36 @@
         </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto">
-        {#if state.entries.length === 0}
-            <div class="px-3 py-4 text-xs text-muted-foreground">No interfaces decoded from cache.</div>
-        {:else if state.filtered.length === 0}
-            <div class="px-3 py-4 text-xs text-muted-foreground">No matches.</div>
-        {:else}
-            {#each state.filtered as entry (entry.id)}
-                <button
-                    type="button"
-                    onclick={() => state.setSelectedId(entry.id)}
-                    class="flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-xs hover:bg-muted/50"
-                    class:bg-muted={state.selectedId === entry.id}
-                    title={entryTitle(entry)}
-                >
-                    <span class="shrink-0 font-mono text-muted-foreground">{entry.id}</span>
-                    <span class="min-w-0 flex-1 truncate">{entry.name}</span>
-                    {#if entry.metadata.diagnostics.length}
-                        <span class="shrink-0 text-[10px] font-semibold text-amber-500" aria-label="Metadata warning">!</span>
-                    {/if}
-                </button>
-            {/each}
-        {/if}
-    </div>
+    <VirtualList
+        items={state.filtered}
+        rowHeight={32}
+        overscan={8}
+        class="min-h-0 flex-1"
+        label="Interfaces"
+    >
+        {#snippet row(entry)}
+            <button
+                type="button"
+                role="option"
+                aria-selected={state.selectedId === entry.id}
+                onclick={() => state.setSelectedId(entry.id)}
+                class="flex h-full w-full items-center gap-2 border-b px-3 text-left text-xs hover:bg-muted/50"
+                class:bg-muted={state.selectedId === entry.id}
+                title={entryTitle(entry)}
+            >
+                <span class="shrink-0 font-mono text-muted-foreground">{entry.id}</span>
+                <span class="min-w-0 flex-1 truncate">{entry.name}</span>
+                {#if entry.metadata.diagnostics.length}
+                    <span class="shrink-0 text-[10px] font-semibold text-amber-500" aria-label="Metadata warning">!</span>
+                {/if}
+            </button>
+        {/snippet}
+        {#snippet empty()}
+            <div class="px-3 py-4 text-xs text-muted-foreground">
+                {state.entries.length === 0 ? "No interfaces decoded from cache." : "No matches."}
+            </div>
+        {/snippet}
+    </VirtualList>
     <div class="shrink-0 border-t px-2 py-1 text-center text-[10px] text-muted-foreground">
         Showing {state.filtered.length} of {state.entries.length}
     </div>
