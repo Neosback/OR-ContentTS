@@ -49,6 +49,14 @@ export function applyInterfaceEditorWorkbenchLayout(api: DockviewApi): void {
     minimumHeight: 160,
   });
 
+  api.addPanel({
+    id: "iface-state-debugger",
+    component: "ifaceStateDebugger",
+    title: "State debugger",
+    position: { referencePanel: "iface-client-script", direction: "within" },
+    inactive: true,
+  });
+
   // Panel options alone leave the preview with whatever the side columns do not take (about 150px in a laptop
   // window), so set the column sizes and the preview's minimum explicitly.
   const preview = api.getPanel("iface-preview");
