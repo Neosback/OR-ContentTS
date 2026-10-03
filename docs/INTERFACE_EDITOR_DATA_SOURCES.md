@@ -62,7 +62,8 @@ Recent parity work includes:
 - PR #66: client-parity runtime-widget defaults;
 - PR #67: local cache-backed enum opcodes;
 - PR #69: rev-240 core NPC/Obj/Param decoder parity;
-- PR #72: stabilized the Svelte preview/render boundary, preserved selected-cache enum/object loaders during redraw, added deterministic mock social queries for 3600-3627, and virtualized the interface list.
+- PR #72: stabilized the Svelte preview/render boundary, preserved selected-cache enum/object loaders during redraw, added deterministic mock social queries for 3600-3627, and virtualized the interface list;
+- PR #73: introduced one shared Mock Client State for CS1/CS2, including Varps/Varbits, Varcs, skills, item containers, social/world/client fields, a change journal, and harness-backed 3300-family client-state opcodes.
 
 Do not reintroduce network/cache-proxy reads for data already available from the selected `CacheSystem`.
 
@@ -197,8 +198,8 @@ A realistic Interface Editor does not require a full simulated game server for o
 
 The next Interface runtime milestone should therefore remain framework-neutral and add:
 
-- one mock client state harness for varps/varbits, varcs, skills, inventories, social state, player/client flags and other script-visible state;
-- event dispatch for on-load, var/inventory/stat transmit, timer, mouse-over/leave and other widget listeners;
+- the PR #73 mock client state harness for varps/varbits, varcs, skills, item containers, social state, player/client flags and other script-visible state;
+- event dispatch for on-load, var/inventory/stat transmit, timer, mouse-over/leave and other widget listeners, consuming PR #73's changed-id journal and widget trigger lists;
 - broader CS2 opcode coverage driven by real cache scripts, retaining correct int/string stack effects and runtime-created widget semantics;
 - explicit Edit and Simulation modes so runtime-created components can be inspected without accidentally treating them as serializable cache definitions;
 - a State Debugger panel that can change mock state and immediately retrigger the appropriate client hooks;
