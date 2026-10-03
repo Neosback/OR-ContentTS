@@ -181,11 +181,11 @@
             </div>
         </div>
         <span
-            class="ml-auto rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-            class:border-emerald-500/50={state.runtimeMode === "simulate"}
-            class:text-emerald-400={state.runtimeMode === "simulate"}
-            class:border-border={state.runtimeMode === "edit"}
-            class:text-muted-foreground={state.runtimeMode === "edit"}
+            class={`ml-auto rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                state.runtimeMode === "simulate"
+                    ? "border-emerald-500/50 text-emerald-400"
+                    : "border-border text-muted-foreground"
+            }`}
         >
             {state.runtimeMode === "simulate" ? "Simulation" : "Edit"}
         </span>
