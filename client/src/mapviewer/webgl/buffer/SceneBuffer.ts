@@ -47,6 +47,8 @@ export type DrawCommand = {
     faceRenderPriorities?: Uint8Array;
     /** Original model face index per emitted triangle, used to preserve RuneLite's equal-depth tie order. */
     faceOrdinals?: Uint32Array;
+    /** Stable source-model placement identity shared by its opaque and alpha interaction commands. */
+    priorityOwner?: object;
 };
 
 export type FacePassMetadata = {
@@ -365,6 +367,7 @@ export class SceneBuffer {
                 elements,
                 faceRenderPriorities: faceMetadata.priorities,
                 faceOrdinals: faceMetadata.ordinals,
+                priorityOwner: sceneModel,
                 instances: [
                     {
                         sceneX: Math.max(0, sceneModel.sceneX),
