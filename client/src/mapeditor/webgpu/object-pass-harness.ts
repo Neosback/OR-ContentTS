@@ -230,12 +230,12 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         const compute: number[] = [];
         const render: number[] = [];
         const total: number[] = [];
-        let lastFrame = pass.stats.frames;
+        let lastGpuSample = pass.stats.gpuSamples;
 
         while (compute.length < sampleCount) {
             await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-            if (pass.stats.frames === lastFrame) continue;
-            lastFrame = pass.stats.frames;
+            if (pass.stats.gpuSamples === lastGpuSample) continue;
+            lastGpuSample = pass.stats.gpuSamples;
 
             const computeMs = pass.stats.computeGpuMs;
             const renderMs = pass.stats.renderGpuMs;
