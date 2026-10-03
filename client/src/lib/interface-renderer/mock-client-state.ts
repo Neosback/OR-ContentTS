@@ -50,6 +50,9 @@ export type MockClientChangeJournal = {
   varcStrings: Set<number>;
   inventories: Set<number>;
   skills: Set<number>;
+  varpEventCount: number;
+  inventoryEventCount: number;
+  skillEventCount: number;
   social: boolean;
 };
 
@@ -86,6 +89,9 @@ export type MockClientChangeSnapshot = {
   varcStrings: readonly number[];
   inventories: readonly number[];
   skills: readonly number[];
+  varpEventCount: number;
+  inventoryEventCount: number;
+  skillEventCount: number;
   social: boolean;
 };
 
@@ -104,6 +110,9 @@ function emptyJournal(): MockClientChangeJournal {
     varcStrings: new Set(),
     inventories: new Set(),
     skills: new Set(),
+    varpEventCount: 0,
+    inventoryEventCount: 0,
+    skillEventCount: 0,
     social: false,
   };
 }
@@ -149,6 +158,9 @@ export function snapshotMockClientChanges(state: MockClientState): MockClientCha
     varcStrings: sorted(state.changes.varcStrings),
     inventories: sorted(state.changes.inventories),
     skills: sorted(state.changes.skills),
+    varpEventCount: state.changes.varpEventCount,
+    inventoryEventCount: state.changes.inventoryEventCount,
+    skillEventCount: state.changes.skillEventCount,
     social: state.changes.social,
   };
 }
@@ -160,6 +172,9 @@ export function clearMockClientChanges(state: MockClientState): void {
   state.changes.varcStrings.clear();
   state.changes.inventories.clear();
   state.changes.skills.clear();
+  state.changes.varpEventCount = 0;
+  state.changes.inventoryEventCount = 0;
+  state.changes.skillEventCount = 0;
   state.changes.social = false;
 }
 
@@ -172,7 +187,10 @@ export function consumeMockClientChanges(state: MockClientState): MockClientChan
 export function setMockClientVarp(state: MockClientState, id: number, value: number): void {
   const previous = state.varps.getVarp(id);
   state.varps.setVarp(id, value);
-  if (state.varps.getVarp(id) !== previous) state.changes.varps.add(id);
+  if (state.varps.getVarp(id) !== previous) {
+    state.changes.varps.add(id);
+    state.changes.varpEventCount++;
+  }
 }
 
 export function setMockClientVarbit(
@@ -201,6 +219,7 @@ export function setMockClientVarbit(
   if (state.varps.getVarp(baseVar) !== before) {
     state.changes.varps.add(baseVar);
     state.changes.varbits.add(id);
+    state.changes.varpEventCount++;
   }
 }
 
@@ -227,6 +246,7 @@ export function setMockClientItemContainer(
     capacity: container.capacity,
   };
   state.changes.inventories.add(containerId);
+  state.changes.inventoryEventCount++;
 }
 
 export function getMockClientItemId(state: MockClientState, containerId: number, slot: number): number {
@@ -278,6 +298,7 @@ export function setMockClientSkill(
   if (values.maximumLevel !== undefined) state.maximumLevels[skillId] = Math.trunc(values.maximumLevel);
   if (values.experience !== undefined) state.currentExp[skillId] = Math.trunc(values.experience);
   state.changes.skills.add(skillId);
+  state.changes.skillEventCount++;
 }
 
 export function setMockClientSocialState(state: MockClientState, social: MockClientSocialState): void {
@@ -303,7 +324,10 @@ export function mergeMockClientState(previous: MockClientState, next: MockClient
   if (previous.varps !== next.varps) {
     const limit = Math.max(previous.varps.Varps_main.length, next.varps.Varps_main.length);
     for (let id = 0; id < limit; id++) {
-      if ((previous.varps.Varps_main[id] ?? 0) !== (next.varps.Varps_main[id] ?? 0)) changes.varps.add(id);
+      if ((previous.varps.Varps_main[id] ?? 0) !== (next.varps.Varps_main[id] ?? 0)) {
+        changes.varps.add(id);
+        changes.varpEventCount++;
+      }
     }
   }
 
@@ -322,6 +346,7 @@ export function mergeMockClientState(previous: MockClientState, next: MockClient
       || (previous.currentExp[id] ?? 0) !== (next.currentExp[id] ?? 0)
     ) {
       changes.skills.add(id);
+      changes.skillEventCount++;
     }
   }
 
