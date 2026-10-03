@@ -88,7 +88,7 @@ export function applyCs2RuntimeFromSim(
   enumTypeLoader: EnumTypeLoader | null | undefined = null,
   socialRuntime: Cs2SocialRuntime | null | undefined = null,
 ): void {
-  const clientState = sim ?? defaultClientState;
+  const clientState = sim ?? createMockClientState();
   ctx = {
     scriptRev,
     cacheHeaders,
