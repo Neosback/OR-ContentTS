@@ -14,7 +14,7 @@ Rules that follow from that split:
 
 - **Svelte owns the active UI.** The active entrypoint is `src/main.ts -> src/ui/main.ts -> App.svelte`.
 - **The runtime beneath the UI should stay framework-neutral.** Rendering, cache, scene and editing systems should not depend on Svelte components.
-- **The backend is the only encoder.** The frontend sends what changed as versioned edit batches, never pre-encoded region bytes.
+- **Encoding follows authority.** TypeScript may provide portable encoders for Studio-owned/offline formats such as terrain/static-loc packages; OpenRune-owned source should be rebuilt by OpenRune, and JVM/FileStore publication stays behind explicit bounded backend operations.
 - **Decoders exist on both sides.** Shared golden fixtures keep TypeScript and Kotlin implementations from drifting.
 - **WebGL2 stays as the reference backend.** WebGPU may be added later as an optional renderer.
 - **Rust/WASM is for measured hot paths.** It should sit behind stable TypeScript interfaces rather than owning application UI.
@@ -63,7 +63,7 @@ Next:
 
 Goal: the frontend works fully offline, with portable TypeScript services first and platform capabilities behind narrow adapters.
 
-- [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches and browser-imported IndexedDB profiles behind one contract; future filesystem-backed cache sources can implement the same interface without requiring the backend.
+- [x] Formalize `CacheSource`: shared framework-neutral cache acquisition with static/Range-backed Studio caches, browser-imported IndexedDB profiles, and `ProjectFileSystemCacheSource` for direct filesystem-backed caches without requiring the backend.
 - [x] Formalize `WorldSource`: framework-neutral world-data loading with bundled/offline NPC and ground-item/object spawn snapshots behind one contract; zones/areas extend the seam once a concrete domain model exists.
 - [x] **Edit Format v1**: versioned JSON schema and strict codec built from the transaction mutation model for terrain and loc edits, with an extensible versioned path for future NPC, zone, shop, interface, and definition mutations.
 - [x] Local project persistence behind a framework-neutral `ProjectStore`, with IndexedDB plus strict portable import/export.
@@ -176,6 +176,8 @@ Next:
 - [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
 - [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
+- [ ] Add DBTable/DBRow/DBColumn decoding using the shared `CacheVarLiteral` mapping, with byte-alignment/golden fixtures against OpenRune FileStore.
+- [ ] Continue the remaining decoder-lossiness/missing-type audit after DBTable/DBRow.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
