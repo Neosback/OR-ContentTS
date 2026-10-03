@@ -240,6 +240,9 @@ describe("Mock client state harness", () => {
       varcStrings: [],
       inventories: [],
       skills: [],
+      varpEventCount: 0,
+      inventoryEventCount: 0,
+      skillEventCount: 0,
       social: false,
     });
   });
