@@ -38,6 +38,7 @@ import { SeqTypeLoader } from "../../rs/config/seqtype/SeqTypeLoader";
 import { VarManager } from "../../rs/config/vartype/VarManager";
 import { getMapSquareId } from "../../rs/map/MapFileIndex";
 import { MapImageRenderer } from "../../rs/map/MapImageRenderer";
+import { setFaceDepthSource, type FaceDepthSource } from "../../rs/model/face-depth-source";
 import { SeqFrameLoader } from "../../rs/model/seq/SeqFrameLoader";
 import { SkeletalSeqLoader } from "../../rs/model/skeletal/SkeletalSeqLoader";
 import { Scene } from "../../rs/scene/Scene";
@@ -61,6 +62,7 @@ const openRuneCorePromise = loadOpenRuneCore();
 
 export type WorkerState = {
     cache: LoadedCache;
+    faceDepth: FaceDepthSource;
     cacheSystem: CacheSystem;
     cacheLoaderFactory: CacheLoaderFactory;
 
@@ -96,7 +98,9 @@ async function initWorker(
     cache: LoadedCache,
     objSpawns: ObjSpawn[],
     npcSpawns: NpcSpawn[],
+    faceDepth: FaceDepthSource,
 ): Promise<WorkerState> {
+    setFaceDepthSource(faceDepth);
     await compressionPromise;
     await hasherPromise;
     await openRuneCorePromise; // resolves false (TS fallback) instead of rejecting
@@ -172,6 +176,7 @@ async function initWorker(
 
     return {
         cache,
+        faceDepth,
         cacheSystem,
         cacheLoaderFactory: loaderFactory,
 
@@ -233,9 +238,14 @@ const worker = {
     setWasmEnabled(enabled: boolean): void {
         setOpenRuneCoreEnabled(enabled);
     },
-    async initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): Promise<void> {
-        console.log("init worker", cache.info);
-        const nextState = initWorker(cache, objSpawns, npcSpawns);
+    async initCache(
+        cache: LoadedCache,
+        objSpawns: ObjSpawn[],
+        npcSpawns: NpcSpawn[],
+        faceDepth: FaceDepthSource = "priority",
+    ): Promise<void> {
+        console.log("init worker", cache.info, { faceDepth });
+        const nextState = initWorker(cache, objSpawns, npcSpawns, faceDepth);
         workerStatePromise = nextState;
         await nextState;
     },
