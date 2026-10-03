@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #69 rev-240 core-decoder checkpoint:
+As of the PR #70 documentation-handoff checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -300,6 +300,7 @@ These PRs establish the current baseline:
 | #67 | Removed CS2 enum cache-proxy reads; enum opcodes now use the active selected-cache `EnumTypeLoader` |
 | #68 | Added framework-neutral Interface metadata enrichment from selected-cache GameVals plus active OpenRune GameVal/RSCM provenance, conflicts, and symbolic component names |
 | #69 | Brought core NPC/Obj/Param decoding to the current OpenRune rev-240 baseline, added CacheVarLiteral ids, fixed modern entity-op alignment, and added byte-alignment regression fixtures |
+| #70 | Documentation-only handoff refresh: synchronized architecture/roadmap/OpenRune/Interface docs, archived stale server instructions, and added the DBTable/DBRow takeover checklist |
 
 Do not reintroduce systems replaced by these PRs.
 
