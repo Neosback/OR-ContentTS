@@ -3,7 +3,12 @@ import type { MapEditor } from "../MapEditor";
 import type { EditorMapSquare } from "../webgl/EditorMapSquare";
 import type { WebGLMapEditorRenderer } from "../webgl/WebGLMapEditorRenderer";
 import { mergeStaticObjectChunks } from "./object-mesh-merge";
-import { WebGPUObjectPass, type ObjectPassFrame, type ObjectPassTextures } from "./WebGPUObjectPass";
+import {
+    WebGPUObjectPass,
+    type ObjectIndexSource,
+    type ObjectPassFrame,
+    type ObjectPassTextures,
+} from "./WebGPUObjectPass";
 import type { PrioritySortValidation } from "./face-priority-validation";
 
 /**
@@ -13,7 +18,9 @@ import type { PrioritySortValidation } from "./face-priority-validation";
  *
  *   await __webgpuHarness()      // from the console; returns the controller (also at window.__webgpuObjectPass)
  *   harness.setMode("diff")      // overlay | only | diff | off
- *   harness.stats                // frame cost, draw calls, GPU time when available
+ *   harness.stats                // CPU, compute GPU and render GPU time when available
+ *   harness.setIndexSource("priority") // draw compute-sorted indices; "original" is the default
+ *   harness.setMode("diff")      // compare the selected WebGPU stream against WebGL2
  *   await harness.validatePriorities() // GPU priority sort vs CPU RuneLite reference for visible maps
  */
 export type HarnessMode = "off" | "overlay" | "only" | "diff";
@@ -27,6 +34,8 @@ export interface ObjectPassHarness {
     readonly overlay: HTMLCanvasElement;
     readonly stats: WebGPUObjectPass["stats"];
     setMode(mode: HarnessMode): void;
+    setIndexSource(source: ObjectIndexSource): void;
+    getIndexSource(): ObjectIndexSource;
     /** Draws one frame now (the harness also draws every animation frame while the page is visible). */
     renderOnce(): void;
     /**
@@ -203,6 +212,13 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         setMode(next) {
             mode = next;
             applyMode();
+        },
+        setIndexSource(source) {
+            pass.setIndexSource(source);
+            console.info(`[webgpu harness] object indices: ${source}`);
+        },
+        getIndexSource() {
+            return pass.getIndexSource();
         },
         renderOnce,
         validatePriorities,
