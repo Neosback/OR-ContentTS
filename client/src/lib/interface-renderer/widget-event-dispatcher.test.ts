@@ -82,7 +82,46 @@ describe("WidgetEventDispatcher", () => {
     expect(transmitTriggersMatch([5], [7])).toBe(false);
     expect(transmitTriggersMatch([], [7])).toBe(true);
     expect(transmitTriggersMatch([7], [])).toBe(false);
-    expect(transmitTriggersMatch([999], Array.from({ length: 33 }, (_, index) => index))).toBe(true);
+    expect(transmitTriggersMatch([999], [1], 33)).toBe(true);
+  });
+
+  it("dispatches on-load listeners only for the active interface group", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+    markerScript(90, 890, 1);
+    markerScript(91, 891, 1);
+
+    const dispatcher = new WidgetEventDispatcher();
+    await dispatcher.dispatchOnLoad(
+      entry(
+        component(1, { packedId: (100 << 16) | 1, onLoad: [90] }),
+        component(2, { packedId: (101 << 16) | 2, onLoad: [91] }),
+      ),
+      100,
+    );
+
+    expect(state.varcs.getInt(890)).toBe(1);
+    expect(state.varcs.getInt(891)).toBe(-1);
+  });
+
+  it("uses write count rather than unique ids for the 32-change transmit overflow", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+    markerScript(95, 895, 1);
+
+    for (let i = 0; i < 33; i++) {
+      setMockClientVarp(state, 12, i % 2 === 0 ? 1 : 2);
+    }
+
+    const dispatcher = new WidgetEventDispatcher();
+    const changes = await dispatcher.dispatchTransmits(
+      entry(component(1, { onVarTransmit: [95], onVarTransmitList: [999] })),
+      state,
+    );
+
+    expect(changes.varps).toEqual([12]);
+    expect(changes.varpEventCount).toBe(33);
+    expect(state.varcs.getInt(895)).toBe(1);
   });
 
   it("dispatches only transmit listeners whose trigger ids changed", async () => {
@@ -154,6 +193,19 @@ describe("WidgetEventDispatcher", () => {
 
     expect(state.varcs.getInt(915)).toBe(7);
     expect(state.varcs.getInt(916)).toBe(-1);
+  });
+
+  it("does not run timer listeners below an effectively hidden parent", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+    markerScript(118, 918, 1);
+
+    const parent = component(10, { packedId: 100, hide: true });
+    const child = component(11, { packedId: 101, layer: 100, hide: false, onTimer: [118] });
+    const dispatcher = new WidgetEventDispatcher();
+    await dispatcher.dispatchTimer(entry(parent, child));
+
+    expect(state.varcs.getInt(918)).toBe(-1);
   });
 
   it("dispatches timer listeners through the serialized clientscript queue", async () => {

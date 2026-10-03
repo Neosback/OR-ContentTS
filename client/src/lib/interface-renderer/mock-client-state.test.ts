@@ -66,7 +66,10 @@ describe("Mock client state harness", () => {
     expect(getCs2RuntimeContext().clientState).toBe(state);
     expect(state.varps.getVarp(321)).toBe(77);
     expect(Cs1Interpreter.evaluate(widget, 0, state)).toBe(77);
-    expect(snapshotMockClientChanges(state).varps).toEqual([321]);
+    expect(snapshotMockClientChanges(state)).toMatchObject({
+      varps: [321],
+      varpEventCount: 1,
+    });
   });
 
   it("tracks varbit mutations against their backing varp", () => {
@@ -82,6 +85,7 @@ describe("Mock client state harness", () => {
     expect(snapshotMockClientChanges(state)).toMatchObject({
       varps: [9],
       varbits: [12],
+      varpEventCount: 1,
     });
   });
 
@@ -229,6 +233,7 @@ describe("Mock client state harness", () => {
     expect(state.social.friends[0]?.name).toBe("Friend");
     expect(snapshotMockClientChanges(state)).toMatchObject({
       inventories: [93],
+      inventoryEventCount: 1,
       social: true,
     });
 
@@ -240,6 +245,9 @@ describe("Mock client state harness", () => {
       varcStrings: [],
       inventories: [],
       skills: [],
+      varpEventCount: 0,
+      inventoryEventCount: 0,
+      skillEventCount: 0,
       social: false,
     });
   });
