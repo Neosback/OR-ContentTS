@@ -53,6 +53,8 @@
                 cacheHeaders={proxyHeaders}
                 spritesById={state.viewer.spritesById}
                 clientScriptIndex={state.viewer.clientScriptIndex}
+                objTypeLoader={state.viewer.objTypeLoader}
+                enumTypeLoader={state.viewer.enumTypeLoader}
                 viewportColor={state.viewportColor}
                 showOverlays={state.showOverlays}
                 showViewportBorder={state.showViewportBorder}

@@ -175,6 +175,11 @@ Next:
 - [x] Move Interface/CS2 enum lookups behind the selected cache: `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now use a local `EnumTypeLoader`; the old enum cache-proxy path is removed.
 - [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
+- [x] Stabilize the Interface preview in PR #72: isolate renderer mutations from Svelte effect tracking, preserve cache-backed enum/object CS2 loaders across redraws, model social queries 3600-3627 against deterministic mock state, and virtualize large interface lists.
+- [ ] Build a framework-neutral Mock Client State Harness for script-visible varps/varbits, varcs, skills, inventories, social state and client/player flags.
+- [ ] Dispatch real Interface CS2 hooks from the harness: on-load, var/inventory/stat transmit, timer, mouse-over/leave, click and related listeners.
+- [ ] Add explicit Interface Edit vs Simulation modes plus a State Debugger for changing mock state and retriggering hooks without a live game server.
+- [ ] Add an optional declarative mock network harness for IF_BUTTON-style round trips; do not require a full game server for ordinary Interface preview.
 - [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
 - [x] Add DBTable/DBRow/DBColumn decoding using the shared `CacheVarLiteral` mapping, selected-cache archive loaders, and byte-alignment fixtures against OpenRune FileStore.
 - [ ] Continue the remaining decoder-lossiness/missing-type audit now that DBTable/DBRow decoding is in place.

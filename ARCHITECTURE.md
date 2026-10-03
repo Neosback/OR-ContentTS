@@ -294,7 +294,7 @@ From `backend/`:
 The Interface Editor has an explicit data-authority model. Full details live in
 `docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
 
-Current implementation through PR #69:
+Current implementation through PR #72:
 
 - cache index 3 is authoritative for decoded interface/component structure;
 - client scripts, varbits, objects, and enums used by CS2 preview come from the selected cache;
@@ -304,6 +304,10 @@ Current implementation through PR #69:
 - the UI keeps alternate/conflicting symbols and mismatch diagnostics visible instead of silently choosing project metadata as runtime truth;
 - switching to Basic Cache clears retained OpenRune project metadata, and switching OpenRune roots replaces the active snapshot atomically;
 - no Kotlin backend is required for ordinary Interface metadata.
+
+Interface simulation follows the same local-first boundary. Ordinary preview does not require a full game server: selected-cache interface and ClientScript2 data plus an explicit mock client state harness should model varps/varbits, varcs, inventories, skills, social state, client/player flags, and widget event dispatch. Runtime-created widgets belong to simulation state and must remain distinguishable from serializable cache definitions. A declarative mock packet layer may later model button-to-state round trips without making OpenRune Server a preview dependency.
+
+Keep this runtime framework-neutral in TypeScript first. Rust/WASM remains appropriate for measured hot paths behind stable TypeScript interfaces, but it should not become a prerequisite for Interface correctness or Basic Cache operation.
 
 Optional backend/JVM enrichment is permitted only if it adds information the portable project index cannot provide. It belongs behind the same framework-neutral metadata seam, not directly in Svelte.
 

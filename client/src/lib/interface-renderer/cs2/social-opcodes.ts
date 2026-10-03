@@ -8,6 +8,166 @@ import {
 
 type UserComparatorIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
+function pushInt(value: number): void {
+  Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = value | 0;
+}
+
+function pushString(value: string): void {
+  Interpreter.Interpreter_stringStack[++Interpreter.Interpreter_stringStackSize - 1] = value;
+}
+
+function popInt(): number {
+  return Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+}
+
+function popString(): string {
+  const value = Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize];
+  return value == null ? "" : String(value);
+}
+
+function sameName(a: string | undefined, b: string | undefined): boolean {
+  return (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+}
+
+function handleSocialStateOpcode(opcode: number, runtime: Cs2SocialRuntime | null): number {
+  const state = runtime?.state;
+  const friends = state?.friends ?? [];
+  const ignores = state?.ignores ?? [];
+  const chat = state?.friendsChat ?? null;
+  const members = chat?.members ?? [];
+
+  if (opcode === ScriptOpcodes.FRIEND_COUNT) {
+    pushInt(friends.length);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_GETNAME) {
+    const friend = friends[popInt()];
+    pushString(friend?.name ?? "");
+    pushString(friend?.previousName ?? friend?.name ?? "");
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_GETWORLD) {
+    const friend = friends[popInt()];
+    pushInt(friend?.isOnline === false ? 0 : (friend?.world ?? 0));
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_GETRANK) {
+    pushInt(friends[popInt()]?.rank ?? 0);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_SETRANK) {
+    popInt();
+    popString();
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_ADD || opcode === ScriptOpcodes.FRIEND_DEL) {
+    popString();
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.IGNORE_ADD || opcode === ScriptOpcodes.IGNORE_DEL) {
+    popString();
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.FRIEND_TEST) {
+    const name = popString();
+    pushInt(friends.some((friend) => sameName(friend.name, name)) ? 1 : 0);
+    return 1;
+  }
+
+  if (opcode === ScriptOpcodes.CLAN_GETCHATDISPLAYNAME) {
+    pushString(chat?.displayName ?? "");
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATCOUNT) {
+    pushInt(members.length);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATUSERNAME) {
+    pushString(members[popInt()]?.name ?? "");
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATUSERWORLD) {
+    pushInt(members[popInt()]?.world ?? 0);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATUSERRANK) {
+    pushInt(members[popInt()]?.rank ?? 0);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATMINKICK) {
+    pushInt(chat?.minKick ?? 0);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_KICKUSER) {
+    popString();
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATRANK) {
+    pushInt(chat?.rank ?? 0);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_JOINCHAT) {
+    popString();
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_LEAVECHAT) {
+    return 1;
+  }
+
+  if (opcode === ScriptOpcodes.IGNORE_COUNT) {
+    pushInt(ignores.length);
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.IGNORE_GETNAME) {
+    const ignored = ignores[popInt()];
+    pushString(ignored?.name ?? "");
+    pushString(ignored?.previousName ?? ignored?.name ?? "");
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.IGNORE_TEST) {
+    const name = popString();
+    pushInt(ignores.some((ignored) => sameName(ignored.name, name)) ? 1 : 0);
+    return 1;
+  }
+
+  if (opcode === ScriptOpcodes.CLAN_ISSELF) {
+    const member = members[popInt()];
+    pushInt(
+      member?.isSelf === true
+      || (member != null && sameName(member.name, state?.localPlayerName))
+        ? 1
+        : 0,
+    );
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_GETCHATOWNERNAME) {
+    pushString(chat?.ownerName ?? "");
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_ISFRIEND) {
+    const member = members[popInt()];
+    pushInt(
+      member?.isFriend === true
+      || (member != null && friends.some((friend) => sameName(friend.name, member.name)))
+        ? 1
+        : 0,
+    );
+    return 1;
+  }
+  if (opcode === ScriptOpcodes.CLAN_ISIGNORE) {
+    const member = members[popInt()];
+    pushInt(
+      member?.isIgnored === true
+      || (member != null && ignores.some((ignored) => sameName(ignored.name, member.name)))
+        ? 1
+        : 0,
+    );
+    return 1;
+  }
+
+  return 2;
+}
+
 function popReversedFlag(): boolean {
   return Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] === 1;
 }
@@ -107,4 +267,16 @@ export function handleSocialComparatorOpcode(opcode: number): number {
   }
 
   return 2;
+}
+
+
+/**
+ * Handles the client-side social state family (3600-3627) plus the existing
+ * comparator family (3628-3657). With no injected social state, Studio uses a
+ * deterministic empty-client model instead of treating valid client opcodes as errors.
+ */
+export function handleSocialOpcode(opcode: number): number {
+  const { socialRuntime } = getCs2RuntimeContext();
+  const stateResult = handleSocialStateOpcode(opcode, socialRuntime);
+  return stateResult === 2 ? handleSocialComparatorOpcode(opcode) : stateResult;
 }

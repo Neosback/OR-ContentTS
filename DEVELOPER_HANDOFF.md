@@ -22,9 +22,10 @@ As of the PR #71 DBTable/DBRow decoder checkpoint:
 - OpenRune server TOML support now mirrors `PackServerConfig`'s registered table families across both `.data/raw-cache/server/**/*.toml` and pack-owned `pack/configs/**/*.toml`. It preserves raw/nested source, resolves symbolic ids through the GameVal registry, surfaces duplicate resolved targets instead of inventing precedence, and provides a typed inventory/shop stock view plus guarded source writes.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
 - CS2 object-definition opcodes 4200-4212 are cache-backed through the active `ObjTypeLoader`; membership, actions, price, note/placeholder transforms, and object search no longer require backend/cache-proxy data.
-- CS2 social comparator opcodes 3628-3657 model client stack semantics locally; preview execution does not require live friends/ignore/Friends Chat state, while an optional runtime adapter can supply simulated state.
+- CS2 social opcodes 3600-3657 now model client stack semantics locally: state queries use a deterministic empty mock client by default, an optional runtime adapter can provide friends/ignore/Friends Chat state, and comparator operations remain client-side.
 - Runtime-created interface widgets now use fresh client-parity Widget defaults instead of inheriting parent rendering state. The renderer also normalizes missing text defaults and treats `textFont = -1` as the valid unassigned-font sentinel.
-- CS2 enum opcodes `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now load enum definitions directly from the selected cache through `EnumTypeLoader`. The old enum `/api/cache-proxy` lookup path is removed.
+- CS2 enum opcodes `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` load enum definitions directly from the selected cache through `EnumTypeLoader`. PR #72 fixes preview redraws so they no longer clear the active enum/object loaders.
+- PR #72 isolates mutable widget layout/render work from Svelte effect dependency tracking to prevent `effect_update_depth_exceeded`, and the Interface list now uses the shared virtual-list component so large caches remain fully scrollable.
 - Cache & Project Setup has two explicit user-facing modes:
   - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
   - **OpenRune project:** both desktop and Chromium File System Access environments can open one OpenRune Server repository root. Desktop stores the native path; browser mode stores the granted `FileSystemDirectoryHandle` separately in IndexedDB and keeps only serializable access metadata in the profile. Both feed the same `ProjectFileSystem` / `OpenRuneProjectSession` layers.
@@ -303,6 +304,7 @@ These PRs establish the current baseline:
 | #69 | Brought core NPC/Obj/Param decoding to the current OpenRune rev-240 baseline, added CacheVarLiteral ids, fixed modern entity-op alignment, and added byte-alignment regression fixtures |
 | #70 | Documentation-only handoff refresh: synchronized architecture/roadmap/OpenRune/Interface docs, archived stale server instructions, and added the DBTable/DBRow takeover checklist |
 | #71 | Added selected-cache DBTable/DBRow/DBColumn decoding, exact smart/varint and signed-long semantics, OSRS archive 38/39 loaders, and alignment/integration fixtures |
+| #72 | Stabilized Interface preview reactivity, preserved enum/object CS2 runtime loaders, added mock social-query semantics for 3600-3627, and virtualized the large Interface list |
 
 Do not reintroduce systems replaced by these PRs.
 

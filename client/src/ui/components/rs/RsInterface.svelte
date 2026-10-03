@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy } from "svelte";
+    import { onDestroy, untrack } from "svelte";
 
     import {
         InterfaceManager,
@@ -12,8 +12,10 @@
     } from "../../../lib/interface-renderer/interface-manager";
     import type { ComponentType, InterfaceEntry } from "../../../lib/interface-renderer/component-types";
     import type { Cs1SimState } from "../../../lib/interface-renderer/cs1-interpreter";
-    import { applyCs2RuntimeFromSim } from "../../../lib/interface-renderer/cs2/runtime-context";
+    import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../../lib/interface-renderer/cs2/runtime-context";
     import type { CacheIndex } from "../../../rs/cache/CacheIndex";
+    import type { EnumTypeLoader } from "../../../rs/config/enumtype/EnumTypeLoader";
+    import type { ObjTypeLoader } from "../../../rs/config/objtype/ObjTypeLoader";
     import type { VarbitDefinitionLookup } from "../../../rs/config/vartype/bit/VarBitTypeLoader";
     import type { Sprite } from "../../../rs/sprite/InterfaceCanvasSprite";
     import type { RsInterfaceMode } from "../../../interface/interface-editor-workbench-model";
@@ -35,6 +37,8 @@
         cacheHeaders = {},
         spritesById = new Map<number, Sprite>(),
         clientScriptIndex = null,
+        objTypeLoader = null,
+        enumTypeLoader = null,
         class: className = "",
         viewportColor = "rgb(76,68,32)",
         showOverlays = true,
@@ -55,6 +59,8 @@
         cacheHeaders?: HeadersInit;
         spritesById?: ReadonlyMap<number, Sprite>;
         clientScriptIndex?: CacheIndex | null;
+        objTypeLoader?: ObjTypeLoader | null;
+        enumTypeLoader?: EnumTypeLoader | null;
         class?: string;
         viewportColor?: string;
         showOverlays?: boolean;
@@ -166,6 +172,7 @@
         setCs1SimState(cs1SimState ?? null);
         setCs1InterfaceEntry(data);
         setCs1VarbitDefinitionLookup(cs1VarbitDefinitionLookup ?? null);
+        const { socialRuntime } = getCs2RuntimeContext();
         applyCs2RuntimeFromSim(
             cs1SimState,
             revision,
@@ -175,6 +182,9 @@
             canvasWidth,
             canvasHeight,
             clientScriptIndex,
+            objTypeLoader,
+            enumTypeLoader,
+            socialRuntime,
         );
 
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -226,6 +236,8 @@
         const headers = cacheHeaders;
         const sprites = spritesById;
         const scriptIndex = clientScriptIndex;
+        const objects = objTypeLoader;
+        const enums = enumTypeLoader;
         viewportOffsetX;
         viewportOffsetY;
         viewportWidth;
@@ -240,6 +252,8 @@
         void rev;
         void headers;
         void scriptIndex;
+        void objects;
+        void enums;
 
         target.width = width;
         target.height = height;
@@ -249,11 +263,15 @@
         const nextManager = new InterfaceManager(context, sprites);
         manager = nextManager;
 
+        // Rendering mutates runtime widget layout fields (tempWidth/tempHeight/x1/y1).
+        // Keep those client-runtime writes outside Svelte dependency tracking so this
+        // effect does not subscribe to the same state it mutates and recurse forever.
+        const renderFrame = (): void => untrack(() => draw(context, nextManager, data, id));
         const frame = (): void => {
-            draw(context, nextManager, data, id);
+            renderFrame();
             renderRaf = requestAnimationFrame(frame);
         };
-        draw(context, nextManager, data, id);
+        renderFrame();
         renderRaf = requestAnimationFrame(frame);
 
         return () => {
