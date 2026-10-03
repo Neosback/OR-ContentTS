@@ -148,6 +148,16 @@ function clean(value: string | undefined): string | undefined {
     return trimmed ? trimmed : undefined;
 }
 
+function metadataNameDiagnostic(
+    cacheName: string | undefined,
+    projectKey: string | undefined,
+): string | undefined {
+    if (!cacheName || !projectKey) return undefined;
+    if (projectKey === cacheName || projectKey.endsWith(`:${cacheName}`)) return undefined;
+    return `Selected-cache name "${cacheName}" differs from OpenRune project name "${projectKey}".`;
+}
+
+
 /**
  * Framework-neutral interface metadata enrichment.
  *
@@ -165,6 +175,9 @@ export function createInterfaceMetadataSource(
             const projects = projectEntries(registry, [["interface", id]]);
             const project = projects[0];
             const projectKey = clean(project?.key);
+            const diagnostics = registryDiagnostics(registry, ["interface"], id, projects);
+            const mismatch = metadataNameDiagnostic(cacheName, projectKey);
+            if (mismatch) diagnostics.push(mismatch);
             return {
                 id,
                 cacheName,
@@ -173,7 +186,7 @@ export function createInterfaceMetadataSource(
                 provenance: project ? provenance(project) : undefined,
                 declarations: project ? declarationProvenance(project) : [],
                 projectAlternates: projects.slice(1).map((entry) => entry.symbol),
-                diagnostics: registryDiagnostics(registry, ["interface"], id, projects),
+                diagnostics,
                 displayName: projectKey ?? cacheName ?? `Interface ${id}`,
             };
         },
@@ -188,6 +201,9 @@ export function createInterfaceMetadataSource(
             const projects = projectEntries(registry, tables.map((table) => [table, packedId] as const));
             const project = projects[0];
             const projectKey = clean(project?.key);
+            const diagnostics = registryDiagnostics(registry, tables, packedId, projects);
+            const mismatch = metadataNameDiagnostic(cacheName, projectKey);
+            if (mismatch) diagnostics.push(mismatch);
             return {
                 interfaceId,
                 componentId,
@@ -198,7 +214,7 @@ export function createInterfaceMetadataSource(
                 provenance: project ? provenance(project) : undefined,
                 declarations: project ? declarationProvenance(project) : [],
                 projectAlternates: projects.slice(1).map((entry) => entry.symbol),
-                diagnostics: registryDiagnostics(registry, tables, packedId, projects),
+                diagnostics,
                 displayName: projectKey ?? cacheName,
             };
         },
