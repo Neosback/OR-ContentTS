@@ -294,7 +294,7 @@ From `backend/`:
 The Interface Editor has an explicit data-authority model. Full details live in
 `docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
 
-Current implementation through PR #73:
+Current implementation through PR #74:
 
 - cache index 3 is authoritative for decoded interface/component structure;
 - client scripts, varbits, objects, and enums used by CS2 preview come from the selected cache;
@@ -305,9 +305,9 @@ Current implementation through PR #73:
 - switching to Basic Cache clears retained OpenRune project metadata, and switching OpenRune roots replaces the active snapshot atomically;
 - no Kotlin backend is required for ordinary Interface metadata.
 
-Interface simulation follows the same local-first boundary. Ordinary preview does not require a full game server. PR #73 provides the shared framework-neutral Mock Client State for varps/varbits, Varcs, item containers, skills, social state, coordinates/world/client flags, and changed-id tracking; the next layer is widget event/transmit dispatch over that state. Runtime-created widgets belong to simulation state and must remain distinguishable from serializable cache definitions. A declarative mock packet layer may later model button-to-state round trips without making OpenRune Server a preview dependency.
+Interface simulation follows the same local-first boundary. Ordinary preview does not require a full game server. PR #73 provides the shared framework-neutral Mock Client State for varps/varbits, Varcs, item containers, skills, social state, coordinates/world/client flags, and changed-id tracking. PR #74 layers serialized client-cycle event dispatch over it for trigger-aware var/inventory/stat transmits, initial var transmits, timers, hover/repeat, click/hold/release and scroll-wheel listeners using widget-relative mouse context. Runtime-created widgets belong to simulation state and must remain distinguishable from serializable cache definitions. A declarative mock packet layer may later model button-to-state round trips without making OpenRune Server a preview dependency.
 
-Keep this runtime framework-neutral in TypeScript first. Rust/WASM remains appropriate for measured hot paths behind stable TypeScript interfaces, but it should not become a prerequisite for Interface correctness or Basic Cache operation.
+The next UI layer should expose this runtime through explicit Edit/Simulation modes and a State Debugger instead of adding another simulation model. Keep this runtime framework-neutral in TypeScript first. Rust/WASM remains appropriate for measured hot paths behind stable TypeScript interfaces, but it should not become a prerequisite for Interface correctness or Basic Cache operation.
 
 Optional backend/JVM enrichment is permitted only if it adds information the portable project index cannot provide. It belongs behind the same framework-neutral metadata seam, not directly in Svelte.
 

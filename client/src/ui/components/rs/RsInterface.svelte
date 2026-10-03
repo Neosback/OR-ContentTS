@@ -13,6 +13,7 @@
     import type { ComponentType, InterfaceEntry } from "../../../lib/interface-renderer/component-types";
     import type { Cs1SimState } from "../../../lib/interface-renderer/cs1-interpreter";
     import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../../lib/interface-renderer/cs2/runtime-context";
+    import { WidgetEventDispatcher } from "../../../lib/interface-renderer/widget-event-dispatcher";
     import type { CacheIndex } from "../../../rs/cache/CacheIndex";
     import type { EnumTypeLoader } from "../../../rs/config/enumtype/EnumTypeLoader";
     import type { ObjTypeLoader } from "../../../rs/config/objtype/ObjTypeLoader";
@@ -48,6 +49,7 @@
         selectedComponent = null,
         interactiveMode = false,
         cs1SimState = null,
+        clientState = null,
         cs1VarbitDefinitionLookup = null,
         cs2RedrawNonce = 0,
     }: {
@@ -70,6 +72,8 @@
         selectedComponent?: ComponentType | null;
         interactiveMode?: boolean;
         cs1SimState?: Cs1SimState | null;
+        /** Shared mock client state for CS2 simulation, including modern IF3 interfaces. */
+        clientState?: Cs1SimState | null;
         cs1VarbitDefinitionLookup?: VarbitDefinitionLookup | null;
         cs2RedrawNonce?: number;
     } = $props();
@@ -80,7 +84,15 @@
     let containerHeight = $state(0);
     let manager: InterfaceManager | null = null;
     let hoverPick: ComponentType | null = null;
+    let hoveredEventComponents = new Set<ComponentType>();
+    let heldComponent: ComponentType | null = null;
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerInside = false;
     let renderRaf = 0;
+    let clientTickTimer = 0;
+    let eventDispatcher: WidgetEventDispatcher | null = null;
+    let latestClientState: Cs1SimState | null = null;
 
     const viewportWidth = $derived(mode === "fixed" ? FIXED_VIEWPORT_WIDTH : containerWidth);
     const viewportHeight = $derived(mode === "fixed" ? FIXED_VIEWPORT_HEIGHT : containerHeight);
@@ -115,6 +127,88 @@
             x: (event.clientX - rect.left) * (canvas.width / rect.width || 1),
             y: (event.clientY - rect.top) * (canvas.height / rect.height || 1),
         };
+    }
+
+    function componentsAt(data: InterfaceEntry, x: number, y: number): ComponentType[] {
+        const currentManager = manager;
+        if (!currentManager) return [];
+        const hits: ComponentType[] = [];
+        for (const component of collectAllComponents(data)) {
+            const bounds = currentManager.getComponentDrawBoundsFor(component);
+            if (!bounds) continue;
+            if (x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height) continue;
+            hits.push(component);
+        }
+        return hits;
+    }
+
+    function relativeEventPosition(component: ComponentType, x: number, y: number): { x: number; y: number } {
+        const bounds = manager?.getComponentDrawBoundsFor(component);
+        return bounds ? { x: x - bounds.x, y: y - bounds.y } : { x, y };
+    }
+
+    function hasHoverListeners(component: ComponentType): boolean {
+        return !!(component.onMouseOver || component.onMouseLeave || component.onMouseRepeat);
+    }
+
+    function hasPressListeners(component: ComponentType): boolean {
+        return !!(component.onClick || component.onHold || component.onClickRepeat || component.onRelease);
+    }
+
+    function pickPressComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
+        const hits = componentsAt(data, x, y);
+        for (let i = hits.length - 1; i >= 0; i--) {
+            if (hasPressListeners(hits[i]!)) return hits[i]!;
+        }
+        return null;
+    }
+
+    function pickScrollListenerAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
+        const hits = componentsAt(data, x, y);
+        for (let i = hits.length - 1; i >= 0; i--) {
+            if (hits[i]!.onScrollWheel) return hits[i]!;
+        }
+        return null;
+    }
+
+    function updateHoverEvents(data: InterfaceEntry, x: number, y: number): void {
+        const nextHits = componentsAt(data, x, y).filter(hasHoverListeners);
+        const next = new Set(nextHits);
+
+        for (const previous of hoveredEventComponents) {
+            if (next.has(previous)) continue;
+            const position = relativeEventPosition(previous, x, y);
+            void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+
+        for (const component of nextHits) {
+            if (hoveredEventComponents.has(component)) continue;
+            const position = relativeEventPosition(component, x, y);
+            void eventDispatcher?.dispatchPointer(component, "mouseOver", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+
+        hoveredEventComponents = next;
+        hoverPick = pickComponentAt(data, x, y);
+        Interpreter.mousedOverWidgetIf1 = hoverPick;
+    }
+
+    function clearHoverEvents(): void {
+        for (const component of hoveredEventComponents) {
+            const position = relativeEventPosition(component, pointerX, pointerY);
+            void eventDispatcher?.dispatchPointer(component, "mouseLeave", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+        hoveredEventComponents = new Set<ComponentType>();
+        hoverPick = null;
+        Interpreter.mousedOverWidgetIf1 = null;
     }
 
     function pickComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
@@ -169,12 +263,13 @@
         data: InterfaceEntry,
         id: number,
     ): void {
+        latestClientState = clientState ?? cs1SimState;
         setCs1SimState(cs1SimState ?? null);
         setCs1InterfaceEntry(data);
         setCs1VarbitDefinitionLookup(cs1VarbitDefinitionLookup ?? null);
         const { socialRuntime } = getCs2RuntimeContext();
         applyCs2RuntimeFromSim(
-            cs1SimState,
+            latestClientState,
             revision,
             cacheHeaders,
             cs1VarbitDefinitionLookup ?? null,
@@ -231,6 +326,7 @@
         const selectedId = selectedComponentId;
         const selected = selectedComponent;
         const simState = cs1SimState;
+        const runtimeState = clientState;
         const lookup = cs1VarbitDefinitionLookup;
         const rev = revision;
         const headers = cacheHeaders;
@@ -248,6 +344,7 @@
         void selectedId;
         void selected;
         void simState;
+        void runtimeState;
         void lookup;
         void rev;
         void headers;
@@ -284,47 +381,165 @@
     });
 
     $effect(() => {
+        const data = interfaceData;
+        const enabled = interactiveMode;
+
+        eventDispatcher?.dispose();
+        eventDispatcher = null;
+        if (clientTickTimer !== 0) {
+            window.clearTimeout(clientTickTimer);
+            clientTickTimer = 0;
+        }
+
+        if (!enabled || !data) return;
+
+        const dispatcher = new WidgetEventDispatcher();
+        eventDispatcher = dispatcher;
+        let cancelled = false;
+
+        // The client invokes var-transmit listeners with trigger lists once when a
+        // group becomes active, before ordinary changed-id processing begins.
+        void dispatcher.dispatchInitialVarTransmit(data);
+
+        const runTick = async (): Promise<void> => {
+            if (cancelled) return;
+            const startedAt = performance.now();
+            const state = latestClientState;
+
+            if (state) {
+                state.clientCycle = (state.clientCycle + 1) | 0;
+
+                // Snapshot transmit changes first. Listener mutations are intentionally
+                // retained for the next 20 ms client tick instead of recursively firing.
+                void dispatcher.dispatchTransmits(data, state);
+                void dispatcher.dispatchTimer(data);
+
+                // Re-hit-test every client cycle. Runtime scripts can move/show/hide widgets
+                // while the pointer is stationary, which can itself cause enter/leave events.
+                if (pointerInside) updateHoverEvents(data, pointerX, pointerY);
+
+                for (const hovered of hoveredEventComponents) {
+                    const position = relativeEventPosition(hovered, pointerX, pointerY);
+                    void dispatcher.dispatchPointer(hovered, "mouseRepeat", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                }
+
+                const clicked = Interpreter.clickedWidget;
+                if (clicked) {
+                    const position = relativeEventPosition(clicked, pointerX, pointerY);
+                    void dispatcher.dispatchPointer(clicked, "hold", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                    void dispatcher.dispatchPointer(clicked, "clickRepeat", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                }
+            }
+
+            // Do not let a slow CS2 listener create overlapping client cycles. The
+            // next cycle starts after the shared VM queue drains, preserving ordering.
+            await dispatcher.flush();
+            if (cancelled) return;
+            const elapsed = performance.now() - startedAt;
+            clientTickTimer = window.setTimeout(() => void runTick(), Math.max(0, 20 - elapsed));
+        };
+
+        clientTickTimer = window.setTimeout(() => void runTick(), 20);
+
+        return () => {
+            cancelled = true;
+            dispatcher.dispose();
+            if (eventDispatcher === dispatcher) eventDispatcher = null;
+            if (clientTickTimer !== 0) {
+                window.clearTimeout(clientTickTimer);
+                clientTickTimer = 0;
+            }
+        };
+    });
+
+    $effect(() => {
         if (interactiveMode) return;
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;
         hoverPick = null;
+        hoveredEventComponents = new Set<ComponentType>();
+        heldComponent = null;
+        pointerInside = false;
     });
 
     function onMouseMove(event: MouseEvent): void {
         const position = localPosition(event);
+        pointerX = position.x;
+        pointerY = position.y;
+        pointerInside = true;
         setInterfaceMousePosition(position.x, position.y);
         if (!interactiveMode || !interfaceData) return;
-        const next = pickComponentAt(interfaceData, position.x, position.y);
-        if (next !== hoverPick) {
-            hoverPick = next;
-            Interpreter.mousedOverWidgetIf1 = next;
-        }
+        updateHoverEvents(interfaceData, position.x, position.y);
     }
 
     function onMouseLeave(): void {
         setInterfaceMousePosition(0, 0);
-        if (hoverPick !== null) {
-            hoverPick = null;
-            Interpreter.mousedOverWidgetIf1 = null;
-        }
+        pointerInside = false;
+        clearHoverEvents();
     }
 
     function onWheel(event: WheelEvent): void {
         if (!interactiveMode || !interfaceData) return;
         event.preventDefault();
         const position = localPosition(event);
+        pointerX = position.x;
+        pointerY = position.y;
+
+        const target = pickScrollListenerAt(interfaceData, position.x, position.y);
+        if (target) {
+            const relative = relativeEventPosition(target, position.x, position.y);
+            void eventDispatcher?.dispatchPointer(target, "scrollWheel", {
+                mouseX: relative.x,
+                mouseY: event.deltaY > 0 ? 1 : -1,
+            });
+        }
+
         const picked = pickScrollableAt(interfaceData, position.x, position.y);
         if (!picked) return;
         nudgeScrollY(picked.runtimeId, event.deltaY, picked.scrollHeight, picked.tempHeight);
     }
 
     function onMouseDown(event: MouseEvent): void {
-        if (!interactiveMode || !interfaceData) return;
+        if (!interactiveMode || !interfaceData || event.button !== 0) return;
         const position = localPosition(event);
-        Interpreter.clickedWidget = pickComponentAt(interfaceData, position.x, position.y);
+        pointerX = position.x;
+        pointerY = position.y;
+        const picked = pickPressComponentAt(interfaceData, position.x, position.y);
+        heldComponent = picked;
+        Interpreter.clickedWidget = picked;
+        if (picked) {
+            const relative = relativeEventPosition(picked, position.x, position.y);
+            void eventDispatcher?.dispatchPointer(picked, "click", {
+                mouseX: relative.x,
+                mouseY: relative.y,
+            });
+        }
     }
 
-    function clearClicked(): void {
+    function clearClicked(event?: MouseEvent): void {
+        const released = heldComponent ?? Interpreter.clickedWidget;
+        if (event) {
+            const position = localPosition(event);
+            pointerX = position.x;
+            pointerY = position.y;
+        }
+        if (released) {
+            const relative = relativeEventPosition(released, pointerX, pointerY);
+            void eventDispatcher?.dispatchPointer(released, "release", {
+                mouseX: relative.x,
+                mouseY: relative.y,
+            });
+        }
+        heldComponent = null;
         Interpreter.clickedWidget = null;
     }
 
@@ -336,6 +551,13 @@
 
     onDestroy(() => {
         cancelAnimationFrame(renderRaf);
+        if (clientTickTimer !== 0) window.clearTimeout(clientTickTimer);
+        clientTickTimer = 0;
+        eventDispatcher?.dispose();
+        eventDispatcher = null;
+        hoveredEventComponents = new Set<ComponentType>();
+        heldComponent = null;
+        pointerInside = false;
         manager = null;
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;

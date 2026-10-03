@@ -177,8 +177,8 @@ Next:
 - [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
 - [x] Stabilize the Interface preview in PR #72: isolate renderer mutations from Svelte effect tracking, preserve cache-backed enum/object CS2 loaders across redraws, model social queries 3600-3627 against deterministic mock state, and virtualize large interface lists.
 - [x] Build a framework-neutral Mock Client State Harness for script-visible varps/varbits, varcs, skills, item containers, social state and core client/player flags; PR #73 also wires the existing 3300 client-state CS2 family to that shared state.
-- [ ] Dispatch real Interface CS2 hooks from the PR #73 harness: on-load, var/inventory/stat transmit, timer, mouse-over/leave, click and related listeners, using the harness change journal to honor trigger lists.
-- [ ] Add explicit Interface Edit vs Simulation modes plus a State Debugger for changing mock state and retriggering hooks without a live game server.
+- [x] Dispatch real Interface CS2 hooks from the PR #73 harness. PR #74 adds trigger-aware var/inventory/stat transmits, initial var-transmit behavior, 20 ms timers, hover/repeat, click/hold/release, and scroll-wheel listeners with serialized CS2 execution and widget-relative mouse context.
+- [ ] Add explicit Interface Edit vs Simulation modes plus a State Debugger for changing PR #73 mock state and observing PR #74 event reactions without a live game server.
 - [ ] Add an optional declarative mock network harness for IF_BUTTON-style round trips; do not require a full game server for ordinary Interface preview.
 - [x] Bring core OSRS config decoding to the OpenRune rev-240 baseline for NPC, Obj and Param definitions, including modern entity-op payloads and CacheVarLiteral ids.
 - [x] Add DBTable/DBRow/DBColumn decoding using the shared `CacheVarLiteral` mapping, selected-cache archive loaders, and byte-alignment fixtures against OpenRune FileStore.

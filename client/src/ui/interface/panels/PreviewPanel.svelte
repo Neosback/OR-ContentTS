@@ -63,6 +63,7 @@
                 selectedComponent={state.selectedComponent}
                 interactiveMode={state.interactiveMode}
                 cs1SimState={state.cs1ForCanvas}
+                clientState={state.cs1SimState}
                 cs1VarbitDefinitionLookup={state.varbitDefinitionLookup}
                 cs2RedrawNonce={state.cs2RedrawNonce}
                 class={state.mode === "resizable" ? "h-full w-full" : "shrink-0"}
