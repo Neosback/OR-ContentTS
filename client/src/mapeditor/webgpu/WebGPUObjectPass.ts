@@ -71,6 +71,7 @@ interface GpuMap {
     indexBuffer: GPUBuffer;
     sortedIndexBuffer: GPUBuffer;
     priorityBuffer: GPUBuffer;
+    priorityOrdinalBuffer: GPUBuffer;
     priorityGroupBuffer: GPUBuffer;
     priorityScratchBuffer: GPUBuffer;
     priorityGroupCount: number;
@@ -242,6 +243,7 @@ export class WebGPUObjectPass {
                 { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
                 { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
                 { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+                { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
             ],
         });
         const layout = device.createPipelineLayout({ bindGroupLayouts: [sceneLayout, mapLayout] });
@@ -373,6 +375,14 @@ export class WebGPUObjectPass {
         if (priorityData.priorities.byteLength > 0) {
             device.queue.writeBuffer(priorityBuffer, 0, priorityData.priorities as Uint32Array<ArrayBuffer>);
         }
+        const priorityOrdinalBuffer = device.createBuffer({
+            label: `map ${id} face ordinals`,
+            size: Math.max(priorityData.ordinals.byteLength, 4),
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        if (priorityData.ordinals.byteLength > 0) {
+            device.queue.writeBuffer(priorityOrdinalBuffer, 0, priorityData.ordinals as Uint32Array<ArrayBuffer>);
+        }
         const priorityGroupBuffer = device.createBuffer({
             label: `map ${id} face priority groups`,
             size: Math.max(priorityData.groups.byteLength, 4),
@@ -447,6 +457,7 @@ export class WebGPUObjectPass {
                 { binding: 3, resource: { buffer: priorityGroupBuffer } },
                 { binding: 4, resource: { buffer: vertexBuffer } },
                 { binding: 5, resource: { buffer: priorityScratchBuffer } },
+                { binding: 6, resource: { buffer: priorityOrdinalBuffer } },
             ],
         });
         this.maps.set(id, {
@@ -455,6 +466,7 @@ export class WebGPUObjectPass {
             indexBuffer,
             sortedIndexBuffer,
             priorityBuffer,
+            priorityOrdinalBuffer,
             priorityGroupBuffer,
             priorityScratchBuffer,
             priorityGroupCount: priorityData.groups.length / GPU_PRIORITY_GROUP_WORDS,
@@ -475,6 +487,7 @@ export class WebGPUObjectPass {
         map.indexBuffer.destroy();
         map.sortedIndexBuffer.destroy();
         map.priorityBuffer.destroy();
+        map.priorityOrdinalBuffer.destroy();
         map.priorityGroupBuffer.destroy();
         map.priorityScratchBuffer.destroy();
         map.slotBuffer.destroy();
