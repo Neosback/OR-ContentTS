@@ -220,6 +220,12 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         if (!Number.isInteger(sampleCount) || sampleCount < 1) {
             throw new RangeError("sampleCount must be a positive integer");
         }
+        if (!pass.hasGpuTimestamps()) {
+            throw new Error("This WebGPU adapter does not support timestamp-query");
+        }
+        if (stopped || mode === "off") {
+            throw new Error("The WebGPU harness must be running and visible to sample timings");
+        }
 
         const compute: number[] = [];
         const render: number[] = [];
