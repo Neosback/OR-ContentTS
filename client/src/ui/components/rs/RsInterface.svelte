@@ -397,8 +397,9 @@
         eventDispatcher = dispatcher;
         let cancelled = false;
 
-        // The client invokes var-transmit listeners with trigger lists once when a
-        // group becomes active, before ordinary changed-id processing begins.
+        // Match group activation order: run onLoad first, then the client's
+        // initial trigger-backed var-transmit listeners before ordinary tick processing.
+        void dispatcher.dispatchOnLoad(data, interfaceId ?? -1);
         void dispatcher.dispatchInitialVarTransmit(data);
 
         const runTick = async (): Promise<void> => {
