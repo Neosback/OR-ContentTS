@@ -82,7 +82,7 @@ describe("WidgetEventDispatcher", () => {
     expect(transmitTriggersMatch([5], [7])).toBe(false);
     expect(transmitTriggersMatch([], [7])).toBe(true);
     expect(transmitTriggersMatch([7], [])).toBe(false);
-    expect(transmitTriggersMatch([999], Array.from({ length: 33 }, (_, index) => index))).toBe(true);
+    expect(transmitTriggersMatch([999], [1], 33)).toBe(true);
   });
 
   it("fires initial var-transmit listeners that declare trigger ids", async () => {
