@@ -632,8 +632,9 @@ export class WebGPUObjectPass {
 
         const encoder = device.createCommandEncoder();
 
-        // Validation stage: execute the priority sorter every frame, but keep the render pass on indexBuffer until
-        // the computed stream is compared against the CPU reference and representative WebGL2 captures.
+        // Priority sorting is always computed so validation and A/B rendering use the same frame data. When
+        // indexSource is "priority", WebGPU pass ordering makes these storage writes visible to the following index
+        // reads without an explicit barrier. The production default remains the original index stream.
         const priorityPass = encoder.beginComputePass({
             label: "object face priority sort",
             timestampWrites: this.timestamps
