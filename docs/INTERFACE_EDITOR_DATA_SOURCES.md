@@ -63,7 +63,8 @@ Recent parity work includes:
 - PR #67: local cache-backed enum opcodes;
 - PR #69: rev-240 core NPC/Obj/Param decoder parity;
 - PR #72: stabilized the Svelte preview/render boundary, preserved selected-cache enum/object loaders during redraw, added deterministic mock social queries for 3600-3627, and virtualized the interface list;
-- PR #73: introduced one shared Mock Client State for CS1/CS2, including Varps/Varbits, Varcs, skills, item containers, social/world/client fields, a change journal, and harness-backed 3300-family client-state opcodes.
+- PR #73: introduced one shared Mock Client State for CS1/CS2, including Varps/Varbits, Varcs, skills, item containers, social/world/client fields, a change journal, and harness-backed 3300-family client-state opcodes;
+- PR #74: added serialized widget event dispatch with initial/changed var transmits, inventory/stat transmits, timers, hover/repeat, click/hold/release, scroll-wheel listeners, trigger filtering, and widget-relative pointer context.
 
 Do not reintroduce network/cache-proxy reads for data already available from the selected `CacheSystem`.
 
@@ -196,14 +197,17 @@ For DB support, see the exact takeover notes in `DEVELOPER_HANDOFF.md`.
 
 A realistic Interface Editor does not require a full simulated game server for ordinary rendering. The server-originated inputs that affect client layout can be represented as explicit mock client state and events while interface structure, ClientScript2 bytecode, varbits, objects, enums, sprites, fonts and models continue to come from the selected cache.
 
-The next Interface runtime milestone should therefore remain framework-neutral and add:
+The Interface runtime remains framework-neutral. PR #73 and PR #74 now provide:
 
 - the PR #73 mock client state harness for varps/varbits, varcs, skills, item containers, social state, player/client flags and other script-visible state;
-- event dispatch for on-load, var/inventory/stat transmit, timer, mouse-over/leave and other widget listeners, consuming PR #73's changed-id journal and widget trigger lists;
-- broader CS2 opcode coverage driven by real cache scripts, retaining correct int/string stack effects and runtime-created widget semantics;
-- explicit Edit and Simulation modes so runtime-created components can be inspected without accidentally treating them as serializable cache definitions;
-- a State Debugger panel that can change mock state and immediately retrigger the appropriate client hooks;
-- an optional declarative mock network layer for testing button-to-state round trips without requiring OpenRune Server.
+- the PR #74 event dispatcher for initial/changed var transmits, inventory/stat transmits, timers and interactive pointer hooks, with serialized client cycles and trigger filtering.
+
+Next, keep building on those seams rather than replacing them:
+
+- add explicit Edit and Simulation modes so runtime-created components can be inspected without accidentally treating them as serializable cache definitions;
+- add a State Debugger panel that changes mock state and immediately exposes the resulting PR #74 hook activity;
+- broaden CS2 opcode coverage from real cache scripts while retaining correct int/string stack effects and runtime-created widget semantics;
+- add an optional declarative mock network layer for testing button-to-state round trips without requiring OpenRune Server.
 
 Keep this in TypeScript behind stable runtime interfaces first. Rust/WASM is appropriate later for measured hot paths such as large decode/layout/VM workloads, but it should not become a prerequisite for Interface correctness or Basic Cache operation.
 
