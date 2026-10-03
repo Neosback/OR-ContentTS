@@ -304,6 +304,7 @@ function collectObjectChunkTransferables(chunks: EditorMapObjectChunkData[]): Tr
         transferables.push(
             chunk.vertices.buffer,
             chunk.indices.buffer,
+            chunk.faceRenderPriorities.buffer,
             chunk.animIndices.buffer,
             chunk.slotInfo.buffer,
         );
