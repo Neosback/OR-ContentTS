@@ -28,6 +28,10 @@ type RuntimeTransmitWidget = ComponentType & {
   onClanTransmit?: ComponentScriptArg[] | null;
 };
 
+function componentRuntimeId(component: ComponentType): number {
+  return typeof component.packedId === "number" ? component.packedId : component.id;
+}
+
 function collectComponents(entry: InterfaceEntry): ComponentType[] {
   const out: ComponentType[] = [];
   const seen = new Set<ComponentType>();
@@ -45,6 +49,24 @@ function collectComponents(entry: InterfaceEntry): ComponentType[] {
   return out;
 }
 
+function collectVisibleComponents(entry: InterfaceEntry): ComponentType[] {
+  const all = collectComponents(entry);
+  const byRuntimeId = new Map(all.map((component) => [componentRuntimeId(component), component]));
+
+  const isEffectivelyHidden = (component: ComponentType): boolean => {
+    const visited = new Set<ComponentType>();
+    let current: ComponentType | undefined = component;
+    while (current && !visited.has(current)) {
+      visited.add(current);
+      if (current.hide) return true;
+      current = byRuntimeId.get(current.layer);
+    }
+    return false;
+  };
+
+  return all.filter((component) => !isEffectivelyHidden(component));
+}
+
 export function normalizeWidgetScriptArgs(raw: unknown): unknown[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const first = raw[0];
@@ -59,12 +81,13 @@ export function normalizeWidgetScriptArgs(raw: unknown): unknown[] | null {
 export function transmitTriggersMatch(
   triggers: readonly number[] | null | undefined,
   changedIds: readonly number[],
+  changeEventCount = changedIds.length,
 ): boolean {
-  if (changedIds.length === 0) return false;
+  if (changeEventCount <= 0) return false;
   // The client only keeps a 32-entry circular change buffer. Once more than 32
-  // values changed since a widget last processed transmits, trigger filtering
+  // writes occurred since a widget last processed transmits, trigger filtering
   // cannot be trusted and the listener fires unconditionally.
-  if (changedIds.length > 32 || triggers == null || triggers.length === 0) return true;
+  if (changeEventCount > 32 || triggers == null || triggers.length === 0) return true;
 
   const changed = new Set(changedIds);
   return triggers.some((id) => changed.has(id));
@@ -136,9 +159,23 @@ export class WidgetEventDispatcher {
     return this.enqueue(component, pointerArgs(component, kind), coordinates);
   }
 
+  dispatchOnLoad(entry: InterfaceEntry, interfaceId: number): Promise<void> {
+    const groupId = interfaceId & 0xffff;
+    const components = collectComponents(entry).sort((a, b) => a.id - b.id);
+    for (const component of components) {
+      if (
+        typeof component.packedId === "number"
+        && ((component.packedId >>> 16) & 0xffff) !== groupId
+      ) {
+        continue;
+      }
+      if (component.onLoad) void this.enqueue(component, component.onLoad);
+    }
+    return this.tail;
+  }
+
   dispatchInitialVarTransmit(entry: InterfaceEntry): Promise<void> {
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
+    for (const component of collectVisibleComponents(entry)) {
       if (
         component.onVarTransmit
         && component.onVarTransmitList != null
@@ -166,21 +203,25 @@ export class WidgetEventDispatcher {
 
       if (
         component.onVarTransmit
-        && transmitTriggersMatch(component.onVarTransmitList, changes.varps)
+        && transmitTriggersMatch(component.onVarTransmitList, changes.varps, changes.varpEventCount)
       ) {
         void this.enqueue(component, component.onVarTransmit);
       }
 
       if (
         component.onInvTransmit
-        && transmitTriggersMatch(component.onInvTransmitList, changes.inventories)
+        && transmitTriggersMatch(
+          component.onInvTransmitList,
+          changes.inventories,
+          changes.inventoryEventCount,
+        )
       ) {
         void this.enqueue(component, component.onInvTransmit);
       }
 
       if (
         component.onStatTransmit
-        && transmitTriggersMatch(component.onStatTransmitList, changes.skills)
+        && transmitTriggersMatch(component.onStatTransmitList, changes.skills, changes.skillEventCount)
       ) {
         void this.enqueue(component, component.onStatTransmit);
       }
