@@ -2,7 +2,15 @@ import type { EnumTypeLoader } from "@/rs/config/enumtype/EnumTypeLoader";
 import type { ObjTypeLoader } from "@/rs/config/objtype/ObjTypeLoader";
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import type { Cs1SimState } from "../cs1-interpreter";
+import {
+  createMockClientState,
+  type MockClientFriendsChatState,
+  type MockClientSocialState,
+  type MockClientSocialUser,
+  type MockClientState,
+} from "../mock-client-state";
 import { Varps } from "../varps";
+import type { Varcs } from "./varcs";
 import type { InterfaceEntry } from "../component-types";
 import type { CacheIndex } from "@/rs/cache/CacheIndex";
 
@@ -12,31 +20,9 @@ export type Cs2SocialComparator =
   | { kind: "user"; index: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 }
   | { kind: "rank" };
 
-export type Cs2SocialUser = {
-  name: string;
-  previousName?: string;
-  world?: number;
-  rank?: number;
-  isOnline?: boolean;
-  isFriend?: boolean;
-  isIgnored?: boolean;
-  isSelf?: boolean;
-};
-
-export type Cs2FriendsChatState = {
-  displayName: string;
-  ownerName: string;
-  minKick: number;
-  rank: number;
-  members: readonly Cs2SocialUser[];
-};
-
-export type Cs2SocialState = {
-  friends: readonly Cs2SocialUser[];
-  ignores: readonly Cs2SocialUser[];
-  friendsChat: Cs2FriendsChatState | null;
-  localPlayerName?: string;
-};
+export type Cs2SocialUser = MockClientSocialUser;
+export type Cs2FriendsChatState = MockClientFriendsChatState;
+export type Cs2SocialState = MockClientSocialState;
 
 export type Cs2SocialRuntime = {
   /** Optional mock/live client state for FRIEND_*, IGNORE_* and legacy Friends Chat queries. */
@@ -57,14 +43,17 @@ export type Cs2RuntimeContext = {
   enumTypeLoader: EnumTypeLoader | null;
   /** Optional live/simulated social-list state and comparator runtime for 3600-3657 opcodes. */
   socialRuntime: Cs2SocialRuntime | null;
+  /** One framework-neutral source of script-visible mock client state shared by CS1 and CS2. */
+  clientState: MockClientState;
   varps: Varps;
+  varcs: Varcs;
   varbitLookup: VarbitDefinitionLookup | null;
   interfaceEntry: InterfaceEntry | null;
   canvasWidth: number | null;
   canvasHeight: number | null;
 };
 
-const defaultVarps = Varps.createDefault();
+const defaultClientState = createMockClientState();
 
 let ctx: Cs2RuntimeContext = {
   scriptRev: "latest",
@@ -73,7 +62,9 @@ let ctx: Cs2RuntimeContext = {
   objTypeLoader: null,
   enumTypeLoader: null,
   socialRuntime: null,
-  varps: defaultVarps,
+  clientState: defaultClientState,
+  varps: defaultClientState.varps,
+  varcs: defaultClientState.varcs,
   varbitLookup: null,
   interfaceEntry: null,
   canvasWidth: null,
@@ -97,6 +88,7 @@ export function applyCs2RuntimeFromSim(
   enumTypeLoader: EnumTypeLoader | null | undefined = null,
   socialRuntime: Cs2SocialRuntime | null | undefined = null,
 ): void {
+  const clientState = sim ?? defaultClientState;
   ctx = {
     scriptRev,
     cacheHeaders,
@@ -104,7 +96,9 @@ export function applyCs2RuntimeFromSim(
     objTypeLoader: objTypeLoader ?? null,
     enumTypeLoader: enumTypeLoader ?? null,
     socialRuntime: socialRuntime ?? null,
-    varps: sim?.varps ?? defaultVarps,
+    clientState,
+    varps: clientState.varps,
+    varcs: clientState.varcs,
     varbitLookup: varbitLookup ?? null,
     interfaceEntry: interfaceEntry ?? null,
     canvasWidth: typeof canvasWidth === "number" ? canvasWidth : null,
