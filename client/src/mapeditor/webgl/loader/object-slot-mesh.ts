@@ -151,7 +151,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
     slotTotal += animated.length;
     const slotInfo = new Uint16Array(Math.max(slotTotal, 1) * SLOT_INFO_STRIDE);
     let slotCount = 0;
-    const staticSlotByInstance = new Map<ModelInfo, number>();
+    const staticSlotByOwner = new Map<object, number>();
 
     // Phase 1: decide every emit job (and write the slot records). Nothing is copied yet.
     const jobs = new GrowableU32(256);
@@ -170,10 +170,11 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
         for (const cmd of commands) {
             if (cmd.elements === 0) continue; // animated placeholder: drawn through the dynamic range
             for (const instance of cmd.instances) {
-                let slot = staticSlotByInstance.get(instance);
+                const owner = cmd.priorityOwner ?? instance;
+                let slot = staticSlotByOwner.get(owner);
                 if (slot === undefined) {
                     slot = slotCount++;
-                    staticSlotByInstance.set(instance, slot);
+                    staticSlotByOwner.set(owner, slot);
                     writeSlotInfo(slotInfo, slot, instance);
                 }
                 const job = addJob(cmd.offset / 4, cmd.elements, slot, TARGET_STATIC);
