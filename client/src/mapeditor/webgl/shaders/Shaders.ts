@@ -1,4 +1,5 @@
 import { ProgramSource, prependDefines } from "../../../mapviewer/webgl/shaders/ShaderUtil";
+import { getFaceDepthSource, type FaceDepthSource } from "../../../rs/model/face-depth-source";
 import mainFragShader from "../../../mapviewer/webgl/shaders/main.frag.glsl";
 import mainVertShader from "../../../mapviewer/webgl/shaders/main.vert.glsl";
 import gridVertShader from "./grid.vert.glsl";
@@ -27,13 +28,20 @@ export function createTerrainProgram(hasMultiDraw: boolean): ProgramSource {
     return createProgram(terrainVertShader, terrainFragShader, hasMultiDraw);
 }
 
-export function createObjectProgram(hasMultiDraw: boolean, discardAlpha: boolean): ProgramSource {
+export function createObjectProgram(
+    hasMultiDraw: boolean,
+    discardAlpha: boolean,
+    faceDepth: FaceDepthSource = getFaceDepthSource(),
+): ProgramSource {
     const defines: string[] = [];
     if (hasMultiDraw) {
         defines.push("MULTI_DRAW");
     }
     if (discardAlpha) {
         defines.push("DISCARD_ALPHA");
+    }
+    if (faceDepth === "bias") {
+        defines.push("FACE_BIAS");
     }
     // The editor merges a map square's object geometry and tags vertices with their model slot.
     defines.push("VERTEX_SLOT");

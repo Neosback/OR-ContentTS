@@ -1,4 +1,5 @@
 import { ProgramSource, prependDefines } from "./ShaderUtil";
+import { getFaceDepthSource, type FaceDepthSource } from "../../../rs/model/face-depth-source";
 import frameFxaaFragShader from "./frame-fxaa.frag.glsl";
 import frameFxaaVertShader from "./frame-fxaa.vert.glsl";
 import frameFragShader from "./frame.frag.glsl";
@@ -12,6 +13,7 @@ export function createProgram(
     fragShader: string,
     hasMultiDraw: boolean,
     discardAlpha: boolean,
+    extraDefines: readonly string[] = [],
 ): ProgramSource {
     const defines: string[] = [];
     if (hasMultiDraw) {
@@ -20,15 +22,36 @@ export function createProgram(
     if (discardAlpha) {
         defines.push("DISCARD_ALPHA");
     }
+    defines.push(...extraDefines);
     return [prependDefines(vertShader, defines), prependDefines(fragShader, defines)];
 }
 
-export function createMainProgram(hasMultiDraw: boolean, discardAlpha: boolean): ProgramSource {
-    return createProgram(mainVertShader, mainFragShader, hasMultiDraw, discardAlpha);
+export function createMainProgram(
+    hasMultiDraw: boolean,
+    discardAlpha: boolean,
+    faceDepth: FaceDepthSource = getFaceDepthSource(),
+): ProgramSource {
+    return createProgram(
+        mainVertShader,
+        mainFragShader,
+        hasMultiDraw,
+        discardAlpha,
+        faceDepth === "bias" ? ["FACE_BIAS"] : [],
+    );
 }
 
-export function createNpcProgram(hasMultiDraw: boolean, discardAlpha: boolean): ProgramSource {
-    return createProgram(npcVertShader, mainFragShader, hasMultiDraw, discardAlpha);
+export function createNpcProgram(
+    hasMultiDraw: boolean,
+    discardAlpha: boolean,
+    faceDepth: FaceDepthSource = getFaceDepthSource(),
+): ProgramSource {
+    return createProgram(
+        npcVertShader,
+        mainFragShader,
+        hasMultiDraw,
+        discardAlpha,
+        faceDepth === "bias" ? ["FACE_BIAS"] : [],
+    );
 }
 
 export const FRAME_PROGRAM = [frameVertShader, frameFragShader];

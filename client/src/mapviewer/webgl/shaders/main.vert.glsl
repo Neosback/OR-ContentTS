@@ -196,9 +196,15 @@ void main() {
     gl_Position = u_viewMatrix * vec4(localPos, 1.0);
     gl_Position.z += float(modelInfo.plane) * 0.005 - isWall * WALL_DEPTH_PUSH;
     gl_Position = u_projectionMatrix * gl_Position;
-    // Coplanar ties (higher face priority over lower, decorations over floors) use a clip-space
-    // bias: a fixed number of depth-buffer steps at any distance, where a view-space nudge vanished
-    // into depth precision when zoomed out.
+#ifdef FACE_BIAS
+    // Newer model files carry the same authored per-face bias RuneLite uploads. The packed 3-bit field stores
+    // bias + 1 so zero remains reserved by the shared vertex format; undo that encoding before applying it.
+    // RuneLite applies this directly in clip space: screenPos.z += bias / 128.
+    gl_Position.z += max(float(vertex.priority) - 1.0, 0.0) / 128.0;
+    gl_Position.z -= float(modelInfo.priority) * (1.0 - isWall) * MODEL_PRIORITY_DEPTH_BIAS * gl_Position.w;
+#else
+    // Legacy editor parity: use face render priority as a small clip-space ordering bias.
     gl_Position.z -= (float(vertex.priority) * FACE_PRIORITY_DEPTH_BIAS
         + float(modelInfo.priority) * (1.0 - isWall) * MODEL_PRIORITY_DEPTH_BIAS) * gl_Position.w;
+#endif
 }

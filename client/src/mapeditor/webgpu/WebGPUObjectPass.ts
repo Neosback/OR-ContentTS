@@ -1,3 +1,4 @@
+import { getFaceDepthSource, type FaceDepthSource } from "../../rs/model/face-depth-source";
 import type { StaticObjectMesh } from "./object-mesh-merge";
 import shaderSource from "./object-pass.wgsl?raw";
 import { generateLayerMips, mipLevelCount } from "./texture-mips";
@@ -145,7 +146,11 @@ export class WebGPUObjectPass {
      * @param alphaMode "premultiplied" lets the canvas sit on top of another one (the harness does this to compare
      * against WebGL2); "opaque" is what a standalone renderer would use.
      */
-    static async create(canvas: HTMLCanvasElement, alphaMode: GPUCanvasAlphaMode = "premultiplied"): Promise<WebGPUObjectPass> {
+    static async create(
+        canvas: HTMLCanvasElement,
+        alphaMode: GPUCanvasAlphaMode = "premultiplied",
+        faceDepth: FaceDepthSource = getFaceDepthSource(),
+    ): Promise<WebGPUObjectPass> {
         if (!WebGPUObjectPass.isSupported()) {
             throw new Error("WebGPU is not available in this browser");
         }
@@ -204,6 +209,7 @@ export class WebGPUObjectPass {
                 vertex: {
                     module,
                     entryPoint: "vs_main",
+                    constants: { FACE_DEPTH_MODE: faceDepth === "bias" ? 1 : 0 },
                     // Four packed uint32 per vertex: three vertex words and the model's slot.
                     buffers: [{ arrayStride: 16, attributes: [{ shaderLocation: 0, offset: 0, format: "uint32x4" }] }],
                 },

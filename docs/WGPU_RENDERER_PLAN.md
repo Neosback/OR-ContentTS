@@ -518,5 +518,10 @@ Known differences and gaps:
 - Static frame only: animated locs, picking (the interact-id output) and terrain are not ported yet.
 - WebGL2 stays the reference renderer and the fallback.
 
-Next: face-priority ordering as a compute pass (port of RuneLite `FacePrioritySorter` / `priority_render.glsl`), then
-the picking target and animated index updates (phases 2 and 3 above).
+The packed object path now has an explicit face-depth source. `priority` preserves the editor's previous small
+clip-space priority bias; `bias` carries the model's authored `faceBias` through model copies/merges, the WASM
+packer, render workers and both WebGL2/WebGPU shaders. The bias shader path matches RuneLite's `screenPos.z +=
+bias / 128` behavior while retaining the editor's separate model-level wall/decor ordering.
+
+Next: keep authored `faceBias` as the depth input and add true face-priority ordering as a WebGPU compute pass
+(port of RuneLite's priority sort), then the picking target and animated index updates (phases 2 and 3 above).

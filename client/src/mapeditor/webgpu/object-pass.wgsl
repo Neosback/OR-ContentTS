@@ -9,6 +9,8 @@ const CONTOUR_GROUND_VERTEX: u32 = 1u;
 const CONTOUR_GROUND_NONE: u32 = 2u;
 const CONTOUR_GROUND_BAKED: u32 = 3u;
 
+override FACE_DEPTH_MODE: u32 = 0u; // 0 = legacy face priority bias, 1 = authored faceBias
+
 const FACE_PRIORITY_DEPTH_BIAS: f32 = 1.5e-6;
 const MODEL_PRIORITY_DEPTH_BIAS: f32 = 2.0e-6;
 // Model priority of walls (SceneLocs WALL_PRIORITY) and how far they are pushed back, in tiles.
@@ -315,8 +317,14 @@ fn vs_main(@location(0) attrib: vec4<u32>) -> VertexOutput {
     var p = scene.view * vec4<f32>(localPos, 1.0);
     p.z += f32(modelInfo.plane) * 0.005 - isWall * WALL_DEPTH_PUSH;
     p = scene.proj * p;
-    p.z -= (f32(vertex.priority) * FACE_PRIORITY_DEPTH_BIAS
-        + f32(modelInfo.priority) * (1.0 - isWall) * MODEL_PRIORITY_DEPTH_BIAS) * p.w;
+    if (FACE_DEPTH_MODE == 1u) {
+        // The shared packed field stores authored bias + 1. Match RuneLite's clip-space face bias.
+        p.z += max(f32(vertex.priority) - 1.0, 0.0) / 128.0;
+        p.z -= f32(modelInfo.priority) * (1.0 - isWall) * MODEL_PRIORITY_DEPTH_BIAS * p.w;
+    } else {
+        p.z -= (f32(vertex.priority) * FACE_PRIORITY_DEPTH_BIAS
+            + f32(modelInfo.priority) * (1.0 - isWall) * MODEL_PRIORITY_DEPTH_BIAS) * p.w;
+    }
     // The projection matrix is OpenGL's (clip z in [-w, w]); WebGPU's clip z is [0, w]. This maps to the same
     // depth values WebGL writes, so the biases above mean the same thing.
     p.z = (p.z + p.w) * 0.5;

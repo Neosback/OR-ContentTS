@@ -2,6 +2,7 @@ import { Pool, spawn } from "threads";
 import type { ModuleThread, QueuedTask } from "threads";
 
 import type { LiveMinimapWorkerResult } from "../../mapeditor/liveMinimapWorkerPayload";
+import { getFaceDepthSource, type FaceDepthSource } from "../../rs/model/face-depth-source";
 import { transferLiveMinimapWorkerRequest } from "../../mapeditor/liveMinimapWorkerPayload";
 import { EditorMapData } from "../../mapeditor/webgl/loader/EditorMapData";
 import { EditorMapTerrainData } from "../../mapeditor/webgl/loader/EditorMapTerrainData";
@@ -42,8 +43,13 @@ export class RenderDataWorkerPool {
         readonly size: number,
     ) {}
 
-    initCache(cache: LoadedCache, objSpawns: ObjSpawn[], npcSpawns: NpcSpawn[]): Promise<void> {
-        return this.runAll((w) => w.initCache(cache, objSpawns, npcSpawns));
+    initCache(
+        cache: LoadedCache,
+        objSpawns: ObjSpawn[],
+        npcSpawns: NpcSpawn[],
+        faceDepth: FaceDepthSource = getFaceDepthSource(),
+    ): Promise<void> {
+        return this.runAll((w) => w.initCache(cache, objSpawns, npcSpawns, faceDepth));
     }
 
     setWasmEnabled(enabled: boolean): Promise<void> {

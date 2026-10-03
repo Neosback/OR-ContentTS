@@ -17,13 +17,14 @@ export type FaceDepthSource = "priority" | "bias";
 /** The vertex word keeps 3 bits for it, stored as value + 1 (see VertexBuffer), so 0..6 is all that fits. */
 export const MAX_FACE_BIAS = 6;
 
-let source: FaceDepthSource = "priority";
+let source: FaceDepthSource | undefined;
 
 export function setFaceDepthSource(next: FaceDepthSource): void {
     source = next;
 }
 
 export function getFaceDepthSource(): FaceDepthSource {
+    source ??= readFaceDepthPreference();
     return source;
 }
 
@@ -53,7 +54,7 @@ export function clampFaceBias(bias: Int8Array): Int8Array {
 }
 
 /** The per-face values the depth bias is built from, or undefined when every face has none. */
-export function faceDepthValues(model: Model, from: FaceDepthSource = source): Int8Array | undefined {
+export function faceDepthValues(model: Model, from: FaceDepthSource = getFaceDepthSource()): Int8Array | undefined {
     if (from === "priority") {
         return model.faceRenderPriorities;
     }
