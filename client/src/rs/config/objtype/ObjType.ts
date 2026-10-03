@@ -87,6 +87,10 @@ export class ObjType extends Type {
     team: number;
 
     isTradable: boolean;
+    stockMarket: boolean;
+    category: number;
+    recolAll: number;
+    weight: number;
 
     op75: number;
 
@@ -143,7 +147,12 @@ export class ObjType extends Type {
         this.ambient = 0;
         this.contrast = 0;
         this.team = 0;
-        this.isTradable = false;
+        this.isTradable =
+            this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240;
+        this.stockMarket = false;
+        this.category = -1;
+        this.recolAll = -1;
+        this.weight = 0;
         this.op75 = 0;
         this.unnotedId = -1;
         this.notedId = -1;
@@ -201,6 +210,12 @@ export class ObjType extends Type {
             this.op13 = buffer.readUnsignedByte();
         } else if (opcode === 14) {
             this.op14 = buffer.readUnsignedByte();
+        } else if (
+            opcode === 15 &&
+            this.cacheInfo.game === "oldschool" &&
+            this.cacheInfo.revision >= 240
+        ) {
+            this.isTradable = false;
         } else if (opcode === 16) {
             this.isMembers = true;
         } else if (opcode === 23) {
@@ -290,9 +305,18 @@ export class ObjType extends Type {
         } else if (opcode === 54) {
             this.femaleHeadModel2 = buffer.readInt();
         } else if (opcode === 65) {
-            this.isTradable = true;
+            if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240) {
+                this.stockMarket = true;
+            } else {
+                this.isTradable = true;
+            }
         } else if (opcode === 75) {
-            this.op75 = buffer.readShort();
+            if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 240) {
+                this.weight = buffer.readUnsignedShort();
+                this.op75 = this.weight;
+            } else {
+                this.op75 = buffer.readShort();
+            }
         } else if (opcode === 78) {
             this.maleModel2 = this.readModelId(buffer);
         } else if (opcode === 79) {
@@ -306,7 +330,7 @@ export class ObjType extends Type {
         } else if (opcode === 93) {
             this.femaleHeadModel2 = this.readModelId(buffer);
         } else if (opcode === 94) {
-            buffer.readUnsignedShort();
+            this.category = buffer.readUnsignedShort();
         } else if (opcode === 95) {
             this.zan2d = buffer.readUnsignedShort();
         } else if (opcode === 96) {
@@ -315,6 +339,8 @@ export class ObjType extends Type {
             this.note = buffer.readUnsignedShort();
         } else if (opcode === 98) {
             this.noteTemplate = buffer.readUnsignedShort();
+        } else if (opcode === 99) {
+            this.recolAll = buffer.readUnsignedShort();
         } else if (opcode >= 100 && opcode < 110) {
             if (!this.countObj) {
                 this.countObj = new Array(10);
