@@ -132,7 +132,7 @@ The original local-foundation steps are now implemented: ProjectFileSystem/Tauri
 
 Continue with:
 
-1. DBTable/DBRow/DBColumn decoding and the remaining decoder parity audit.
+1. The remaining decoder-lossiness/missing-type parity audit after PR #71 DBTable/DBRow/DBColumn decoding.
 2. TypeScript terrain file-0 and static-loc file-1 encoders with golden round-trip fixtures.
 3. Portable raw/region package export.
 4. A narrow `StudioBackendClient` bridge for explicit allowlisted OpenRune build/test/verification operations.
