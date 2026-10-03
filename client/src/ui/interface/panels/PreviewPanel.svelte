@@ -28,15 +28,28 @@
             {#if state.selectedComponentId != null}
                 <span class="ml-2 text-cyan-400">selected component {state.selectedComponentId}</span>
             {/if}
-            <Button
-                type="button"
-                variant={state.interactiveMode ? "default" : "outline"}
-                size="sm"
-                class="ml-2 h-7 text-xs"
-                onclick={() => (state.interactiveMode = !state.interactiveMode)}
-            >
-                Interactive mode
-            </Button>
+            <div class="ml-2 flex overflow-hidden rounded-md border border-border">
+                <Button
+                    type="button"
+                    variant={state.runtimeMode === "edit" ? "default" : "ghost"}
+                    size="sm"
+                    class="h-7 rounded-none border-0 px-2 text-xs"
+                    title="Edit cache-backed widget definitions with runtime CS2 hooks paused"
+                    onclick={() => state.setRuntimeMode("edit")}
+                >
+                    Edit
+                </Button>
+                <Button
+                    type="button"
+                    variant={state.runtimeMode === "simulate" ? "default" : "ghost"}
+                    size="sm"
+                    class="h-7 rounded-none border-0 border-l px-2 text-xs"
+                    title="Run onLoad, timer, transmit and pointer hooks against an isolated runtime copy"
+                    onclick={() => state.setRuntimeMode("simulate")}
+                >
+                    Simulation
+                </Button>
+            </div>
         {:else}
             <span>Select an interface from the list</span>
         {/if}
@@ -48,7 +61,7 @@
                 interfaceId={state.selectedId}
                 mode={state.mode}
                 isInterfaceLoaded={state.isInterfaceLoaded}
-                interfaceData={state.interfaceData}
+                interfaceData={state.previewInterfaceData}
                 revision={state.revision}
                 cacheHeaders={proxyHeaders}
                 spritesById={state.viewer.spritesById}

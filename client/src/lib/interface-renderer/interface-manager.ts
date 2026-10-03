@@ -188,7 +188,12 @@ export function setRootInterface(value: number): void {
   rootInterface = value;
 }
 
-export async function openInterface(var0: number, var1: number, var2: number): Promise<InterfaceParent> {
+export async function openInterface(
+  var0: number,
+  var1: number,
+  var2: number,
+  runOnLoad = true,
+): Promise<InterfaceParent> {
   const entry = cs1InterfaceEntry;
   if (!entry) {
     throw new Error("openInterface called without cs1InterfaceEntry");
@@ -205,10 +210,12 @@ export async function openInterface(var0: number, var1: number, var2: number): P
 
   revalidateWidgetScrollFromJava(entry, var4);
 
-  try {
-    await runWidgetOnLoadListener(entry, var1);
-  } catch {
-    console.log("Unable to run script on interface: " + (var0 >> 16));
+  if (runOnLoad) {
+    try {
+      await runWidgetOnLoadListener(entry, var1);
+    } catch {
+      console.log("Unable to run script on interface: " + (var0 >> 16));
+    }
   }
 
   if (rootInterface !== -1) {

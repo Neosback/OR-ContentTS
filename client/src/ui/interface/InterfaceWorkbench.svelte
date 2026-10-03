@@ -12,6 +12,7 @@
     import ClientScriptPanel from "./panels/ClientScriptPanel.svelte";
     import InterfacesPanel from "./panels/InterfacesPanel.svelte";
     import PreviewPanel from "./panels/PreviewPanel.svelte";
+    import StateDebuggerPanel from "./panels/StateDebuggerPanel.svelte";
 
     let { state: editor }: { state: InterfaceEditorState } = $props();
     let host = $state<HTMLDivElement>();
@@ -38,11 +39,18 @@
                 props: { state: editor },
                 isolateInput: true,
             }),
+            sveltePanel({
+                id: "ifaceStateDebugger",
+                title: "State debugger",
+                component: StateDebuggerPanel,
+                props: { state: editor },
+                isolateInput: true,
+            }),
         ];
 
         dock = createStudioDock(host, {
             panels,
-            storageKey: "interface-editor-workbench-layout-v2",
+            storageKey: "interface-editor-workbench-layout-v3",
             isRestoredLayoutValid: (api) => api.getPanel("iface-preview") !== undefined,
             defaultRenderer: "always",
             defaultLayout: (workspace) => applyInterfaceEditorWorkbenchLayout(workspace.api),

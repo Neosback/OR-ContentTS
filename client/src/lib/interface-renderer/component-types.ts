@@ -192,3 +192,58 @@ function adaptComponentPackedIdFromApi(comp: ComponentType): ComponentType {
   delete (next as { internalId?: unknown }).internalId;
   return next as ComponentType;
 }
+
+
+function cloneRuntimeValue<T>(value: T, seen: WeakMap<object, unknown>): T {
+  if (value == null || typeof value !== "object") return value;
+
+  const objectValue = value as object;
+  const existing = seen.get(objectValue);
+  if (existing !== undefined) return existing as T;
+
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    seen.set(objectValue, out);
+    for (const item of value) out.push(cloneRuntimeValue(item, seen));
+    return out as T;
+  }
+
+  if (value instanceof Map) {
+    const out = new Map();
+    seen.set(objectValue, out);
+    for (const [key, item] of value.entries()) {
+      out.set(cloneRuntimeValue(key, seen), cloneRuntimeValue(item, seen));
+    }
+    return out as T;
+  }
+
+  if (value instanceof Set) {
+    const out = new Set();
+    seen.set(objectValue, out);
+    for (const item of value.values()) out.add(cloneRuntimeValue(item, seen));
+    return out as T;
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    const ctor = value.constructor as { new (source: ArrayLike<number>): unknown };
+    return new ctor(value as unknown as ArrayLike<number>) as T;
+  }
+
+  const out: Record<string, unknown> = {};
+  seen.set(objectValue, out);
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = cloneRuntimeValue(item, seen);
+  }
+  return out as T;
+}
+
+/**
+ * Creates an isolated Interface runtime graph for Simulation mode.
+ *
+ * The clone preserves shared object identity inside the component tree so dynamic
+ * children and root-map references still point at the same runtime widget objects,
+ * while all CS2 mutations stay detached from the authoring/cache-backed definition.
+ */
+export function cloneInterfaceEntryForSimulation(entry: InterfaceEntry): InterfaceEntry {
+  return cloneRuntimeValue(entry, new WeakMap<object, unknown>());
+}
