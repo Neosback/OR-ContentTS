@@ -8,6 +8,20 @@
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     let { state }: { state: InterfaceEditorState } = $props();
+
+    function entryTitle(entry: (typeof state.entries)[number]): string {
+        const parts = [`Interface ${entry.id}`];
+        if (entry.metadata.projectSymbol) parts.push(entry.metadata.projectSymbol);
+        if (entry.metadata.provenance) {
+            const source = entry.metadata.provenance;
+            parts.push(`${source.sourcePath}${source.line ? `:${source.line}` : ""}`);
+        }
+        if (entry.metadata.cacheName && entry.metadata.cacheName !== entry.name) {
+            parts.push(`Cache name: ${entry.metadata.cacheName}`);
+        }
+        if (entry.metadata.diagnostics.length) parts.push(...entry.metadata.diagnostics);
+        return parts.join("\n");
+    }
 </script>
 
 <div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
@@ -64,9 +78,13 @@
                     onclick={() => state.setSelectedId(entry.id)}
                     class="flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-xs hover:bg-muted/50"
                     class:bg-muted={state.selectedId === entry.id}
+                    title={entryTitle(entry)}
                 >
                     <span class="shrink-0 font-mono text-muted-foreground">{entry.id}</span>
-                    <span class="truncate">{entry.name}</span>
+                    <span class="min-w-0 flex-1 truncate">{entry.name}</span>
+                    {#if entry.metadata.diagnostics.length}
+                        <span class="shrink-0 text-[10px] font-semibold text-amber-500" aria-label="Metadata warning">!</span>
+                    {/if}
                 </button>
             {/each}
         {/if}
