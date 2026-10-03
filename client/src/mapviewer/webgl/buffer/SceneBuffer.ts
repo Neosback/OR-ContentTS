@@ -45,6 +45,13 @@ export type DrawCommand = {
     instances: ModelInfo[];
     /** One byte per triangle. 0xff means the source model had no explicit face-priority array. */
     faceRenderPriorities?: Uint8Array;
+    /** Original model face index per emitted triangle, used to preserve RuneLite's equal-depth tie order. */
+    faceOrdinals?: Uint32Array;
+};
+
+export type FacePassMetadata = {
+    priorities: Uint8Array;
+    ordinals: Uint32Array;
 };
 
 export type SceneModel = {
@@ -137,7 +144,7 @@ export class SceneBuffer {
      * `faces` is the caller's already-partitioned face list for this pass, used by the TypeScript path to skip
      * recomputing it; the wasm kernel does its own filtering.
      */
-    addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): Uint8Array {
+    addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): FacePassMetadata {
         const selectedFaces =
             faces ??
             getModelFaces(model, this.faceDepth).filter(
@@ -148,7 +155,7 @@ export class SceneBuffer {
         } else {
             this.addModel(model, selectedFaces, offset);
         }
-        return packFaceRenderPriorities(selectedFaces);
+        return packFaceMetadata(selectedFaces);
     }
 
     addTerrainTile(tile: SceneTile, offsetX: number, offsetY: number): void {
@@ -351,12 +358,13 @@ export class SceneBuffer {
             sceneModel: SceneModel,
             offset: number,
             elements: number,
-            faceRenderPriorities: Uint8Array,
+            faceMetadata: FacePassMetadata,
         ): void => {
             const drawCommand: DrawCommand = {
                 offset,
                 elements,
-                faceRenderPriorities,
+                faceRenderPriorities: faceMetadata.priorities,
+                faceOrdinals: faceMetadata.ordinals,
                 instances: [
                     {
                         sceneX: Math.max(0, sceneModel.sceneX),
@@ -428,7 +436,7 @@ export class SceneBuffer {
                         true,
                         this.faceDepth,
                     );
-                    const faceRenderPriorities = packFaceRenderPriorities(
+                    const faceMetadata = packFaceMetadata(
                         getModelFaces(model, this.faceDepth).filter(
                             (face) =>
                                 isModelFaceTransparent(this.textureLoader, face) === group.transparent,
@@ -441,7 +449,7 @@ export class SceneBuffer {
                             group.models[modelIndex + i]!,
                             offset,
                             elements,
-                            faceRenderPriorities,
+                            faceMetadata,
                         );
                         offset += elements * 4;
                     }
@@ -459,13 +467,13 @@ export class SceneBuffer {
                 vertexOffset[1] = -sceneModel.heightOffset;
             }
             const offset = this.indexByteOffset();
-            const faceRenderPriorities = this.addModelPass(
+            const faceMetadata = this.addModelPass(
                 model,
                 group.transparent,
                 vertexOffset,
             );
             const elements = (this.indexByteOffset() - offset) / 4;
-            addInteractionCommand(sceneModel, offset, elements, faceRenderPriorities);
+            addInteractionCommand(sceneModel, offset, elements, faceMetadata);
             modelIndex++;
         }
 
@@ -648,12 +656,14 @@ export type ModelFace = {
     textureId: number;
 };
 
-export function packFaceRenderPriorities(faces: readonly ModelFace[]): Uint8Array {
+export function packFaceMetadata(faces: readonly ModelFace[]): FacePassMetadata {
     const priorities = new Uint8Array(faces.length);
+    const ordinals = new Uint32Array(faces.length);
     for (let i = 0; i < faces.length; i++) {
         priorities[i] = faces[i].renderPriority;
+        ordinals[i] = faces[i].index;
     }
-    return priorities;
+    return { priorities, ordinals };
 }
 
 export function isModelFaceTransparent(textureLoader: TextureLoader, face: ModelFace): boolean {
