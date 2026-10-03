@@ -21,6 +21,7 @@ export type ProjectFileSystemErrorCode =
     | "IS_DIRECTORY"
     | "READ_UNAVAILABLE"
     | "WRITE_UNAVAILABLE"
+    | "ACCESS_DENIED"
     | "IO_FAILED";
 
 export class ProjectFileSystemError extends Error {

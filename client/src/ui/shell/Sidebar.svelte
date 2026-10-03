@@ -1,6 +1,5 @@
 <script lang="ts">
     import Archive from "@lucide/svelte/icons/archive";
-    import Coffee from "@lucide/svelte/icons/coffee";
     import Home from "@lucide/svelte/icons/home";
     import LayoutGrid from "@lucide/svelte/icons/layout-grid";
     import MapIcon from "@lucide/svelte/icons/map";
@@ -92,16 +91,6 @@
             <Settings class="size-4 shrink-0" />
             {#if !collapsed}<span class="ml-1 truncate">Settings</span>{/if}
         </button>
-        <a
-            href="https://buymeacoffee.com/openrune"
-            target="_blank"
-            rel="noopener noreferrer"
-            class={footerClass}
-            aria-label="Buy Me a Coffee"
-        >
-            <Coffee class="size-4 shrink-0" />
-            {#if !collapsed}<span class="ml-1 truncate">Buy Me a Coffee</span>{/if}
-        </a>
     </div>
 </div>
 

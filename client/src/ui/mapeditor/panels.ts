@@ -4,21 +4,25 @@ import { sveltePanel, type PanelContext, type StudioPanel } from "../lib/panel";
 import { editorContext, type EditorState } from "./editor-state.svelte";
 import BrushWorkspaceDockPanel from "./panels/BrushWorkspaceDockPanel.svelte";
 import HistoryPanel from "./panels/HistoryPanel.svelte";
-import InspectorPanel from "./panels/InspectorPanel.svelte";
+import InspectorObjectPanel from "./panels/InspectorObjectPanel.svelte";
+import InspectorTilePanel from "./panels/InspectorTilePanel.svelte";
 import MinimapPanel from "./panels/MinimapPanel.svelte";
 import PaintToolsPanel from "./panels/PaintToolsPanel.svelte";
 import PaletteHost from "./panels/PaletteHost.svelte";
 import PanelRoot from "./panels/PanelRoot.svelte";
 import ScenePanel from "./panels/ScenePanel.svelte";
 import TilePainterPanel from "./panels/TilePainterPanel.svelte";
+import HeightPalette from "./palettes/HeightPalette.svelte";
 import ObjectDeletePalette from "./palettes/ObjectDeletePalette.svelte";
 import RegionStampPalette from "./palettes/RegionStampPalette.svelte";
+import RenderingPalette from "./palettes/RenderingPalette.svelte";
 
 /** Palette component per dockview component name (the names `getMapEditorFloatableDockPanelDefaults` uses). */
 const PALETTES: Record<string, { title: string; component: Component }> = {
-    objectSelectorPalette: { title: "Inspector", component: InspectorPanel },
+    heightPalette: { title: "Height", component: HeightPalette },
     objectDeletePalette: { title: "Delete objects", component: ObjectDeletePalette },
     regionStampPalette: { title: "Region stamp", component: RegionStampPalette },
+    renderingPalette: { title: "Rendering", component: RenderingPalette },
 };
 
 /** Every dockview component the editor workbench can host. Panels mount outside the app tree, so each gets the editor state as context. */
@@ -43,10 +47,13 @@ export function createEditorPanels(state: EditorState): StudioPanel[] {
         });
 
     const panels: StudioPanel[] = [
-        panel("sceneEditor", "Editor", ScenePanel, { keepAlive: true, fixed: true }),
+        panel("sceneEditor", "3D", ScenePanel, { keepAlive: true, fixed: true }),
         panel("paintTools", "Tools", PaintToolsPanel, { props: (ctx) => ({ api: ctx.api }) }),
         panel("brushWorkspace", "Brush", BrushWorkspaceDockPanel),
         panel("tilePainter", "Tile painter", TilePainterPanel, { props: (ctx) => ({ api: ctx.api }) }),
+        // The inspector's two tabs: each can be docked, floated or popped out on its own.
+        panel("objectSelectorPalette", "Object", InspectorObjectPanel, { props: (ctx) => ({ api: ctx.api }) }),
+        panel("inspectorTilePalette", "Tile", InspectorTilePanel, { props: (ctx) => ({ api: ctx.api }) }),
         panel("historyWorkspace", "History", HistoryPanel),
         panel("minimapWorkspace", "Minimap", MinimapPanel),
     ];

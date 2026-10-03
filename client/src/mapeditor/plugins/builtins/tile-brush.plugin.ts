@@ -23,6 +23,10 @@ export const tileBrushEditorTool: EditorToolPlugin = {
             id: "select-tool",
             defaultChords: [{ code: "KeyB" }],
         }),
+        editorCommandKeyBinding("tile-brush.eyedropper", {
+            id: "eyedropper",
+            defaultChords: [{ code: "KeyI" }],
+        }),
     ],
     paintPolicy: {
         // Overlay fill/footprint modifiers and the height Alt-inversion apply when those parts are switched on.

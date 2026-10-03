@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ProjectFileSystemError } from "./project-filesystem";
 import {
     TauriProjectFileSystem,
+    describeIoCause,
     type TauriProjectDirEntry,
     type TauriProjectFileInfo,
     type TauriProjectFileSystemOps,
@@ -228,8 +229,35 @@ describe("TauriProjectFileSystem", () => {
         });
     });
 
+    it("reports paths outside the granted folders as ACCESS_DENIED, with the app's own message", async () => {
+        const { ops } = fixture();
+        ops.exists = async () => {
+            throw "ACCESS_DENIED: /project/.data is outside the folders you have granted. Add it in Settings > Folder access.";
+        };
+        const fs = new TauriProjectFileSystem("/project", ops);
+
+        await expect(fs.exists(".data/gamevals")).rejects.toMatchObject({
+            code: "ACCESS_DENIED",
+            path: ".data/gamevals",
+            message: expect.stringContaining("Settings > Folder access"),
+        });
+    });
+
     it("rejects an empty selected root", () => {
         const { ops } = fixture();
         expect(() => new TauriProjectFileSystem("", ops)).toThrowError(ProjectFileSystemError);
+    });
+});
+
+describe("describeIoCause", () => {
+    it("keeps the folder-access error text as it is (it already says what to do)", () => {
+        const text = "ACCESS_DENIED: /x/.data is outside the folders you have granted. Add it in Settings > Folder access.";
+        expect(describeIoCause(text)).toBe(text);
+    });
+
+    it("keeps other errors, truncating very long ones", () => {
+        expect(describeIoCause(new Error("No such file"))).toBe("No such file");
+        expect(describeIoCause("x".repeat(500)).length).toBe(301);
+        expect(describeIoCause({ code: 5 })).toBe('{"code":5}');
     });
 });

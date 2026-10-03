@@ -10,3 +10,8 @@
     min-height: 0;
     overflow: hidden;
 }
+
+/*
+ * dockview floats panels above everything by default (z-index 999). Here floating panels start at 10 and dockview raises the active one by 2 each time (see dockview.css) so
+ * menus and dialogs (50) can cover them, with floating windows (the object properties window, 45) in between.
+ */

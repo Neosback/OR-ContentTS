@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount, untrack } from "svelte";
     import FolderOpen from "@lucide/svelte/icons/folder-open";
+    import ListChecks from "@lucide/svelte/icons/list-checks";
     import ImagePlus from "@lucide/svelte/icons/image-plus";
     import Package from "@lucide/svelte/icons/package";
     import Pencil from "@lucide/svelte/icons/pencil";
@@ -42,9 +43,12 @@
     import { router } from "../../lib/router.svelte";
     import { cn } from "../../lib/utils";
     import AddCacheDialog from "./AddCacheDialog.svelte";
+    import OpenRuneProjectDialog from "./OpenRuneProjectDialog.svelte";
 
     let profiles = $state<LocalCacheProfile[]>([]);
     let activeProfileId = $state<string | null>(null);
+    let overviewOpen = $state(false);
+    let overviewProfile = $state<LocalCacheProfile | null>(null);
     let editingProfile = $state<LocalCacheProfile | null>(null);
     let addOpen = $state(false);
     let savedMap = $state<Record<string, boolean>>({});
@@ -161,6 +165,13 @@
                 ? `Updated "${profile.name}".`
                 : `Added "${profile.name}".`,
         );
+        if (!exists && cacheSetupKind(profile) === "openrune") showOverview(profile);
+    }
+
+    /** Shows everything the project provided: after setup, and from the setup's card. */
+    function showOverview(profile: LocalCacheProfile): void {
+        overviewProfile = profile;
+        overviewOpen = true;
     }
 
     async function onDeleteProfile(id: string): Promise<void> {
@@ -490,6 +501,12 @@
                                           ? "Reload from disk"
                                           : "Update cache"}
                                 </button>
+                                {#if cacheSetupKind(p) === "openrune"}
+                                    <button type="button" class={actionButton} onclick={() => showOverview(p)}>
+                                        <ListChecks class="size-3.5" />
+                                        Project overview
+                                    </button>
+                                {/if}
                             </div>
                         </div>
                     </div>
@@ -498,6 +515,8 @@
         </div>
     </section>
 </div>
+
+<OpenRuneProjectDialog bind:open={overviewOpen} profile={overviewProfile} />
 
 <AddCacheDialog
     bind:open={addOpen}

@@ -2,7 +2,6 @@
     import { HEIGHT_MODES } from "../../../mapeditor/plugins/builtins/height-brush-settings.shared";
     import { executeEditorCommand, heightModeCommandId } from "../../../mapeditor/commands/editor-command-registry";
     import { getBuiltinEditorToolPlugin } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
-    import { getTileBrushFocus } from "../../../mapeditor/plugins/builtins/tile-brush-model";
     import { getHeightToolModel } from "../../../mapeditor/plugins/builtins/height-tool-model";
     import { Button } from "../../components/ui/button";
     import { Label } from "../../components/ui/label";
@@ -14,7 +13,7 @@
     const editor = useEditorState();
     const host = editor.host;
     const tool = $derived(editor.tool.current);
-    const heightFocus = $derived(editor.read(() => getTileBrushFocus(host) === "height"));
+    const heightFocus = $derived(editor.read(() => host.getEditorTool() === "height"));
     const heightMode = $derived(editor.read(() => getHeightToolModel(host).mode));
     const selectedMode = $derived(HEIGHT_MODES.find((mode) => mode.id === heightMode) ?? HEIGHT_MODES[0]);
     const heightStep = $derived(editor.read(() => host.heightAdjustStep));

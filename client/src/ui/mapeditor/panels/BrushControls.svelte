@@ -25,17 +25,12 @@
     const viewPlaneMax = $derived(editor.read(() => host.viewPlaneMax));
     const hideBelow = $derived(editor.read(() => host.hideBelowViewPlane));
     const showRoofs = $derived(editor.read(() => host.showRoofs));
-    const bridgeLinkBelow = $derived(editor.read(() => host.bridgeLinkBelow));
     const lowest = $derived(hideBelow ? viewPlaneMax : 0);
     const highest = $derived(showRoofs ? 3 : viewPlaneMax);
     const planeHint = $derived(lowest === highest ? `Showing plane ${lowest}` : `Showing planes ${lowest}–${highest}`);
 
     function setPlane(next: number): void {
         host.viewPlaneMax = Math.max(0, Math.min(3, next));
-        host.notifyWorkbenchStateChanged();
-    }
-    function setHideBelow(next: boolean): void {
-        host.hideBelowViewPlane = next;
         host.notifyWorkbenchStateChanged();
     }
 
@@ -84,13 +79,6 @@
     </div>
 {/snippet}
 
-{#snippet planeCheckbox(checked: boolean, label: string, title: string, onChange: (next: boolean) => void)}
-    <label class="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground" {title}>
-        <input type="checkbox" class="size-3.5 shrink-0 accent-primary" {checked} onchange={(event) => onChange(event.currentTarget.checked)} />
-        {label}
-    </label>
-{/snippet}
-
 {#snippet planeFooter(layout: "bar" | "window")}
     <div
         class={cn(
@@ -106,9 +94,6 @@
             <span class="w-5 shrink-0 text-center font-mono text-xs tabular-nums">{viewPlaneMax}</span>
             <Button variant="outline" size="icon" class="h-7 w-7 shrink-0" disabled={viewPlaneMax >= 3} aria-label="Increase view plane" onclick={() => setPlane(viewPlaneMax + 1)}>+</Button>
         </div>
-        {@render planeCheckbox(hideBelow, "Hide below", "Hide planes below the view plane (editor aid)", setHideBelow)}
-        {@render planeCheckbox(showRoofs, "Roofs", "Draw planes above the view plane, like RS with roofs shown. Off matches RS 'Hide roofs'.", (next) => host.setShowRoofs(next))}
-        {@render planeCheckbox(bridgeLinkBelow, "Bridges", "Plane-1 bridge tiles draw one plane lower, as RS renders them", (next) => host.setBridgeLinkBelow(next))}
     </div>
 {/snippet}
 

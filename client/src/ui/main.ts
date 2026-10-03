@@ -8,8 +8,10 @@ import { mount } from "svelte";
 
 import { Bzip2 } from "../rs/compression/Bzip2";
 import App from "./App.svelte";
+import { installDevLogBridge } from "../lib/tauri/dev-log-bridge";
 import { settings } from "./lib/settings.svelte";
 
+installDevLogBridge();
 void Bzip2.initWasm();
 
 (window as unknown as { wallpaperPropertyListener?: unknown }).wallpaperPropertyListener = {

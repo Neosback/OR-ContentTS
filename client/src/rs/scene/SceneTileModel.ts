@@ -547,3 +547,63 @@ export function getOverlayHighlightUvTriangles(
     }
     return collectShapeTableOverlayUvTriangles(model, sceneTileX, sceneTileY);
 }
+
+/** Position of each tile vertex id (1-16) in tile units 0..1, x east and y north; see the vertex switch in the constructor. */
+const SHAPE_VERTEX_POSITIONS: ReadonlyArray<readonly [number, number]> = [
+    [0, 0], // 0 unused
+    [0, 0],
+    [0.5, 0],
+    [1, 0],
+    [1, 0.5],
+    [1, 1],
+    [0.5, 1],
+    [0, 1],
+    [0, 0.5],
+    [0.5, 0.25],
+    [0.75, 0.5],
+    [0.5, 0.75],
+    [0.25, 0.5],
+    [0.25, 0.25],
+    [0.75, 0.25],
+    [0.75, 0.75],
+    [0.25, 0.75],
+];
+
+export type TileShapeTriangle = readonly [number, number, number, number, number, number];
+
+/**
+ * The underlay and overlay triangles of a tile shape in 0..1 tile units (x east, y north), exactly as the tile model
+ * is built. `shape` is the stored overlay shape (0-11, 0 = a full overlay tile); a tile without an overlay is a plain
+ * underlay square.
+ */
+export function getTileShapeTriangles(
+    shape: number | undefined,
+    rotation: number,
+): { underlay: TileShapeTriangle[]; overlay: TileShapeTriangle[] } {
+    const tableIndex = shape === undefined ? 0 : shape + 1;
+    const vertexIds = tileShapeVertexIndices[tableIndex];
+    const faces = tileShapeFaces[tableIndex];
+    if (!vertexIds || !faces) return { underlay: [], overlay: [] };
+    const rot = ((Math.round(rotation) % 4) + 4) % 4;
+
+    const positions = vertexIds.map((id) => {
+        let vertexIndex = id;
+        if ((vertexIndex & 1) === 0 && vertexIndex <= 8) vertexIndex = ((vertexIndex - rot - rot - 1) & 7) + 1;
+        if (vertexIndex > 8 && vertexIndex <= 12) vertexIndex = ((vertexIndex - 9 - rot) & 3) + 9;
+        if (vertexIndex > 12 && vertexIndex <= 16) vertexIndex = ((vertexIndex - 13 - rot) & 3) + 13;
+        return SHAPE_VERTEX_POSITIONS[vertexIndex] ?? SHAPE_VERTEX_POSITIONS[16]!;
+    });
+
+    const underlay: TileShapeTriangle[] = [];
+    const overlay: TileShapeTriangle[] = [];
+    for (let i = 0; i + 3 < faces.length; i += 4) {
+        const isOverlay = faces[i] === 1;
+        const corners = [1, 2, 3].map((k) => {
+            const index = faces[i + k]!;
+            return positions[index < 4 ? (index - rot) & 3 : index]!;
+        });
+        const triangle: TileShapeTriangle = [corners[0]![0], corners[0]![1], corners[1]![0], corners[1]![1], corners[2]![0], corners[2]![1]];
+        (isOverlay ? overlay : underlay).push(triangle);
+    }
+    return { underlay, overlay };
+}

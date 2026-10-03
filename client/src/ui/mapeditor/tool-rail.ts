@@ -6,7 +6,7 @@ import type { MapEditorTool } from "../../mapeditor/map-editor-kinds";
  */
 export const TOOL_RAIL_GROUPS: readonly (readonly MapEditorTool[])[] = [
     ["object-selector"],
-    ["tile-brush"],
+    ["tile-brush", "height"],
     ["object-delete", "region-stamp"],
 ];
 

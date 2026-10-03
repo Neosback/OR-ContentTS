@@ -15,7 +15,7 @@ describe("tool rail", () => {
 
     it("drops unavailable tools and empty groups", () => {
         const groups = visibleRailGroups((tool) => tool !== "object-selector" && tool !== "region-stamp");
-        expect(groups[0]).toEqual(["tile-brush"]);
+        expect(groups[0]).toEqual(["tile-brush", "height"]);
         expect(groups[1]).toEqual(["object-delete"]);
         expect(groups.flat()).not.toContain("object-selector");
         expect(visibleRailGroups(() => false)).toEqual([]);

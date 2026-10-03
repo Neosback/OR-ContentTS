@@ -3,6 +3,10 @@
 precision highp float;
 
 uniform vec4 u_fillColor;
+/** Brush ghost: same texture array and layer as the terrain (layer < 0 = untextured). */
+uniform highp sampler2DArray u_textures;
+uniform float u_ghostMode;
+uniform float u_ghostTexLayer;
 uniform vec4 u_outlineColor;
 uniform float u_outlineThickness;
 /** (left, right, bottom, top) — 1 = draw outline on that side (neighbor not in selection). */
@@ -16,6 +20,8 @@ uniform int u_boundarySegCount;
 uniform vec4 u_boundarySeg[BOUND_MAX];
 
 in vec3 v_bc;
+in vec3 v_ghostColor;
+in vec2 v_ghostUv;
 in vec2 v_tileUv;
 in vec2 v_overlayUv;
 
@@ -32,6 +38,11 @@ float segmentDist(vec2 p, vec4 s) {
 }
 
 void main() {
+    if (u_ghostMode > 0.5) {
+        vec3 texel = u_ghostTexLayer >= 0.0 ? texture(u_textures, vec3(v_ghostUv, u_ghostTexLayer)).bgr : vec3(1.0);
+        fragColor = vec4(v_ghostColor * texel, u_fillColor.a);
+        return;
+    }
     if (u_highlightShapeMode < 0.5) {
         if (u_edgeMask.x + u_edgeMask.y + u_edgeMask.z + u_edgeMask.w < 0.01) {
             fragColor = u_fillColor;

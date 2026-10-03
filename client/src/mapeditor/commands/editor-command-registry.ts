@@ -11,7 +11,7 @@ import type {
     EditorToolKeybindTrigger,
 } from "../plugins/builtins/builtin-plugin-types";
 
-import { getTileBrushFocus } from "../plugins/builtins/tile-brush-model";
+import { getTileBrushModel } from "../plugins/builtins/tile-brush-model";
 export type EditorCommandId =
     | "workbench.brush-size-up"
     | "workbench.brush-size-down"
@@ -28,6 +28,7 @@ export type EditorCommandId =
     | "tool.select-height"
     | "tool.select-tile-flags"
     | "tool.select-tile-brush"
+    | "tile-brush.eyedropper"
     | "tool.select-object-selector"
     | "tool.select-object-delete"
     | "tool.select-region-stamp"
@@ -200,7 +201,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.step.increase",
         name: "Increase height step",
         description: "Increase Height step slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             host.heightAdjustStep = Math.max(1, Math.min(256, host.heightAdjustStep + 1));
             host.notifyWorkbenchStateChanged();
@@ -210,7 +211,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.step.decrease",
         name: "Decrease height step",
         description: "Decrease Height step slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             host.heightAdjustStep = Math.max(1, Math.min(256, host.heightAdjustStep - 1));
             host.notifyWorkbenchStateChanged();
@@ -220,7 +221,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.slope-strength.increase",
         name: "Increase slope strength",
         description: "Increase Slope strength slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             const model = getHeightToolModel(host);
             model.setSlopeStrength(model.slopeStrength + 0.05);
@@ -230,7 +231,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.slope-strength.decrease",
         name: "Decrease slope strength",
         description: "Decrease Slope strength slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             const model = getHeightToolModel(host);
             model.setSlopeStrength(model.slopeStrength - 0.05);
@@ -240,7 +241,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.blend-strength.increase",
         name: "Increase blend strength",
         description: "Increase Blend strength slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             const model = getHeightToolModel(host);
             model.setBlendStrength(model.blendStrength + 0.05);
@@ -250,7 +251,7 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         id: "height.blend-strength.decrease",
         name: "Decrease blend strength",
         description: "Decrease Blend strength slider value.",
-        isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+        isEnabled: ({ host }) => host.getEditorTool() === "height",
         execute: ({ host }) => {
             const model = getHeightToolModel(host);
             model.setBlendStrength(model.blendStrength - 0.05);
@@ -267,6 +268,18 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
             if (host.isObjectCopyPlacementActive()) host.cancelObjectCopyPlacement();
             else host.clearSelectedObject();
             host.notifyWorkbenchStateChanged();
+        },
+    },
+    {
+        id: "tile-brush.eyedropper",
+        name: "Pick tile into brush",
+        description: "Load the hovered tile (underlay, overlay, shape, rotation, height and flags) into the Tile painter brush.",
+        isEnabled: ({ host }) => host.getEditorTool() === "tile-brush" && host.getHoveredTile() !== undefined,
+        execute: ({ host }) => {
+            const hovered = host.getHoveredTile();
+            const tile = hovered ? host.getTileInfo(host.selectedLevel, hovered.worldX, hovered.worldY) : undefined;
+            if (!tile) return false;
+            getTileBrushModel(host).sendTile(tile);
         },
     },
     {
@@ -370,7 +383,7 @@ const HEIGHT_COMMANDS: readonly EditorCommand[] = HEIGHT_MODE_COMMANDS.map(({ id
     id,
     name,
     description,
-    isEnabled: ({ host }) => getTileBrushFocus(host) === "height",
+    isEnabled: ({ host }) => host.getEditorTool() === "height",
     execute: ({ host }) => {
         getHeightToolModel(host).setMode(mode);
         host.setEditorTool("height");

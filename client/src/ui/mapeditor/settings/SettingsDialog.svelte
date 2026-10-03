@@ -7,8 +7,9 @@
     import GizmoTab from "./GizmoTab.svelte";
     import GraphicsTab from "./GraphicsTab.svelte";
     import KeybindsTab from "./KeybindsTab.svelte";
+    import WorkspaceTab from "./WorkspaceTab.svelte";
 
-    let { open = $bindable(false) }: { open?: boolean } = $props();
+    let { open = $bindable(false), tab = $bindable() }: { open?: boolean; tab?: string } = $props();
 
     const editor = useEditorState();
     const host = editor.host;
@@ -26,9 +27,14 @@
         { id: "gizmo-style", title: "Gizmo Style", component: GizmoTab },
         { id: "core-keybinds", title: "Core Keybinds", component: KeybindsTab, props: { scope: "core" } },
         { id: "keybinds", title: "Keybinds", component: KeybindsTab, props: { scope: "plugins" } },
+        { id: "workspace", title: "Workspace & layouts", component: WorkspaceTab },
     ];
 
-    let activeId = $state(tabs[0].id);
+    let activeId = $state(tab ?? tabs[0].id);
+    // Opening the dialog on a given tab (for example from the View menu).
+    $effect(() => {
+        if (open && tab) activeId = tab;
+    });
     const active = $derived(tabs.find((tab) => tab.id === activeId) ?? tabs[0]);
     const Active = $derived(active.component);
 

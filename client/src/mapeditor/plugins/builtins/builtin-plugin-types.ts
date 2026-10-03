@@ -39,6 +39,8 @@ export type MapEditorDockPanelId =
     | "editor-overlays"
     | "editor-height"
     | "editor-object-selector"
+    | "editor-inspector-tile"
+    | "editor-rendering"
     | "editor-object-delete"
     | "editor-region-stamp"
     | "editor-tile-flags"

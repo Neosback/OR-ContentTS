@@ -23,6 +23,9 @@ type WorkerDescriptor<ThreadType> = {
 
 function spawnWorker(): Promise<RenderDataWorkerThread> {
     const worker = new Worker(new URL("./RenderDataWorker.ts", import.meta.url), { type: "module" });
+    // A worker that dies while loading (for example a module it cannot import) otherwise fails silently.
+    worker.addEventListener("error", (event) => console.error("[render worker error]", event.message, event.filename, event.lineno));
+    worker.addEventListener("messageerror", () => console.error("[render worker] message could not be deserialized"));
     return spawn<RenderDataWorker>(worker);
 }
 

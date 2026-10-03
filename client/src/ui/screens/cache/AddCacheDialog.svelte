@@ -1,5 +1,7 @@
 <script lang="ts">
+    import Check from "@lucide/svelte/icons/check";
     import FolderGit2 from "@lucide/svelte/icons/folder-git-2";
+    import Loader from "@lucide/svelte/icons/loader-circle";
     import HardDrive from "@lucide/svelte/icons/hard-drive";
     import ImagePlus from "@lucide/svelte/icons/image-plus";
 
@@ -18,15 +20,27 @@
     } from "../../../lib/tauri/desktop-cache";
     import { isTauriRuntime } from "../../../lib/tauri/is-tauri";
     import {
+        BrowserProjectFileSystem,
         getBrowserProjectAccessMode,
         selectBrowserProjectDirectory,
         type BrowserDirectoryHandle,
     } from "../../../project/browser-project-filesystem";
+    import { join } from "@tauri-apps/api/path";
     import {
-        indexOpenRuneProject,
-        type OpenRuneProjectIndex,
-    } from "../../../project/openrune-project-index";
+        describeOpenRuneProject,
+        type OpenRuneProjectOverview as ProjectOverview,
+    } from "../../../project/openrune-project-overview";
+    import {
+        locateOpenRuneProject,
+        type ProjectCandidate,
+        type ProjectRejection,
+    } from "../../../project/openrune-project-locator";
+    import type { OpenRuneProjectIndex } from "../../../project/openrune-project-index";
+    import { OpenRuneProjectSession } from "../../../project/openrune-project-session";
+    import { ScopedProjectFileSystem } from "../../../project/scoped-project-filesystem";
     import type { ProjectFileSystem } from "../../../project/project-filesystem";
+    import { pickAndGrantFolder } from "../../../lib/tauri/desktop-access";
+    import { ProjectFileSystemError } from "../../../project/project-filesystem";
     import { TauriProjectFileSystem } from "../../../project/tauri-project-filesystem";
     import ConfirmationDialog from "../../components/confirmation/ConfirmationDialog.svelte";
     import { Dialog, DialogContent, DialogTitle } from "../../components/ui/dialog";
@@ -70,6 +84,21 @@
     let sourceError = $state<string | null>(null);
     let confirmDeleteOpen = $state(false);
     let inspectingOpenRune = $state(false);
+    /** Set when the picked folder is not a project; explains why. */
+    let rejection = $state<ProjectRejection | null>(null);
+    /** Several projects were found inside the picked folder: the user chooses one. */
+    let candidates = $state<ProjectCandidate[]>([]);
+    let pickedSource: {
+        fileSystem: ProjectFileSystem;
+        label: string;
+        accessMode: OpenRuneProjectAccessMode;
+        rootPath?: string;
+        browserHandle?: BrowserDirectoryHandle;
+    } | null = null;
+    /** What the project provides, shown as a short summary (full detail opens after setup). */
+    let overview = $state<ProjectOverview | null>(null);
+    let loadingOverview = $state(false);
+    let foundNote = $state<string | null>(null);
 
     $effect(() => {
         if (!open) return;
@@ -92,6 +121,11 @@
         browserCacheFiles = [];
         iconError = null;
         sourceError = null;
+        rejection = null;
+        candidates = [];
+        pickedSource = null;
+        overview = null;
+        foundNote = null;
     });
 
     async function onIconFiles(files: FileList | null): Promise<void> {
@@ -113,6 +147,7 @@
             openRuneRootPath = undefined;
             pendingBrowserProjectHandle = undefined;
             openRuneProject = null;
+            overview = null;
         } else {
             systemCachePath = undefined;
             browserCacheFiles = [];
@@ -138,57 +173,133 @@
         sourceError = null;
     }
 
-    async function inspectOpenRuneFileSystem(
-        fileSystem: ProjectFileSystem,
-        label: string,
-        accessMode: OpenRuneProjectAccessMode,
-        rootPath?: string,
-        browserHandle?: BrowserDirectoryHandle,
-    ): Promise<void> {
-        inspectingOpenRune = true;
+    function resetProjectSelection(): void {
+        openRuneProject = null;
+        overview = null;
+        rejection = null;
+        candidates = [];
+        foundNote = null;
         sourceError = null;
+    }
+
+    /**
+     * Looks for an OpenRune project in the folder the user picked: the folder itself, or one inside it. Explains
+     * clearly when there is none, and re-asks for access (with the picker at that folder) when access was missing.
+     */
+    async function handlePickedFolder(source: NonNullable<typeof pickedSource>): Promise<void> {
+        pickedSource = source;
+        inspectingOpenRune = true;
+        resetProjectSelection();
         try {
-            const project = await indexOpenRuneProject(fileSystem);
-            if (!project.isOpenRuneProject) {
-                openRuneProject = null;
-                sourceError =
-                    "That folder does not look like an OpenRune Server project root. Choose the repository root containing the Gradle/OpenRune project.";
-                return;
+            let located;
+            try {
+                located = await locateOpenRuneProject(source.fileSystem);
+            } catch (error) {
+                if (!(error instanceof ProjectFileSystemError) || error.code !== "ACCESS_DENIED" || !source.rootPath) throw error;
+                const granted = await pickAndGrantFolder({ title: "Allow access to this OpenRune project", defaultPath: source.rootPath });
+                if (!granted) throw error;
+                located = await locateOpenRuneProject(source.fileSystem);
             }
 
-            openRuneAccessMode = accessMode;
-            openRuneRootPath =
-                accessMode === "system-path" ? rootPath : undefined;
-            pendingBrowserProjectHandle =
-                accessMode === "browser-handle"
-                    ? browserHandle
-                    : undefined;
-            openRuneProject = project;
-            locationNotes = label;
-            if (!name.trim()) {
-                name = project.gameConfig?.name?.trim() || "OpenRune project";
+            if (located.kind === "rejected") {
+                rejection = located.rejection;
+                locationNotes = source.label;
+                return;
             }
-            if (project.gameConfig?.revision !== undefined) {
-                revision = String(project.gameConfig.revision);
+            if (located.kind === "project") {
+                await acceptProject("", source, located.project);
+                return;
             }
+            if (located.candidates.length === 1) {
+                const [only] = located.candidates;
+                foundNote = `Found the project in "${only.subPath}" inside the folder you chose.`;
+                await acceptProject(only.subPath, source);
+                return;
+            }
+            candidates = located.candidates;
+            locationNotes = source.label;
         } catch (error) {
-            openRuneProject = null;
+            resetProjectSelection();
             sourceError = errorMessage(error);
         } finally {
             inspectingOpenRune = false;
         }
     }
 
+    async function chooseCandidate(candidate: ProjectCandidate): Promise<void> {
+        if (!pickedSource) return;
+        inspectingOpenRune = true;
+        candidates = [];
+        foundNote = `Using "${candidate.subPath}".`;
+        try {
+            await acceptProject(candidate.subPath, pickedSource);
+        } catch (error) {
+            resetProjectSelection();
+            sourceError = errorMessage(error);
+        } finally {
+            inspectingOpenRune = false;
+        }
+    }
+
+    /** Makes `subPath` (inside the picked folder) the project root for this setup, then reads what it provides. */
+    async function acceptProject(
+        subPath: string,
+        source: NonNullable<typeof pickedSource>,
+        knownProject?: OpenRuneProjectIndex,
+    ): Promise<void> {
+        let fileSystem = source.fileSystem;
+        let rootPath = source.rootPath;
+        let browserHandle = source.browserHandle;
+        let label = source.label;
+        if (subPath) {
+            fileSystem = new ScopedProjectFileSystem(source.fileSystem, subPath);
+            if (source.accessMode === "system-path" && source.rootPath) {
+                rootPath = await join(source.rootPath, ...subPath.split("/"));
+                fileSystem = new TauriProjectFileSystem(rootPath);
+                label = rootPath;
+            } else if (source.browserHandle) {
+                let handle = source.browserHandle;
+                for (const part of subPath.split("/")) handle = await handle.getDirectoryHandle(part);
+                browserHandle = handle;
+                fileSystem = new BrowserProjectFileSystem(handle);
+                label = `${source.label}/${subPath}`;
+            }
+        }
+
+        const session = new OpenRuneProjectSession(fileSystem);
+        loadingOverview = true;
+        try {
+            const snapshot = await session.refresh();
+            openRuneProject = snapshot.project;
+            overview = describeOpenRuneProject(snapshot, name.trim() || undefined);
+        } catch (error) {
+            // The folder was recognized (the locator checked it), so keep it usable even if a source index failed.
+            openRuneProject = knownProject ?? null;
+            sourceError = `The project was found but reading it failed: ${errorMessage(error)}`;
+            if (!openRuneProject) return;
+        } finally {
+            loadingOverview = false;
+        }
+
+        openRuneAccessMode = source.accessMode;
+        openRuneRootPath = source.accessMode === "system-path" ? rootPath : undefined;
+        pendingBrowserProjectHandle = source.accessMode === "browser-handle" ? browserHandle : undefined;
+        locationNotes = label;
+        const project = openRuneProject;
+        if (project && !name.trim()) name = project.gameConfig?.name?.trim() || "OpenRune project";
+        if (project?.gameConfig?.revision !== undefined) revision = String(project.gameConfig.revision);
+    }
+
     async function onPickOpenRuneRoot(): Promise<void> {
         if (tauri) {
             const path = await pickOpenRuneProjectDirectory();
             if (!path) return;
-            await inspectOpenRuneFileSystem(
-                new TauriProjectFileSystem(path),
-                path,
-                "system-path",
-                path,
-            );
+            await handlePickedFolder({
+                fileSystem: new TauriProjectFileSystem(path),
+                label: path,
+                accessMode: "system-path",
+                rootPath: path,
+            });
             return;
         }
 
@@ -205,13 +316,12 @@
                     : "openrune-project",
             });
             if (!fileSystem) return;
-            await inspectOpenRuneFileSystem(
+            await handlePickedFolder({
                 fileSystem,
-                fileSystem.rootHandle.name || "OpenRune project",
-                "browser-handle",
-                undefined,
-                fileSystem.rootHandle,
-            );
+                label: fileSystem.rootHandle.name || "OpenRune project",
+                accessMode: "browser-handle",
+                browserHandle: fileSystem.rootHandle,
+            });
         } catch (error) {
             sourceError = errorMessage(error);
         }
@@ -264,21 +374,68 @@
     const fieldClass =
         "w-full rounded-md border border-input bg-background px-2 py-1.5";
     const kindCard =
-        "flex min-h-24 flex-1 items-start gap-3 rounded-lg border p-3 text-left transition-colors";
+        "flex flex-1 items-start gap-3 rounded-lg border p-3 text-left transition-colors";
 </script>
+
+{#snippet identityFields()}
+    <div class="grid gap-3 sm:grid-cols-[96px_1fr]">
+        <div class="space-y-1">
+            <span class="text-sm font-medium">Icon</span>
+            <label class="inline-flex cursor-pointer">
+                <span class="inline-flex size-24 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
+                    {#if iconDataUrl}
+                        <img src={iconDataUrl} alt="" class="size-24 object-cover" />
+                    {:else}
+                        <ImagePlus class="size-7 text-muted-foreground" />
+                    {/if}
+                </span>
+                <input type="file" accept="image/*" class="sr-only" onchange={(e) => void onIconFiles(e.currentTarget.files)} />
+            </label>
+            {#if iconError}
+                <p class="text-xs text-destructive">{iconError}</p>
+            {/if}
+        </div>
+
+        <div class="space-y-3">
+            <label class="block text-sm">
+                <span class="mb-1 block font-medium">Name</span>
+                <input class={fieldClass} bind:value={name} />
+            </label>
+            <label class="block text-sm">
+                <span class="mb-1 block font-medium">Revision</span>
+                <input
+                    class={fieldClass}
+                    bind:value={revision}
+                    readonly={setupKind === "openrune"}
+                    placeholder={setupKind === "openrune" ? "Read from game.yml" : "Optional"}
+                />
+                <span class="mt-1 block text-xs text-muted-foreground">
+                    {setupKind === "openrune"
+                        ? "Read from the project's game.yml when it has one."
+                        : "Optional cache metadata. Studio still detects the cache storage format from its files."}
+                </span>
+            </label>
+        </div>
+
+        <label class="block text-sm sm:col-span-2">
+            <span class="mb-1 block font-medium">Description</span>
+            <textarea rows="2" class={fieldClass} bind:value={description}></textarea>
+        </label>
+    </div>
+{/snippet}
 
 <Dialog bind:open>
     <DialogContent
         showClose={false}
-        class="w-[44vw] min-w-[340px] max-w-[820px] gap-0 bg-card p-0 sm:rounded-lg"
+        class="flex max-h-[90vh] w-[92vw] max-w-[760px] flex-col gap-0 bg-card p-0 sm:rounded-lg"
     >
-        <div class="border-b border-border px-6 py-4">
+        <div class="shrink-0 border-b border-border px-6 py-3.5">
             <DialogTitle class="text-base leading-normal">
                 {editing ? "Manage setup" : "Add setup"}
             </DialogTitle>
         </div>
 
-        <div class="space-y-4 px-6 py-4">
+        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
             <div class="space-y-2">
                 <span class="text-sm font-medium">Setup type</span>
                 <div class="flex gap-2">
@@ -287,9 +444,7 @@
                         disabled={editing !== null}
                         class={cn(
                             kindCard,
-                            setupKind === "basic"
-                                ? "border-primary bg-primary/10"
-                                : "border-border bg-background",
+                            setupKind === "basic" ? "border-primary bg-primary/10" : "border-border bg-background",
                             editing && "cursor-default",
                         )}
                         onclick={() => selectKind("basic")}
@@ -297,9 +452,7 @@
                         <HardDrive class="mt-0.5 size-5 shrink-0" />
                         <span>
                             <span class="block text-sm font-medium">Basic cache</span>
-                            <span class="mt-1 block text-xs text-muted-foreground">
-                                Cache-only setup. Use any compatible cache directory without OpenRune project features.
-                            </span>
+                            <span class="mt-0.5 block text-xs text-muted-foreground">A game cache on its own, without a project.</span>
                         </span>
                     </button>
                     <button
@@ -307,240 +460,179 @@
                         disabled={editing !== null || !openRuneFolderAccess}
                         class={cn(
                             kindCard,
-                            setupKind === "openrune"
-                                ? "border-primary bg-primary/10"
-                                : "border-border bg-background",
-                            (!openRuneFolderAccess || editing) &&
-                                "cursor-default opacity-70",
+                            setupKind === "openrune" ? "border-primary bg-primary/10" : "border-border bg-background",
+                            (!openRuneFolderAccess || editing) && "cursor-default opacity-70",
                         )}
                         onclick={() => selectKind("openrune")}
                     >
                         <FolderGit2 class="mt-0.5 size-5 shrink-0" />
                         <span>
                             <span class="block text-sm font-medium">OpenRune project</span>
-                            <span class="mt-1 block text-xs text-muted-foreground">
-                                Choose the OpenRune Server repository root once. Studio discovers LIVE/SERVER, GameVals, RSCM, map/server TOML, and pack sources from it.
+                            <span class="mt-0.5 block text-xs text-muted-foreground">
+                                Pick the server folder once. Studio finds the cache, GameVals and sources.
                             </span>
-                            {#if !tauri && browserProjectAccess === "filesystem"}
-                                <span class="mt-1 block text-xs text-emerald-400">
-                                    Direct project read/write is available in this browser. Build/run operations will still require native execution later.
-                                </span>
-                            {:else if !tauri}
-                                <span class="mt-1 block text-xs text-amber-400">
-                                    This browser cannot grant direct project-folder access. Use a Chromium browser or the desktop app for OpenRune projects.
-                                </span>
-                            {/if}
                         </span>
                     </button>
                 </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-[128px_1fr]">
-                <div class="space-y-1">
-                    <span class="text-sm font-medium">Icon</span>
-                    <label class="inline-flex cursor-pointer">
-                        <span
-                            class="inline-flex size-32 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40"
-                        >
-                            {#if iconDataUrl}
-                                <img
-                                    src={iconDataUrl}
-                                    alt=""
-                                    class="size-32 object-cover"
-                                />
-                            {:else}
-                                <ImagePlus
-                                    class="size-8 text-muted-foreground"
-                                />
-                            {/if}
-                        </span>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            class="sr-only"
-                            onchange={(e) =>
-                                void onIconFiles(e.currentTarget.files)}
-                        />
-                    </label>
-                    {#if iconError}
-                        <p class="text-xs text-destructive">{iconError}</p>
-                    {/if}
-                </div>
-
-                <div class="space-y-3">
-                    <label class="block text-sm">
-                        <span class="mb-1 block font-medium">Name</span>
-                        <input class={fieldClass} bind:value={name} />
-                    </label>
-                    <label class="block text-sm">
-                        <span class="mb-1 block font-medium">Revision</span>
-                        <input
-                            class={fieldClass}
-                            bind:value={revision}
-                            readonly={setupKind === "openrune"}
-                            placeholder={setupKind === "openrune"
-                                ? "Read from game.yml"
-                                : "Optional"}
-                        />
-                        <span class="mt-1 block text-xs text-muted-foreground">
-                            {setupKind === "openrune"
-                                ? "OpenRune revision is discovered from the project when available."
-                                : "Optional cache metadata. Studio still detects the cache storage format from its files."}
-                        </span>
-                    </label>
-                </div>
-
-                <label class="block text-sm sm:col-span-2">
-                    <span class="mb-1 block font-medium">Description</span>
-                    <textarea
-                        rows="2"
-                        class={fieldClass}
-                        bind:value={description}
-                    ></textarea>
-                </label>
-
-                {#if setupKind === "openrune"}
-                    <div class="space-y-2 sm:col-span-2">
-                        <span class="block text-sm font-medium">
-                            OpenRune Server root
-                        </span>
-                        <button
-                            type="button"
-                            disabled={!openRuneFolderAccess || inspectingOpenRune}
-                            class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm disabled:opacity-60"
-                            onclick={() => void onPickOpenRuneRoot()}
-                        >
-                            {inspectingOpenRune
-                                ? "Inspecting OpenRune project..."
-                                : locationNotes
-                                  ? "Change OpenRune project root"
-                                  : "Choose OpenRune project root"}
-                        </button>
-
-                        {#if locationNotes}
-                            <p class="break-all text-xs text-muted-foreground">
-                                {locationNotes}
-                            </p>
-                        {/if}
-
-                        {#if openRuneProject}
-                            <div
-                                class="grid gap-2 rounded-md border border-border bg-background/50 p-3 text-xs sm:grid-cols-2"
-                            >
-                                <div>
-                                    <span class="text-muted-foreground">Project</span>
-                                    <p class="font-medium text-emerald-400">
-                                        Valid OpenRune project
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-muted-foreground">Authoring access</span>
-                                    <p class="font-medium">
-                                        {openRuneAccessMode === "browser-handle"
-                                            ? "Browser read/write"
-                                            : "Direct disk read/write"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-muted-foreground">LIVE cache</span>
-                                    <p class="font-medium">
-                                        {openRuneProject.liveCachePath ??
-                                            "Not built yet — bootstrap needed"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-muted-foreground">SERVER cache</span>
-                                    <p class="font-medium">
-                                        {openRuneProject.serverCachePath ?? "Not built yet"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-muted-foreground">GameVal/RSCM</span>
-                                    <p class="font-medium">
-                                        {openRuneProject.gameValBinaryFiles.length} DAT ·
-                                        {openRuneProject.rscmFiles.length} RSCM ·
-                                        {openRuneProject.gameValTomlFiles.length} module TOML
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-muted-foreground">OpenRune sources</span>
-                                    <p class="font-medium">
-                                        {openRuneProject.rawMapSources.npcTomlFiles.length +
-                                            openRuneProject.rawMapSources.objTomlFiles.length +
-                                            openRuneProject.rawMapSources.areaTomlFiles.length}
-                                        map TOML ·
-                                        {openRuneProject.rawServerSources.tomlFiles.length}
-                                        server TOML ·
-                                        {openRuneProject.packRoots.length} pack roots
-                                    </p>
-                                </div>
-                            </div>
-                            {#if !openRuneProject.liveCachePath}
-                                <p class="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
-                                    This is a valid OpenRune project. Source editing is available, but Map cannot load until OpenRune generates LIVE. Bootstrap will be added as a separate native/Companion capability.
-                                </p>
-                            {/if}
-                        {/if}
-                    </div>
-                {:else}
-                    <div class="space-y-2 sm:col-span-2">
-                        <span class="block text-sm font-medium">Cache folder</span>
-                        {#if tauri}
-                            <button
-                                type="button"
-                                class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm"
-                                onclick={() => void onPickSystemFolder()}
-                            >
-                                {systemCachePath
-                                    ? "Change cache folder"
-                                    : "Choose cache folder"}
-                            </button>
-                            <p class="text-xs text-muted-foreground">
-                                Desktop reads the selected cache directly from disk. No IndexedDB cache copy is created.
-                            </p>
-                        {:else}
-                            <label class="inline-flex w-full cursor-pointer">
-                                <span
-                                    class="inline-flex h-9 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-sm"
-                                >
-                                    {browserCacheFiles.length > 0
-                                        ? "Change cache folder"
-                                        : "Choose cache folder"}
-                                </span>
-                                <input
-                                    type="file"
-                                    class="sr-only"
-                                    multiple
-                                    {...directoryInput}
-                                    onchange={(e) =>
-                                        onBrowserFolderFiles(
-                                            e.currentTarget.files,
-                                        )}
-                                />
-                            </label>
-                            <p class="text-xs text-muted-foreground">
-                                Browser basic-cache mode imports the selected cache into local browser storage.
-                            </p>
-                        {/if}
-                        {#if locationNotes}
-                            <p class="break-all text-xs text-muted-foreground">
-                                {locationNotes}
-                            </p>
-                        {/if}
-                    </div>
-                {/if}
-
-                {#if sourceError}
-                    <p
-                        class="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive sm:col-span-2"
-                    >
-                        {sourceError}
+                {#if !tauri && browserProjectAccess === "filesystem"}
+                    <p class="text-xs text-emerald-400">Direct project read/write is available in this browser.</p>
+                {:else if !tauri}
+                    <p class="text-xs text-amber-400">
+                        This browser cannot grant direct project-folder access. Use a Chromium browser or the desktop app for OpenRune projects.
                     </p>
                 {/if}
             </div>
+
+            {#if setupKind === "openrune"}
+                <div class="space-y-2">
+                    <span class="block text-sm font-medium">OpenRune Server folder</span>
+                    <button
+                        type="button"
+                        disabled={!openRuneFolderAccess || inspectingOpenRune}
+                        class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm disabled:opacity-60"
+                        onclick={() => void onPickOpenRuneRoot()}
+                    >
+                        {inspectingOpenRune
+                            ? "Looking for the project..."
+                            : locationNotes
+                              ? "Choose a different folder"
+                              : "Choose the OpenRune Server folder"}
+                    </button>
+                    {#if !locationNotes && !inspectingOpenRune}
+                        <p class="text-xs text-muted-foreground">
+                            Choose the repository root (the folder with <code>settings.gradle.kts</code>). If you choose a folder that contains it, Studio will find it.
+                        </p>
+                    {/if}
+                    {#if locationNotes}
+                        <p class="break-all text-xs text-muted-foreground select-text">{locationNotes}</p>
+                    {/if}
+                    {#if inspectingOpenRune || loadingOverview}
+                        <p class="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+                            <Loader class="size-3.5 animate-spin" aria-hidden="true" />
+                            {loadingOverview ? "Reading the project..." : "Looking for the project..."}
+                        </p>
+                    {/if}
+                    {#if foundNote}
+                        <p class="text-xs text-sky-400">{foundNote}</p>
+                    {/if}
+
+                    {#if candidates.length > 0}
+                        <div class="rounded-md border border-border bg-background/50 p-3">
+                            <p class="mb-2 text-xs font-medium">Found {candidates.length} OpenRune projects in that folder. Which one?</p>
+                            <div class="flex flex-wrap gap-2">
+                                {#each candidates as candidate (candidate.subPath)}
+                                    <button
+                                        type="button"
+                                        class="rounded-md border border-input bg-secondary px-2.5 py-1 text-xs"
+                                        onclick={() => void chooseCandidate(candidate)}
+                                    >
+                                        {candidate.subPath}
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if rejection}
+                        <div class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs" role="alert">
+                            <p class="font-medium text-amber-300">This folder is not an OpenRune Server project.</p>
+                            <p class="mt-1 text-amber-200/90">{rejection.message}</p>
+                            {#if rejection.found.length > 0}
+                                <p class="mt-1.5 text-muted-foreground">Found: <span class="font-mono">{rejection.found.join(", ")}</span></p>
+                            {/if}
+                            {#if rejection.missing.length > 0}
+                                <p class="text-muted-foreground">Expected one of: <span class="font-mono">{rejection.missing.join(", ")}</span></p>
+                            {/if}
+                        </div>
+                    {/if}
+
+                    {#if openRuneProject && overview}
+                        <div class="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+                            <p class="flex items-center gap-1.5 font-medium text-emerald-400">
+                                <Check class="size-4" aria-hidden="true" />
+                                OpenRune project found: {overview.name}
+                            </p>
+                            <p class="mt-0.5 text-muted-foreground">{overview.summary}</p>
+                            <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="Capabilities">
+                                {#each overview.features as feature (feature.id)}
+                                    <li
+                                        class={cn(
+                                            "rounded px-1.5 py-0.5",
+                                            feature.status === "ready"
+                                                ? "bg-emerald-500/15 text-emerald-300"
+                                                : feature.status === "partial"
+                                                  ? "bg-amber-500/15 text-amber-300"
+                                                  : "bg-muted text-muted-foreground line-through decoration-muted-foreground/40",
+                                        )}
+                                        title={feature.detail}
+                                    >
+                                        {feature.label}
+                                    </li>
+                                {/each}
+                            </ul>
+                            <p class="mt-2 text-muted-foreground">The full list of everything loaded opens when you add the setup.</p>
+                        </div>
+                        {#if !openRuneProject.liveCachePath}
+                            <p class="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
+                                LIVE has not been generated yet. Source access works, but the map and interface editors need the LIVE cache (run OpenRune bootstrap, then reload the project).
+                            </p>
+                        {/if}
+                    {/if}
+                </div>
+
+                <details class="rounded-md border border-border" open={editing !== null}>
+                    <summary class="cursor-pointer px-3 py-2 text-sm font-medium">Name, icon and description <span class="font-normal text-muted-foreground">(optional)</span></summary>
+                    <div class="border-t border-border p-3">
+                        {@render identityFields()}
+                    </div>
+                </details>
+            {:else}
+                {@render identityFields()}
+
+                <div class="space-y-2">
+                    <span class="block text-sm font-medium">Cache folder</span>
+                    {#if tauri}
+                        <button
+                            type="button"
+                            class="h-9 w-full rounded-md border border-input bg-secondary px-3 text-sm"
+                            onclick={() => void onPickSystemFolder()}
+                        >
+                            {systemCachePath ? "Change cache folder" : "Choose cache folder"}
+                        </button>
+                        <p class="text-xs text-muted-foreground">
+                            Desktop reads the selected cache directly from disk. No IndexedDB cache copy is created.
+                        </p>
+                    {:else}
+                        <label class="inline-flex w-full cursor-pointer">
+                            <span class="inline-flex h-9 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-sm">
+                                {browserCacheFiles.length > 0 ? "Change cache folder" : "Choose cache folder"}
+                            </span>
+                            <input
+                                type="file"
+                                class="sr-only"
+                                multiple
+                                {...directoryInput}
+                                onchange={(e) => onBrowserFolderFiles(e.currentTarget.files)}
+                            />
+                        </label>
+                        <p class="text-xs text-muted-foreground">
+                            Browser basic-cache mode imports the selected cache into local browser storage.
+                        </p>
+                    {/if}
+                    {#if locationNotes}
+                        <p class="break-all text-xs text-muted-foreground">{locationNotes}</p>
+                    {/if}
+                </div>
+            {/if}
+
+            {#if sourceError}
+                <p class="max-h-32 overflow-y-auto break-words rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive select-text">
+                    {sourceError}
+                </p>
+            {/if}
         </div>
 
-        <div class="flex justify-end gap-2 border-t border-border px-6 py-4">
+        <div class="flex shrink-0 justify-end gap-2 border-t border-border px-6 py-3.5">
             <button
                 type="button"
                 class="rounded-md border border-input px-3 py-2 text-sm"
@@ -559,7 +651,7 @@
             {/if}
             <button
                 type="button"
-                disabled={!sourceReady}
+                disabled={!sourceReady || inspectingOpenRune || loadingOverview}
                 class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 onclick={save}
             >

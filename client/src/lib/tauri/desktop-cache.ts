@@ -1,18 +1,14 @@
+import { pickAndGrantFolder } from "./desktop-access";
 import { isTauriRuntime } from "./is-tauri";
 
+/** Opens the native folder picker and grants the chosen folder to the app (see desktop-access.ts). */
 export async function pickSystemDirectory(
   title = "Choose folder",
+  defaultPath?: string,
 ): Promise<string | null> {
   if (!isTauriRuntime()) return null;
   try {
-    const dialog = await import("@tauri-apps/plugin-dialog");
-    const selected = await dialog.open({
-      directory: true,
-      multiple: false,
-      recursive: true,
-      title,
-    });
-    return typeof selected === "string" ? selected : null;
+    return await pickAndGrantFolder({ title, defaultPath });
   } catch {
     return null;
   }

@@ -1,3 +1,4 @@
+import { clampBrushRadius } from "./brush-footprint";
 import { vec3 } from "gl-matrix";
 import type { AddPanelOptions } from "dockview-core";
 
@@ -53,6 +54,7 @@ import {
     getEditorBottomBarWorkbenchSnapshot,
 } from "./plugins/builtins/editor-bottom-bar-model";
 import { getMapEditorPanelDisplaySnapshot } from "./map-editor-panel-display";
+import { getQuickControlsWorkbenchSnapshot } from "./quick-controls-model";
 import {
     bootstrapPaintToolsStripModel,
     getPaintToolsStripWorkbenchSnapshot,
@@ -168,9 +170,12 @@ type PersistedKeybindOverrides = Record<string, EditorToolKeyChord | null>;
 const LEGACY_PAINT_TOOL_TABS: Partial<Record<MapEditorTool, TileBrushComponent>> = {
     underlay: "underlay",
     overlay: "overlay",
-    height: "height",
-    smooth: "height",
     "tile-flags": "flags",
+};
+
+/** Retired tool ids that resolve to another tool. */
+const TOOL_ALIASES: Partial<Record<MapEditorTool, MapEditorTool>> = {
+    smooth: "height",
 };
 
 export class MapEditor {
@@ -255,13 +260,41 @@ export class MapEditor {
     /** Plane-1 bridge flags lower their column one plane, as the RS client renders bridges. */
     bridgeLinkBelow: boolean = true;
 
-    selectedUnderlayId: number = 0;
+    private selectedUnderlayIdValue = 0;
+    /** The underlay the Tile painter paints (id, not id + 1). Changing it refreshes the panels that show it. */
+    get selectedUnderlayId(): number {
+        return this.selectedUnderlayIdValue;
+    }
+    set selectedUnderlayId(value: number) {
+        if (value === this.selectedUnderlayIdValue) return;
+        this.selectedUnderlayIdValue = value;
+        this.notifyWorkbenchStateChanged();
+    }
 
     /** Overlay floor id; **-1** = clear overlay (stored as **0** in scene). */
-    selectedOverlayId: number = -1;
+    private selectedOverlayIdValue = -1;
+    /** The overlay the Tile painter paints (id, or -1 for none). Changing it refreshes the panels that show it. */
+    get selectedOverlayId(): number {
+        return this.selectedOverlayIdValue;
+    }
+    set selectedOverlayId(value: number) {
+        if (value === this.selectedOverlayIdValue) return;
+        this.selectedOverlayIdValue = value;
+        this.notifyWorkbenchStateChanged();
+    }
 
     /** Tile radius from center (0 = single tile). Max 16. */
-    brushSize: number = 2;
+    private brushSizeValue = 2;
+    /** Brush radius in tiles (0-16). Setting it re-renders the panels that show it and is clamped like the footprint. */
+    get brushSize(): number {
+        return this.brushSizeValue;
+    }
+    set brushSize(value: number) {
+        const next = clampBrushRadius(value);
+        if (next === this.brushSizeValue) return;
+        this.brushSizeValue = next;
+        this.notifyWorkbenchStateChanged();
+    }
 
     brushType: MapEditorBrushType = "square";
 
@@ -381,8 +414,10 @@ export class MapEditor {
         this.inputManager.setInputBlockedForUi(this.isEditorInputSuspended());
     }
 
-    setEditorTool(requested: MapEditorTool): void {
-        // The single-purpose paint tools now live in the Tile painter: selecting one opens that drawer tab.
+    setEditorTool(requestedTool: MapEditorTool): void {
+        const requested = TOOL_ALIASES[requestedTool] ?? requestedTool;
+        // The floor tools (underlay, overlay, flags) live in the Tile painter: selecting one opens that drawer tab.
+        // Height is its own tool.
         const legacyTab = LEGACY_PAINT_TOOL_TABS[requested];
         let tool = requested;
         if (legacyTab) {
@@ -658,7 +693,7 @@ export class MapEditor {
     }
 
     adjustBrushSize(delta: number): void {
-        this.brushSize = clamp(this.brushSize + delta, 0, 16);
+        this.brushSize = this.brushSize + delta;
     }
 
     toggleOverlayFloodMode(): void {
@@ -922,11 +957,12 @@ export class MapEditor {
         const bottomBarWorkbench = getEditorBottomBarWorkbenchSnapshot(this.pluginHost);
         const panelDisplayWorkbench = getMapEditorPanelDisplaySnapshot(this.pluginHost);
         const tileFlagsWorkbench = getTileFlagsToolWorkbenchSnapshot(this.pluginHost);
-        const tileBrushWorkbench = getTileBrushWorkbenchSnapshot(this.pluginHost);
+        const tileBrushWorkbench = `${getTileBrushWorkbenchSnapshot(this.pluginHost)}#${this.brushSize}:${this.brushType}#${this.selectedUnderlayId}:${this.selectedOverlayId}`;
         const underlayWorkbench = getUnderlayGradientWorkbenchSnapshot(this.pluginHost);
         const overlayWorkbench = getOverlayGradientWorkbenchSnapshot(this.pluginHost);
         const objectVisibility = this.objectsVisible ? "1" : "0";
-        const planeView = `${this.showRoofs ? 1 : 0}${this.bridgeLinkBelow ? 1 : 0}`;
+        const planeView = `${this.showRoofs ? 1 : 0}${this.bridgeLinkBelow ? 1 : 0}${this.hideBelowViewPlane ? 1 : 0}${this.viewPlaneMax}`;
+        const quickControls = getQuickControlsWorkbenchSnapshot(this.pluginHost);
         const terrainSmoothing = this.terrainSmoothingEnabled ? "1" : "0";
         const sandbox = JSON.stringify({
             active: this.sandboxModeActive,
@@ -949,7 +985,7 @@ export class MapEditor {
             copyOptions: this.regionStampCopyOptions,
             clipboard: this.regionStampClipboard ? `${this.regionStampClipboard.width}x${this.regionStampClipboard.height}` : null,
         });
-        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${tileBrushWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${sandbox}|${objectSelector}|${regionStamp}`;
+        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${tileBrushWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${quickControls}|${sandbox}|${objectSelector}|${regionStamp}`;
     };
 
     saveDockPanelRestore(panelId: string, options: AddPanelOptions): void {

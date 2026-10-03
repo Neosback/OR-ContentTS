@@ -1,15 +1,4 @@
-import { join } from "@tauri-apps/api/path";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import {
-    exists as tauriExists,
-    readDir as tauriReadDir,
-    readFile as tauriReadFile,
-    readTextFile as tauriReadTextFile,
-    stat as tauriStat,
-    writeFile as tauriWriteFile,
-    writeTextFile as tauriWriteTextFile,
-} from "@tauri-apps/plugin-fs";
-
+import { desktopFileOps, isAccessDenied, pickAndGrantFolder } from "../lib/tauri/desktop-access";
 import {
     normalizeProjectPath,
     projectParentPath,
@@ -46,16 +35,21 @@ export interface TauriProjectFileSystemOps {
     writeTextFile(path: string, data: string): Promise<void>;
 }
 
-const defaultOps: TauriProjectFileSystemOps = {
-    join,
-    exists: tauriExists,
-    readDir: tauriReadDir,
-    stat: tauriStat,
-    readFile: tauriReadFile,
-    readTextFile: tauriReadTextFile,
-    writeFile: tauriWriteFile,
-    writeTextFile: tauriWriteTextFile,
-};
+
+/** Tauri rejects with plain strings (scope/permission errors name the capability), not Error objects. */
+export function describeIoCause(error: unknown): string {
+    let text: string;
+    if (typeof error === "string") text = error;
+    else if (error instanceof Error) text = error.message;
+    else {
+        try {
+            text = JSON.stringify(error);
+        } catch {
+            text = String(error);
+        }
+    }
+    return text.length > 300 ? `${text.slice(0, 300)}…` : text;
+}
 
 export type SelectTauriProjectDirectoryOptions = {
     title?: string;
@@ -64,14 +58,7 @@ export type SelectTauriProjectDirectoryOptions = {
 export async function selectTauriProjectDirectory(
     options: SelectTauriProjectDirectoryOptions = {},
 ): Promise<TauriProjectFileSystem | undefined> {
-    const selected = await openDialog({
-        directory: true,
-        multiple: false,
-        recursive: true,
-        title: options.title ?? "Open OpenRune project",
-    });
-    if (!selected) return undefined;
-    const rootPath = Array.isArray(selected) ? selected[0] : selected;
+    const rootPath = await pickAndGrantFolder({ title: options.title ?? "Open OpenRune project" });
     if (!rootPath) return undefined;
     return new TauriProjectFileSystem(rootPath);
 }
@@ -80,9 +67,9 @@ export async function selectTauriProjectDirectory(
  * ProjectFileSystem backed by a directory selected through Tauri's native
  * directory picker.
  *
- * The picker adds the selected directory to tauri-plugin-fs's runtime scope.
- * `recursive: true` requests descendant access. Tauri's `stat` follows
- * symlinks but rejects targets outside the allowed scope, providing the backing
+ * The picker grants the selected directory (and everything under it, hidden folders
+ * included) in the app's access layer (src-tauri/src/access.rs). Every file command
+ * resolves symlinks and rejects paths outside a granted folder, providing the backing
  * filesystem confinement required by ProjectFileSystem.
  */
 export class TauriProjectFileSystem implements ProjectFileSystem {
@@ -94,7 +81,7 @@ export class TauriProjectFileSystem implements ProjectFileSystem {
 
     constructor(
         readonly rootPath: string,
-        private readonly ops: TauriProjectFileSystemOps = defaultOps,
+        private readonly ops: TauriProjectFileSystemOps = desktopFileOps,
     ) {
         if (!rootPath) {
             throw new ProjectFileSystemError(
@@ -284,9 +271,12 @@ export class TauriProjectFileSystem implements ProjectFileSystem {
             return await operation();
         } catch (error) {
             if (error instanceof ProjectFileSystemError) throw error;
+            if (isAccessDenied(error)) {
+                throw new ProjectFileSystemError("ACCESS_DENIED", describeIoCause(error), path, { cause: error });
+            }
             throw new ProjectFileSystemError(
                 "IO_FAILED",
-                `Project filesystem operation failed for "${path}".`,
+                `Project filesystem operation failed for "${path}": ${describeIoCause(error)}`,
                 path,
                 { cause: error },
             );

@@ -2,6 +2,9 @@
     import Check from "@lucide/svelte/icons/check";
     import SettingsIcon from "@lucide/svelte/icons/settings";
 
+    import { isTauriRuntime } from "../../lib/tauri/is-tauri";
+    import FolderAccessSection from "./FolderAccessSection.svelte";
+
     import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
     import { THEME_PRESETS, settings } from "../lib/settings.svelte";
     import { cn } from "../lib/utils";
@@ -9,10 +12,11 @@
     let { open = $bindable(false) }: { open?: boolean } = $props();
 
     const dark = $derived(settings.value.themeMode === "dark");
+    const desktop = isTauriRuntime();
 </script>
 
 <Dialog bind:open>
-    <DialogContent class="max-w-lg bg-card p-6">
+    <DialogContent class="max-h-[88vh] max-w-lg overflow-y-auto bg-card p-6">
         <DialogHeader>
             <DialogTitle class="flex items-center gap-2">
                 <SettingsIcon class="size-5" />
@@ -55,6 +59,9 @@
                     </button>
                 </div>
             </section>
+            {#if desktop}
+                <FolderAccessSection />
+            {/if}
             <section>
                 <h3 class="mb-2 text-sm font-semibold">Color themes</h3>
                 <div class="space-y-2">

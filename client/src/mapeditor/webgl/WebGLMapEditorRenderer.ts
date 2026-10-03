@@ -22,6 +22,7 @@ import { applyDrawMode } from "./draw-backend";
 import { createTextureArray } from "../../picogl/PicoTexture";
 import { getMapSquareId } from "../../rs/map/MapFileIndex";
 import { Scene, loadHeightMapTextureData } from "../../rs/scene/Scene";
+import { SceneBuilder } from "../../rs/scene/SceneBuilder";
 import { getOverlayHighlightUvTriangles } from "../../rs/scene/SceneTileModel";
 import {
     OVERLAY_MESH_BOUNDARY_SEG_MAX,
@@ -29,9 +30,10 @@ import {
     overlayMeshBoundarySegments,
 } from "./overlayMeshBoundary";
 import { clamp } from "../../util/MathUtil";
-import {
-    isInBuiltinBrushShape,
-} from "../plugins/builtins/current-plugin-layout.builtin";
+import { brushFootprint } from "../brush-footprint";
+import { planGhostTile } from "../brush-ghost";
+import { INVALID_HSL_COLOR, adjustOverlayLight, adjustUnderlayLight, packHsl } from "../../rs/util/ColorUtil";
+import { paintTileShape } from "../tile-shape-paint";
 import type { MapEditorBrushType } from "../map-editor-kinds";
 import { getActivePaintModifiers } from "../editor-tool-input";
 import type { IEditorPluginHost } from "../plugins/editor-plugin-host";
@@ -101,7 +103,7 @@ import type { LocType } from "../../rs/config/loctype/LocType";
 import { LocEntity } from "../../rs/scene/entity/LocEntity";
 import { Model } from "../../rs/model/Model";
 import { ModelData } from "../../rs/model/ModelData";
-import { applyHeightToolRuntime } from "../plugins/builtins/height-edit-runtime";
+import { applyHeightSetRuntime, applyHeightToolRuntime } from "../plugins/builtins/height-edit-runtime";
 import { applyTileRenderFlagsRuntime } from "../plugins/builtins/tile-flags-edit-runtime";
 import { getTileBrushFocus, getTileBrushModel } from "../plugins/builtins/tile-brush-model";
 import { getTileFlagsToolModel } from "../plugins/builtins/tile-flags-tool-model";
@@ -135,6 +137,15 @@ const MAX_CLIENT_TICKS_PER_FRAME = 5;
 
 type PendingMapBuild = { mapId: number; generation: number; builder: EditorMapSquareBuilder };
 
+
+/** Opacity of the brush ghost (the translucent preview of a stroke under the cursor). */
+const BRUSH_GHOST_ALPHA = 1;
+/** The plain highlight sits just under the terrain surface (it is drawn without depth testing). */
+const HIGHLIGHT_Y_BIAS = -0.01;
+/** The brush ghost sits a little above the surface (negative is up here): thin floor objects do not hide it, walls and trees do. */
+const GHOST_Y_BIAS = -0.04;
+/** At most this many tiles get a ghost per frame, keeping huge brushes cheap. */
+const GHOST_MAX_TILES = 400;
 
 export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     private readonly pendingMapBuilds: PendingMapBuild[] = [];
@@ -268,7 +279,6 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     affectedTilesMap: Map<number, Set<number>> = new Map();
     /** Local tiles where terrain height was actually changed (not terrain mesh neighbors). */
     heightChangedTilesMap: Map<number, Set<number>> = new Map();
-    private brushOffsetsCache = new Map<string, ReadonlyArray<readonly [number, number]>>();
     private lastTerrainSmoothingEnabled = this.host.terrainSmoothingEnabled;
     private readonly highlightFullTileRange = newDrawRange(0, 6);
     private readonly highlightTriangleRange = newDrawRange(0, 3);
@@ -331,6 +341,12 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.highlightTileDrawCall.uniform("u_edgeMask", [1, 1, 1, 1]);
         this.highlightTileDrawCall.uniform("u_footprintPass", 0);
         this.highlightTileDrawCall.uniform("u_boundarySegCount", 0);
+        this.highlightTileDrawCall.uniform("u_ghostHeightOn", 0);
+        this.highlightTileDrawCall.uniform("u_ghostHeight", 0);
+        this.highlightTileDrawCall.uniform("u_yBias", HIGHLIGHT_Y_BIAS);
+        this.highlightTileDrawCall.uniform("u_ghostMode", 0);
+        this.highlightTileDrawCall.uniform("u_ghostTexLayer", -1);
+        this.highlightTileDrawCall.uniform("u_ghostHsl", [0, 0, 0, 0]);
         // 6 vertices/2 triangles per tile
         this.highlightTileDrawCall.drawRanges(this.highlightFullTileRange);
 
@@ -375,6 +391,9 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
         this.tilePickingDrawCall = this.app.createDrawCall(this.tilePickingProgram);
         this.highlightTileDrawCall = this.app.createDrawCall(this.highlightTileProgram);
+        if (this.textureArray) {
+            this.highlightTileDrawCall.texture("u_textures", this.textureArray);
+        }
 
         return programs;
     }
@@ -565,6 +584,9 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 maxAnisotropy: PicoGL.WEBGL_INFO.MAX_TEXTURE_ANISOTROPY,
             },
         );
+
+        // The brush ghost samples the same texture array as the terrain.
+        this.highlightTileDrawCall?.texture("u_textures", this.textureArray);
 
         console.timeEnd("load textures");
     }
@@ -1318,6 +1340,11 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             }
         }
 
+        // Every highlight pass shares one program, whose ghost sampler must always point at the terrain texture array.
+        if (this.textureArray) {
+            this.highlightTileDrawCall.texture("u_textures", this.textureArray);
+        }
+
         this.renderObjectPicking();
         this.renderObjectSelectorWireframes();
         this.renderSelectToolTileHighlights();
@@ -1380,6 +1407,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                     }
                 });
 
+                this.ghostActive = this.renderBrushGhost(level, hoveredTilesMap);
                 this.highlightTileDrawCall.uniform("u_level", level);
 
                 for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
@@ -1401,9 +1429,204 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                         this.drawSingleTileHighlight(map, level, tileX, tileY, brushPaintedWorldKeys);
                     }
                 }
+                this.ghostActive = false;
             }
             this.app.enable(PicoGL.CULL_FACE);
         }
+    }
+
+    /** Terrain texture array layer for a texture id (0 is the white layer, so ids start at 1); undefined while not uploaded. */
+    private getTextureLayer(textureId: number): number | undefined {
+        if (textureId < 0 || !this.loadedTextureIds.has(textureId)) {
+            return undefined;
+        }
+        const index = this.textureIds.indexOf(textureId);
+        return index < 0 ? undefined : index + 1;
+    }
+
+    /**
+     * The brush ghost: the tiles under the Tile painter cursor drawn the way they would look after a stroke. It uses the
+     * terrain's own recipe (the tile's vertex lighting applied to the underlay/overlay HSL, the overlay's texture from the
+     * terrain texture array, the real shape and rotation) and is depth-tested against the scene, so walls and objects
+     * cover it like they cover the ground. Per frame it is at most `GHOST_MAX_TILES` tiles of a few small triangles each.
+     */
+    private renderBrushGhost(level: number, hoveredTilesMap: Map<number, number[]>): boolean {
+        if (this.host.editorTool !== "tile-brush" || !this.textureArray) {
+            return false;
+        }
+        const brush = getTileBrushModel(this.host);
+        if (!brush.ghost) {
+            return false;
+        }
+        const underlayOn = brush.isEnabled("underlay");
+        const overlayOn = brush.isEnabled("overlay");
+        const shapeOn = brush.isEnabled("shape");
+        const rotationOn = brush.isEnabled("rotation");
+        const heightOn = brush.isEnabled("height");
+        if (!underlayOn && !overlayOn && !shapeOn && !rotationOn && !heightOn) {
+            return false;
+        }
+
+        const call = this.highlightTileDrawCall;
+        const gl = this.gl;
+        // Depth-tested, no depth writes, nudged towards the camera so it never z-fights with the ground it covers.
+        this.app.enable(PicoGL.DEPTH_TEST);
+        this.app.enable(PicoGL.BLEND);
+        this.app.blendFunc(PicoGL.SRC_ALPHA, PicoGL.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+        gl.enable(gl.POLYGON_OFFSET_FILL);
+        gl.polygonOffset(-2, -2);
+        call.texture("u_textures", this.textureArray);
+        call.uniform("u_level", level);
+        call.uniform("u_edgeMask", [0, 0, 0, 0]);
+        call.uniform("u_footprintPass", 0);
+        call.uniform("u_boundarySegCount", 0);
+        call.uniform("u_yBias", GHOST_Y_BIAS);
+
+        const underlayHsl = (stored: number): number => {
+            try {
+                const type = this.host.underlayTypeLoader.load(stored - 1);
+                return packHsl(((type.getHueBlend() * 256) / type.getHueMultiplier()) | 0, type.saturation, type.lightness);
+            } catch {
+                return -1;
+            }
+        };
+        /** Overlay HSL as the scene builder derives it (-1 = lit grey under a texture, -2 = invisible), plus its texture layer. */
+        const overlayInfo = (stored: number): { hsl: number; layer: number } | undefined => {
+            try {
+                const type = this.host.overlayTypeLoader.load(stored - 1);
+                const textured = type.textureId !== -1;
+                const sdTexture = textured && this.host.textureLoader.isSd(type.textureId);
+                const hsl = sdTexture ? -1 : type.primaryRgb === 0xff00ff ? -2 : packHsl(type.hue, type.saturation, type.lightness);
+                if (hsl === -2) {
+                    return undefined;
+                }
+                return { hsl, layer: this.getTextureLayer(type.textureId) ?? -1 };
+            } catch {
+                return undefined;
+            }
+        };
+        const drawLayer = (
+            triangles: ReadonlyArray<readonly number[]>,
+            corners: [number, number, number, number],
+            layer: number,
+        ): void => {
+            call.uniform("u_ghostHsl", corners);
+            call.uniform("u_ghostTexLayer", layer);
+            for (const t of triangles) {
+                call.uniform("u_cornerA", [t[0], t[1]]);
+                call.uniform("u_cornerB", [t[2], t[3]]);
+                call.uniform("u_cornerC", [t[4], t[5]]);
+                call.draw();
+            }
+        };
+
+        call.uniform("u_fillColor", [1, 1, 1, BRUSH_GHOST_ALPHA]);
+        call.uniform("u_outlineColor", [1, 1, 1, BRUSH_GHOST_ALPHA]);
+        call.uniform("u_ghostMode", 1);
+
+        let budget = GHOST_MAX_TILES;
+        for (let i = 0; i < this.mapManager.visibleMapCount && budget > 0; i++) {
+            const map = this.mapManager.visibleMaps[i] as EditorMapSquare;
+            const tiles = hoveredTilesMap.get(getMapSquareId(map.mapX, map.mapY));
+            if (!tiles) {
+                continue;
+            }
+            const scene = map.scene;
+            const lights = scene.tileLights[level];
+            const blended = scene.tileBlendedColors[level];
+            call.uniform("u_mapX", map.mapX);
+            call.uniform("u_mapY", map.mapY);
+            call.texture("u_heightMap", map.heightMapTexture);
+            for (const tileId of tiles) {
+                if (budget <= 0) {
+                    break;
+                }
+                const lx = tileId >> 8;
+                const ly = tileId & 0xff;
+                const sx = lx + map.borderSize;
+                const sy = ly + map.borderSize;
+                if (sx < 0 || sy < 0 || sx >= scene.sizeX - 1 || sy >= scene.sizeY - 1 || !this.tileWillReceiveFloorPaint(map, lx, ly, null)) {
+                    continue;
+                }
+                const worldX = map.mapX * 64 + lx;
+                const worldY = map.mapY * 64 + ly;
+                const current = {
+                    u: scene.tileUnderlays[level][sx][sy],
+                    o: scene.tileOverlays[level][sx][sy],
+                    s: scene.tileShapes[level][sx][sy],
+                    r: scene.tileRotations[level][sx][sy],
+                };
+                const plan = planGhostTile({
+                    current,
+                    paint: {
+                        underlayId: underlayOn ? this.host.getUnderlayPaintTypeId(worldX, worldY) : undefined,
+                        overlayId: overlayOn ? this.host.getOverlayPaintTypeId(worldX, worldY) : undefined,
+                        shape: shapeOn ? brush.shape : undefined,
+                        rotation: rotationOn ? brush.rotation : undefined,
+                        height: heightOn ? brush.heightValue : undefined,
+                    },
+                });
+                if (!plan) {
+                    continue;
+                }
+                budget--;
+
+                // Vertex light at the tile's four corners (SW, SE, NE, NW), as the terrain was last built.
+                const light = (x: number, y: number): number => lights?.[x]?.[y] ?? 96;
+                const corner = [light(sx, sy), light(sx + 1, sy), light(sx + 1, sy + 1), light(sx, sy + 1)];
+
+                call.uniform("u_tileX", lx);
+                call.uniform("u_tileY", ly);
+                call.uniform("u_ghostHeightOn", plan.height === undefined ? 0 : 1);
+                call.uniform("u_ghostHeight", plan.height ?? 0);
+                call.uniform("u_highlightShapeMode", 1);
+                call.drawRanges(this.highlightTriangleRange);
+
+                if (plan.underlay) {
+                    // An unchanged underlay keeps the scene's own blended colour; a new one is its flat colour.
+                    const base = plan.underlay.value === current.u && blended?.[sx]?.[sy] !== undefined && blended[sx][sy] !== -1 ? blended[sx][sy] : underlayHsl(plan.underlay.value);
+                    if (base !== -1) {
+                        const lit = corner.map((l) => adjustUnderlayLight(base, l));
+                        if (!lit.includes(INVALID_HSL_COLOR)) {
+                            drawLayer(plan.underlay.triangles, lit as [number, number, number, number], -1);
+                        }
+                    }
+                }
+                if (plan.overlay) {
+                    const info = overlayInfo(plan.overlay.value);
+                    if (info) {
+                        const lit = corner.map((l) => adjustOverlayLight(info.hsl, l));
+                        if (!lit.includes(INVALID_HSL_COLOR)) {
+                            drawLayer(plan.overlay.triangles, lit as [number, number, number, number], info.layer);
+                        }
+                    }
+                }
+                if (!plan.underlay && !plan.overlay && plan.height !== undefined) {
+                    // Height only: a flat tint at the height that would be stamped.
+                    call.uniform("u_ghostMode", 0);
+                    call.uniform("u_fillColor", [0.4, 0.7, 1, 0.55]);
+                    call.uniform("u_outlineColor", [0.4, 0.7, 1, 0.55]);
+                    call.uniform("u_highlightShapeMode", 0);
+                    call.drawRanges(this.highlightFullTileRange);
+                    call.draw();
+                    call.uniform("u_ghostMode", 1);
+                    call.uniform("u_fillColor", [1, 1, 1, BRUSH_GHOST_ALPHA]);
+                }
+            }
+        }
+
+        // Back to the state the other highlight passes expect.
+        call.uniform("u_ghostMode", 0);
+        call.uniform("u_ghostHeightOn", 0);
+        call.uniform("u_ghostTexLayer", -1);
+        call.uniform("u_yBias", HIGHLIGHT_Y_BIAS);
+        call.uniform("u_highlightShapeMode", 0);
+        call.drawRanges(this.highlightFullTileRange);
+        gl.disable(gl.POLYGON_OFFSET_FILL);
+        gl.depthMask(true);
+        this.app.disable(PicoGL.DEPTH_TEST);
+        return true;
     }
 
     /** Full connected overlay preview: every world tile in `floodSet` on visible map squares. */
@@ -1808,6 +2031,33 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.lastMouseLeftDown = false;
         this.lastDeleteHoverKey = undefined;
         this.lastObjectDeleteModeActive = false;
+        this.updateEyedropper();
+    }
+
+    private eyedropperArmed = false;
+
+    /**
+     * Tile painter eyedropper: Alt+left-click (a click, not a drag) loads the tile under the cursor into the brush.
+     * The `I` key does the same through the `tile-brush.eyedropper` command.
+     */
+    private updateEyedropper(): void {
+        const input = this.host.inputManager;
+        const leftDown = input.isKeyDown("MouseLeft");
+        if (this.host.getEditorTool() !== "tile-brush") {
+            this.eyedropperArmed = false;
+            return;
+        }
+        if (leftDown && !this.eyedropperArmed && input.isAltDown()) {
+            this.eyedropperArmed = true;
+        } else if (!leftDown && this.eyedropperArmed) {
+            this.eyedropperArmed = false;
+            if (this.hoverWorldX !== -1 && this.hoverWorldY !== -1) {
+                const tile = this.host.getTileInfo(this.host.selectedLevel, this.hoverWorldX, this.hoverWorldY);
+                if (tile) {
+                    getTileBrushModel(this.host).sendTile(tile);
+                }
+            }
+        }
     }
 
     private pickHoveredObject(): import("./sceneLocPicker").EditorObjectRef | undefined {
@@ -2400,12 +2650,15 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         return { lines, cacheKey };
     }
 
+    /** True while the brush ghost is drawn: the cursor tint is dropped (outline only) so the ghost shows true colours. */
+    private ghostActive = false;
+
     private applyBrushHighlightUniforms(): void {
         this.highlightTileDrawCall.uniform("u_fillColor", [
             this.brushFill[0],
             this.brushFill[1],
             this.brushFill[2],
-            this.brushFill[3],
+            this.ghostActive ? 0 : this.brushFill[3],
         ]);
         this.highlightTileDrawCall.uniform("u_outlineColor", [
             this.brushOutlineColor[0],
@@ -2886,24 +3139,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     }
 
     private getBrushOffsets(): ReadonlyArray<readonly [number, number]> {
-        const r = this.host.brushSize;
-        const shape = this.host.brushType;
-        const key = `${shape}:${r}`;
-        const cached = this.brushOffsetsCache.get(key);
-        if (cached) {
-            return cached;
-        }
-        const offsets: Array<readonly [number, number]> = [];
-        for (let dx = -r; dx <= r; dx++) {
-            for (let dy = -r; dy <= r; dy++) {
-                if (!isInBuiltinBrushShape(dx, dy, r, shape)) {
-                    continue;
-                }
-                offsets.push([dx, dy]);
-            }
-        }
-        this.brushOffsetsCache.set(key, offsets);
-        return offsets;
+        return brushFootprint(this.host.brushType, this.host.brushSize);
     }
 
     /**
@@ -3044,9 +3280,12 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         const inputManager = this.host.inputManager;
         this.syncTileFlagsPaintStroke();
 
+        // Height is its own tool (raise, lower, slope...); every other paint tool is the Tile painter.
+        const heightTool = this.host.editorTool === "height";
         const brush = getTileBrushModel(this.host);
         // Painting flags alone is a plain click-drag (it never orbits the camera); mixed strokes hold like the floor tools.
-        const flagsOnly = brush.isEnabled("flags") && !brush.isEnabled("underlay") && !brush.isEnabled("overlay") && !brush.isEnabled("height");
+        const flagsOnly =
+            !heightTool && brush.isEnabled("flags") && !brush.isEnabled("underlay") && !brush.isEnabled("overlay") && !brush.isEnabled("shape") && !brush.isEnabled("rotation") && !brush.isEnabled("height");
         const isPainting = this.isTileFlagsToolActive() && flagsOnly
             ? inputManager.isKeyDown("MouseLeft")
             : // Alt+right-click opens the viewport context menu instead of painting.
@@ -3147,19 +3386,31 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             }
         });
 
-        // The Tile painter applies every part that is switched on, floors first and height last so the floor
-        // edits see the tiles as they were when the stroke began.
-        if (brush.isEnabled("underlay")) {
-            this.applyUnderlayChange(hoveredTilesMap);
-        }
-        if (brush.isEnabled("overlay")) {
-            this.applyOverlayChange(hoveredTilesMap);
-        }
-        if (brush.isEnabled("flags")) {
-            applyTileRenderFlagsRuntime(this, hoveredTilesMap, this.tileFlagsPaintedKeys, inputManager.isControlDown());
-        }
-        if (brush.isEnabled("height")) {
+        if (heightTool) {
             applyHeightToolRuntime(this, hoveredTilesMap);
+        } else {
+            // The Tile painter applies every part that is switched on, floors first and height last so the floor
+            // edits see the tiles as they were when the stroke began.
+            if (brush.isEnabled("underlay")) {
+                this.applyUnderlayChange(hoveredTilesMap);
+            }
+            if (brush.isEnabled("overlay")) {
+                this.applyOverlayChange(hoveredTilesMap);
+            }
+            // Shape and rotation go after the overlay so tiles that just received an overlay get their shape in the same stroke.
+            const shapePaint = {
+                shape: brush.isEnabled("shape") ? brush.shape : undefined,
+                rotation: brush.isEnabled("rotation") ? brush.rotation : undefined,
+            };
+            if (shapePaint.shape !== undefined || shapePaint.rotation !== undefined) {
+                this.applyShapeChange(hoveredTilesMap, shapePaint);
+            }
+            if (brush.isEnabled("flags")) {
+                applyTileRenderFlagsRuntime(this, hoveredTilesMap, this.tileFlagsPaintedKeys, inputManager.isControlDown());
+            }
+            if (brush.isEnabled("height")) {
+                applyHeightSetRuntime(this, hoveredTilesMap, brush.heightValue);
+            }
         }
 
         this.updateAffectedTiles();
@@ -3235,6 +3486,60 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                     continue;
                 }
 
+                // An underlay colour is blended over BLEND_RADIUS tiles, so every tile within that distance (plus the
+                // shared vertices) must be rebuilt, or a stale ring is left around the edit.
+                const margin = SceneBuilder.BLEND_RADIUS + 1;
+                for (let x = worldX - margin; x <= worldX + margin; x++) {
+                    for (let y = worldY - margin; y <= worldY + margin; y++) {
+                        this.addAffectedTile(x, y);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Paints the overlay shape and/or rotation onto tiles that have an overlay (see `paintTileShape`). */
+    applyShapeChange(hoveredTilesMap: Map<number, Set<number>>, paint: { shape?: number; rotation?: number }): void {
+        const level = this.host.selectedLevel;
+        for (const [mapId, tileIds] of hoveredTilesMap) {
+            const map = this.mapManager.getMapById(mapId);
+            if (!map) {
+                continue;
+            }
+            const scene = map.scene;
+            for (const tileId of tileIds) {
+                const sceneX = tileId >> 8;
+                const sceneY = tileId & 0xff;
+                if (sceneX >= scene.sizeX || sceneY >= scene.sizeY) {
+                    continue;
+                }
+                let changed = false;
+                recordEditTileMutation(this.host, map, level, sceneX, sceneY, () => {
+                    changed = paintTileShape(
+                        {
+                            overlays: scene.tileOverlays[level][sceneX][sceneY],
+                            shape: scene.tileShapes[level][sceneX][sceneY],
+                            rotation: scene.tileRotations[level][sceneX][sceneY],
+                            set: (shape, rotation) => {
+                                scene.tileShapes[level][sceneX][sceneY] = shape;
+                                scene.tileRotations[level][sceneX][sceneY] = rotation;
+                            },
+                        },
+                        paint,
+                    );
+                });
+                if (!changed) {
+                    continue;
+                }
+                map.overlayUpdated = true;
+
+                const tileX = sceneX - map.borderSize;
+                const tileY = sceneY - map.borderSize;
+                if (tileX < 0 || tileX >= 64 || tileY < 0 || tileY >= 64) {
+                    continue;
+                }
+                const worldX = map.mapX * 64 + tileX;
+                const worldY = map.mapY * 64 + tileY;
                 for (let x = worldX - 4; x <= worldX + 4; x++) {
                     for (let y = worldY - 4; y <= worldY + 4; y++) {
                         this.addAffectedTile(x, y);

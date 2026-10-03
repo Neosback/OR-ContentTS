@@ -9,6 +9,7 @@
     import { contextMenu } from "../components/context-menu/context-menu.svelte";
     import { EditorState, provideEditorState } from "./editor-state.svelte";
     import { createEditorPanels } from "./panels";
+    import ObjectPropertiesWindow from "./panels/ObjectPropertiesWindow.svelte";
     import RegionStampCopyDialog from "./palettes/RegionStampCopyDialog.svelte";
     import TitleBar from "./TitleBar.svelte";
     import { Workbench } from "./workbench-controller.svelte";
@@ -76,3 +77,4 @@
 
 <!-- Mounted at workbench level so pressing C works even when the Region stamp panel is closed. -->
 <RegionStampCopyDialog />
+<ObjectPropertiesWindow />

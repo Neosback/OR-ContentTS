@@ -6,7 +6,7 @@ import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 
 const EDITOR_PALETTE_COLUMN_INITIAL_WIDTH = 380;
 const EDITOR_HISTORY_MINIMAP_INITIAL_HEIGHT = 240;
-const EDITOR_TILE_PAINTER_INITIAL_HEIGHT = 230;
+const EDITOR_TILE_PAINTER_INITIAL_HEIGHT = 276;
 const EDITOR_SCENE_PANEL_ID = "editor-scene-editor";
 
 export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPanelId): AddPanelOptions | null {
@@ -15,9 +15,36 @@ export function getMapEditorFloatableDockPanelDefaults(panelId: MapEditorDockPan
             return {
                 id: "editor-object-selector",
                 component: "objectSelectorPalette",
-                title: "Inspector",
+                title: "Object",
                 position: { referencePanel: EDITOR_SCENE_PANEL_ID, direction: "right" },
                 initialWidth: EDITOR_PALETTE_COLUMN_INITIAL_WIDTH,
+            };
+        case "editor-inspector-tile":
+            // The Tile tab of the inspector: its own panel, a tab next to Object by default, free to dock or float.
+            return {
+                id: "editor-inspector-tile",
+                component: "inspectorTilePalette",
+                title: "Tile",
+                position: { referencePanel: "editor-object-selector", direction: "within" },
+                inactive: true,
+            };
+        case "editor-rendering":
+            // What the 3D view draws (planes, scene, tile flag colours); a tab beside the inspector, free to dock or float.
+            return {
+                id: "editor-rendering",
+                component: "renderingPalette",
+                title: "Rendering",
+                position: { referencePanel: "editor-object-selector", direction: "within" },
+                inactive: true,
+            };
+        case "editor-height":
+            // The Height tool's palette (raise, lower, slope, smooth...): a tab beside the inspector, free to dock or float.
+            return {
+                id: "editor-height",
+                component: "heightPalette",
+                title: "Height",
+                position: { referencePanel: "editor-object-selector", direction: "within" },
+                inactive: true,
             };
         case "editor-tile-painter":
             // A drawer under the viewport: floor, height and flag palettes as tabs of one brush.

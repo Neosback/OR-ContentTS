@@ -5,6 +5,17 @@ import { ComponentType } from "./ComponentType";
 import { InterfaceType } from "./InterfaceType";
 
 
+/**
+ * The packed id of a component's parent layer, or -1 for a root component.
+ *
+ * The cache stores the parent as a 16-bit file id, with "no parent" encoded as null (0xFFFF). Combining null with the
+ * group id would silently turn it into file 0 of the group (`group << 16`), which makes every root a child of
+ * component 0 and hides the whole tree from anything that looks for roots at layer -1.
+ */
+export function resolveComponentLayer(group: number, layer: number | null | undefined): number {
+    return layer === null || layer === undefined ? -1 : (group << 16) | layer;
+}
+
 export class ComponentDecoder {
     private index3;
     private supportsModels = true;
@@ -74,7 +85,7 @@ export class ComponentDecoder {
                 const combinedId = (group << 16) | file;
                 const childID = combinedId & 0xffff;
 
-                component.layer = (group << 16) | component.layer;
+                component.layer = resolveComponentLayer(group, component.layer as number | null);
                 component.internalId = combinedId;
                 component.id = childID;
 

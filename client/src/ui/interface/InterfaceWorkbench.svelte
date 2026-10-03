@@ -42,7 +42,7 @@
 
         dock = createStudioDock(host, {
             panels,
-            storageKey: "interface-editor-workbench-layout-v1",
+            storageKey: "interface-editor-workbench-layout-v2",
             isRestoredLayoutValid: (api) => api.getPanel("iface-preview") !== undefined,
             defaultRenderer: "always",
             defaultLayout: (workspace) => applyInterfaceEditorWorkbenchLayout(workspace.api),

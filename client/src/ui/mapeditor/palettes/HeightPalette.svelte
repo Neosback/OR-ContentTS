@@ -4,6 +4,7 @@
     import { getBuiltinEditorToolPlugin } from "../../../mapeditor/plugins/builtins/current-plugin-layout.builtin";
     import { HEIGHT_MODES } from "../../../mapeditor/plugins/builtins/height-brush-settings.shared";
     import { getHeightToolModel } from "../../../mapeditor/plugins/builtins/height-tool-model";
+    import { getTileBrushModel } from "../../../mapeditor/plugins/builtins/tile-brush-model";
     import { Badge } from "../../components/ui/badge";
     import { Button } from "../../components/ui/button";
     import { CardContent } from "../../components/ui/card";
@@ -77,7 +78,10 @@
                                 size="sm"
                                 variant={selected ? "secondary" : "outline"}
                                 class={cn("h-8 justify-start gap-1.5 px-2 text-[11px]", selected && "ring-1 ring-primary/35")}
-                                onclick={() => executeEditorCommand(heightModeCommandId(m.id), { host })}
+                                onclick={() => {
+                                    executeEditorCommand(heightModeCommandId(m.id), { host });
+                                    getTileBrushModel(host).setEnabled("height", true);
+                                }}
                             >
                                 <Icon class="size-3.5" />
                                 {m.name}

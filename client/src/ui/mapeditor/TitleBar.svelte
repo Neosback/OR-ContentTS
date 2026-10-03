@@ -29,6 +29,7 @@
     import type { ProjectSessionController } from "./project-session.svelte";
     import PluginHub from "./PluginHub.svelte";
     import SettingsDialog from "./settings/SettingsDialog.svelte";
+    import { listLayouts, saveLayout, uniqueLayoutName, type SavedLayout } from "./workspace-layouts";
 
     let {
         projectSession,
@@ -44,6 +45,9 @@
     const projectDirty = $derived(projectSession.snapshot.dirty);
 
     let settingsOpen = $state(false);
+    let settingsTab = $state<string | undefined>();
+    let savedLayouts = $state<SavedLayout[]>([]);
+    let layoutName = $state("");
 
     const importGroups = groupProviders("import");
     const exportGroups = groupProviders("export");
@@ -64,6 +68,22 @@
     }
     function restoreAll(): void {
         executeEditorCommand("workbench.restore-panels", commandContext());
+    }
+    function openSettings(tab?: string): void {
+        settingsTab = tab;
+        settingsOpen = true;
+    }
+    function saveLayoutAs(): void {
+        const workbench = editor.layout;
+        if (!workbench) return;
+        const name = uniqueLayoutName(listLayouts(), layoutName || "My layout");
+        saveLayout(workbench.captureLayout(name));
+        layoutName = "";
+        notifySuccess(`Saved layout "${name}".`);
+    }
+    function applyNamed(layout: SavedLayout): void {
+        if (editor.layout?.applyLayout(layout)) notifySuccess(`Switched to "${layout.name}".`);
+        else notifyError(`"${layout.name}" could not be loaded; the default layout was restored.`);
     }
     function resetLayout(): void {
         executeEditorCommand("workbench.reset-layout", commandContext());
@@ -222,6 +242,27 @@
                 </DropdownMenuSub>
                 <DropdownMenuItem onSelect={restoreAll}>Restore all missing panels</DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuSub onOpenChange={(open) => open && (savedLayouts = listLayouts())}>
+                    <DropdownMenuSubTrigger>
+                        <LayoutGrid class="size-4" />
+                        Layouts
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent class="w-60">
+                        <div class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Starting points</div>
+                        <DropdownMenuItem onSelect={() => editor.layout?.applyPreset("default")}>Default</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => editor.layout?.applyPreset("minimal")}>Minimal (3D + painter)</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <div class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Your layouts</div>
+                        {#each savedLayouts as layout (layout.id)}
+                            <DropdownMenuItem onSelect={() => applyNamed(layout)}>{layout.name}</DropdownMenuItem>
+                        {:else}
+                            <div class="px-2 py-1 text-xs text-muted-foreground">None saved yet</div>
+                        {/each}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => openSettings("workspace")}>Save, manage and share…</DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={resetLayout}>
                     <RotateCcw class="size-4" />
                     Reset workspace layout
@@ -237,7 +278,7 @@
             </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="sm" class="gap-1.5 px-2" onclick={() => (settingsOpen = true)}>
+        <Button variant="ghost" size="sm" class="gap-1.5 px-2" onclick={() => openSettings()}>
             <Settings class="size-4" />
             <span class="hidden sm:inline">Settings</span>
         </Button>
@@ -245,6 +286,6 @@
 
         <div class="flex-1"></div>
 
-        <SettingsDialog bind:open={settingsOpen} />
+        <SettingsDialog bind:open={settingsOpen} bind:tab={settingsTab} />
     </header>
 </TooltipProvider>

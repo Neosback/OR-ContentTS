@@ -1,17 +1,29 @@
-import type { AddPanelOptions, DockviewApi } from "dockview-core";
+import type { AddPanelOptions, DockviewApi, SerializedDockview } from "dockview-core";
 
 import { addMapEditorDockPanelRestoredOrDefault, extractDockPanelRestoreOptions } from "../../mapeditor/map-editor-dock-panel-restore";
 import { getMapEditorFloatableDockPanelDefaults } from "../../mapeditor/map-editor-floatable-dock-defaults";
 import { EDITOR_TOOL_DOCK_PANEL, MAP_EDITOR_FLOATABLE_DOCK_PANELS } from "../../mapeditor/map-editor-panel-config";
 import type { MapEditorDockPanelId } from "../../mapeditor/plugins/builtins/builtin-plugin-types";
 import { activateEditorToolWorkspaces } from "../../mapeditor/plugins/builtins/editor-tool-workspaces";
+import { getQuickControlsModel } from "../../mapeditor/quick-controls-model";
 import { getPaintToolsStripModel } from "../../mapeditor/plugins/builtins/paint-tools-strip-model";
 import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
 import { isTauriRuntime } from "../../lib/tauri/is-tauri";
 import type { ContextMenuItem } from "../components/context-menu/context-menu.svelte";
 import { createStudioDock, floatPanel, pinGroup, popoutPanel, type StudioDock } from "../lib/dock";
 import type { StudioPanel } from "../lib/panel";
-import { applyTilePainterDrawer, TILE_PAINTER_PANEL_ID } from "./tile-painter-drawer";
+import { newLayoutId, type SavedLayout } from "./workspace-layouts";
+import {
+    applyTilePainterDrawer,
+    getTilePainterState,
+    positionFromRects,
+    setTilePainterState,
+    setTilePainterPosition,
+    sizeTilePainterForPosition,
+    TILE_PAINTER_PANEL_ID,
+    tilePainterPosition,
+    type TilePainterPosition,
+} from "./tile-painter-drawer";
 
 export const SCENE_PANEL_ID = "editor-scene-editor";
 export const PAINT_TOOLS_PANEL_ID = "editor-paint-tools";
@@ -25,7 +37,7 @@ export const BRUSH_BAR_HEIGHT = 44;
 const VISIBLE_PALETTE_TABS = 3;
 
 /** Bump when panel ids or their meaning change; an old saved layout is then discarded. */
-const LAYOUT_STORAGE_KEY = "map-editor-workbench-layout-v5";
+const LAYOUT_STORAGE_KEY = "map-editor-workbench-layout-v6";
 
 export type PanelLocation = "grid" | "floating" | "popout";
 
@@ -102,7 +114,9 @@ export class Workbench {
     // ── layout ───────────────────────────────────────────────
     private buildDefaultLayout(): void {
         const host = this.host;
-        this.dock.open("sceneEditor", { panelId: SCENE_PANEL_ID, title: "Editor" });
+        this.dock.open("sceneEditor", { panelId: SCENE_PANEL_ID, title: "3D" });
+        // A fresh layout puts the Tile painter under the viewport.
+        setTilePainterPosition("bottom");
 
         for (const config of MAP_EDITOR_FLOATABLE_DOCK_PANELS) {
             if (!this.isPanelEnabled(config.panelId)) continue;
@@ -115,13 +129,41 @@ export class Workbench {
     }
 
     private afterLayout(): void {
+        this.recoverTilePainterPosition();
         this.pinDockedChrome();
         this.enabledSignature = this.computeEnabledSignature();
         this.refreshLocations();
     }
 
+    /** After a layout restore the Tile painter may sit on any side: read where it is from the screen. */
+    private recoverTilePainterPosition(): void {
+        const painter = this.api.getPanel(TILE_PAINTER_PANEL_ID);
+        const scene = this.api.getPanel(SCENE_PANEL_ID);
+        if (!painter || !scene || painter.api.location.type !== "grid") return;
+        const a = painter.group.element.getBoundingClientRect();
+        const b = scene.group.element.getBoundingClientRect();
+        if (a.width === 0 || a.height === 0 || b.width === 0 || b.height === 0) return;
+        setTilePainterPosition(positionFromRects(a, b));
+    }
+
+    /** Moves the Tile painter next to the 3D view: below, above, left or right of it. */
+    moveTilePainter(position: TilePainterPosition): void {
+        const panel = this.api.getPanel(TILE_PAINTER_PANEL_ID);
+        const scene = this.api.getPanel(SCENE_PANEL_ID);
+        if (!panel || !scene || panel.api.location.type === "popout") return;
+        setTilePainterPosition(position);
+        panel.api.moveTo({ group: scene.group, position });
+        // Moving can create a new group: size and constrain it for its new place.
+        const moved = this.api.getPanel(TILE_PAINTER_PANEL_ID);
+        if (moved) sizeTilePainterForPosition(moved.group);
+        this.pinDockedChrome();
+        this.refreshLocations();
+    }
+
     /** Sizes and hidden headers are not serialized by dockview, so they are re-applied after every restore/dock. */
     private pinDockedChrome(): void {
+        // Titles are stored with a saved layout: keep the viewport tab named for what it is (a 2D view is coming).
+        this.api.getPanel(SCENE_PANEL_ID)?.api.setTitle("3D");
         const strip = this.api.getPanel(PAINT_TOOLS_PANEL_ID);
         if (strip) {
             // Docked: a fixed-width column. Floating: the group's own drag bar is the handle, so the tab header goes.
@@ -140,6 +182,48 @@ export class Workbench {
             if (brush.api.location.type === "grid") pinGroup(brush.group, { height: BRUSH_BAR_HEIGHT, hideHeader: true });
             brush.api.setTitle(brush.api.location.type === "grid" ? "Brush" : "Brush workspace");
         }
+    }
+
+    // ── named layouts ────────────────────────────────────────
+    /** The current arrangement as a saveable layout (popouts are left out; they cannot be re-opened on load). */
+    captureLayout(name: string, id: string = newLayoutId()): SavedLayout {
+        const dock = this.api.toJSON();
+        return {
+            id,
+            name,
+            savedAt: Date.now(),
+            dock: { ...dock, popoutGroups: [] },
+            painter: getTilePainterState(),
+            quickControls: [...getQuickControlsModel(this.host).pinned],
+        };
+    }
+
+    /** Switches to a saved layout; falls back to the default layout (and returns false) when it cannot be loaded. */
+    applyLayout(layout: SavedLayout): boolean {
+        try {
+            this.api.clear();
+            this.api.fromJSON(layout.dock as SerializedDockview);
+            if (!this.api.getPanel(SCENE_PANEL_ID)) throw new Error("layout has no 3D panel");
+        } catch (error) {
+            console.warn("[studio] saved layout could not be applied", error);
+            this.dock.resetLayout();
+            return false;
+        }
+        setTilePainterState(layout.painter);
+        if (layout.quickControls) getQuickControlsModel(this.host).setPinned(layout.quickControls);
+        this.afterLayout();
+        this.host.notifyWorkbenchStateChanged();
+        return true;
+    }
+
+    /** Built-in starting points: the default layout, or a bare viewport with just the tools, painter and brush bar. */
+    applyPreset(preset: "default" | "minimal"): void {
+        this.resetLayout();
+        if (preset === "minimal") {
+            const palettes = ["editor-object-selector", "editor-inspector-tile", "editor-rendering", "editor-height", "editor-object-delete", "editor-region-stamp", "editor-history", "editor-minimap"];
+            for (const id of palettes) this.api.getPanel(id)?.api.close();
+        }
+        this.refreshLocations();
     }
 
     private addBrushBar(): void {
@@ -225,6 +309,12 @@ export class Workbench {
 
     /** Selecting a tool brings its palette tabs forward. */
     activateTool(tool: Parameters<typeof activateEditorToolWorkspaces>[2]): void {
+        // A layout saved before a tool had its own palette lacks that panel: open it at its default place.
+        const panelId = EDITOR_TOOL_DOCK_PANEL[tool];
+        if (panelId && (tool === "height" || tool === "tile-brush") && !this.api.getPanel(panelId) && this.isPanelEnabled(panelId)) {
+            this.restoreDocked(panelId);
+            this.refreshLocations();
+        }
         activateEditorToolWorkspaces(this.api, this.host, tool);
         this.orderPaletteTabs(tool);
     }
@@ -276,6 +366,8 @@ export class Workbench {
         } else {
             this.restoreDocked(panelId);
         }
+        // Palette panels come back as background tabs; opening one means showing it.
+        this.api.getPanel(panelId)?.api.setActive();
         this.refreshLocations();
     }
 
@@ -283,7 +375,13 @@ export class Workbench {
     private restoreDocked(panelId: string): void {
         const defaults = getMapEditorFloatableDockPanelDefaults(panelId as MapEditorDockPanelId);
         if (!defaults) return;
-        addMapEditorDockPanelRestoredOrDefault(this.api, panelId, defaults, this.host);
+        // A default placed beside another panel falls back to the viewport's right edge when that panel is closed.
+        const position = defaults.position as { referencePanel?: string } | undefined;
+        const anchored: AddPanelOptions =
+            position?.referencePanel && this.api.getPanel(position.referencePanel)
+                ? defaults
+                : ({ ...defaults, floating: false, position: { referencePanel: SCENE_PANEL_ID, direction: "right" }, initialWidth: defaults.initialWidth ?? 380 } as AddPanelOptions);
+        addMapEditorDockPanelRestoredOrDefault(this.api, panelId, anchored, this.host);
     }
 
     dockPanel(panelId: string): void {
@@ -367,10 +465,24 @@ export class Workbench {
         const canExternal = !isTauriRuntime() && (isChrome ? panelId === BRUSH_PANEL_ID : MAP_EDITOR_FLOATABLE_DOCK_PANELS.find((row) => row.panelId === panelId)?.canExternal !== false);
         const dockLabel = panelId === PAINT_TOOLS_PANEL_ID ? "Dock to left" : panelId === BRUSH_PANEL_ID ? "Dock to bottom" : "Dock to panel";
 
-        const items: ContextMenuItem[] = [
-            { id: "dock", label: dockLabel, disabled: location === "grid", onSelect: () => this.dockPanel(panelId) },
+        const items: ContextMenuItem[] = [];
+        if (panelId === TILE_PAINTER_PANEL_ID && location !== "popout") {
+            const here = location === "grid" ? tilePainterPosition() : undefined;
+            const places: [TilePainterPosition, string][] = [
+                ["bottom", "Dock below the 3D view"],
+                ["top", "Dock above the 3D view"],
+                ["left", "Dock left of the 3D view"],
+                ["right", "Dock right of the 3D view"],
+            ];
+            for (const [position, label] of places) {
+                items.push({ id: `move-${position}`, label, disabled: here === position, onSelect: () => this.moveTilePainter(position) });
+            }
+        } else {
+            items.push({ id: "dock", label: dockLabel, disabled: location === "grid", onSelect: () => this.dockPanel(panelId) });
+        }
+        items.push(
             { id: "float", label: "Float over workbench", disabled: location === "floating", onSelect: () => this.floatFromDock(panelId) },
-        ];
+        );
         if (canExternal) {
             items.push({ id: "external", label: "Open external window", disabled: location === "popout", onSelect: () => void this.popOut(panelId) });
         }
@@ -390,7 +502,7 @@ export class Workbench {
         const ids = [SCENE_PANEL_ID, ...MAP_EDITOR_FLOATABLE_DOCK_PANELS.map((row) => row.panelId), BRUSH_PANEL_ID, PAINT_TOOLS_PANEL_ID];
         return ids
             .filter((id) => id === SCENE_PANEL_ID || this.isPanelEnabledIncludingChrome(id))
-            .map((id) => ({ id, title: id === SCENE_PANEL_ID ? "Editor (3D)" : panelTitle(id), open: this.api.getPanel(id) !== undefined }));
+            .map((id) => ({ id, title: id === SCENE_PANEL_ID ? "3D" : panelTitle(id), open: this.api.getPanel(id) !== undefined }));
     }
 
     restoreAllPanels(): void {
