@@ -1436,8 +1436,9 @@ export function method3416(var0: number, var1: Script, var2: boolean): number {
       : var0 === ScriptOpcodes.STAT_BASE
         ? clientState.maximumLevels
         : clientState.currentExp;
+    const fallback = var0 === ScriptOpcodes.STAT_XP ? 0 : 1;
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
-      skillId >= 0 && skillId < values.length ? values[skillId]! : 0;
+      skillId >= 0 && skillId < values.length ? values[skillId]! : fallback;
     return 1;
   } else if (var0 === ScriptOpcodes.COORD) {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
@@ -1496,12 +1497,12 @@ export function method3416(var0: number, var1: Script, var2: boolean): number {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = value;
     return 1;
   } else if (var0 === ScriptOpcodes.MOVECOORD) {
-    Interpreter.Interpreter_intStackSize -= 4;
-    const x = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
-    const y = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
-    const plane = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
-    const addY = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 3]!;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = packCoord(plane, x, y + addY);
+    const y = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+    const plane = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+    const x = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+    const packed = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
+      (packed + ((plane << 28) | (x << 14) | y)) | 0;
     return 1;
   } else {
     return 2;
