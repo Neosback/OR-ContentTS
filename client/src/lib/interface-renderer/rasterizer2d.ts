@@ -409,7 +409,7 @@ export class Rasterizer2D {
       const key = "missing";
       if (!Rasterizer2D.warnedFontIds.has(key)) {
         Rasterizer2D.warnedFontIds.add(key);
-        console.warn("[interface-renderer] Missing widget textFont id/size; defaulting to Plain 11 (id 494).");
+        console.warn("[interface-renderer] Missing widget textFont id; defaulting to Plain 11 (id 494).");
       }
       return fallback;
     }
