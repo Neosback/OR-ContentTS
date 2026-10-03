@@ -12,6 +12,7 @@ import {
 } from "../../lib/cache-types";
 import type { InterfaceEntry } from "../../lib/interface-renderer/component-types";
 import { Cs1Interpreter, type Cs1SimState } from "../../lib/interface-renderer/cs1-interpreter";
+import { mergeMockClientState } from "../../lib/interface-renderer/mock-client-state";
 import {
     makeCs2LogLine,
     setCs2ConsoleSink,
@@ -259,7 +260,9 @@ export class InterfaceEditorState {
     };
 
     setCs1SimState: StateSetter<Cs1SimState> = (value) => {
-        this.cs1SimState = applySetter(this.cs1SimState, value);
+        const previous = this.cs1SimState;
+        const next = applySetter(previous, value);
+        this.cs1SimState = mergeMockClientState(previous, next);
     };
 
     setCs2RedrawNonce: StateSetter<number> = (value) => {
