@@ -172,7 +172,23 @@ function adaptComponentPackedIdFromApi(comp: ComponentType): ComponentType {
   const children = Array.isArray(r.children)
     ? r.children.map((ch) => adaptComponentPackedIdFromApi(ch))
     : r.children;
-  const next = { ...r, packedId, children } as ComponentType & { internalId?: number | null };
+  const finiteNumberOr = (value: unknown, fallback: number): number =>
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+  const next = {
+    ...r,
+    packedId,
+    children,
+    // The client represents an unassigned widget font as -1. Cache decoders
+    // and legacy/API payloads may surface that state as undefined/null instead.
+    textFont: finiteNumberOr(r.textFont, -1),
+    text: typeof r.text === "string" ? r.text : "",
+    secondaryText: typeof r.secondaryText === "string" ? r.secondaryText : "",
+    textLineHeight: finiteNumberOr(r.textLineHeight, 0),
+    textAlignH: finiteNumberOr(r.textAlignH, 0),
+    textAlignV: finiteNumberOr(r.textAlignV, 0),
+    textShadow: r.textShadow === true,
+  } as ComponentType & { internalId?: number | null };
   delete (next as { internalId?: unknown }).internalId;
   return next as ComponentType;
 }
