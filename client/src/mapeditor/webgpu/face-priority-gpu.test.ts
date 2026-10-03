@@ -8,6 +8,7 @@ function mesh(): StaticObjectMesh {
         words: new Uint32Array(0),
         indices: new Uint32Array(0),
         faceRenderPriorities: Uint8Array.from([0, 10, 2, 11, 4]),
+        faceOrdinals: Uint32Array.from([4, 1, 8, 3, 9]),
         priorityGroups: Uint32Array.from([
             3, 0, 2, 3, 1,
             8, 2, 1, 4, 1,
@@ -24,6 +25,7 @@ describe("buildPrioritySortGpuData", () => {
         const data = buildPrioritySortGpuData(mesh());
 
         expect(Array.from(data.priorities)).toEqual([0, 10, 2, 11, 4]);
+        expect(Array.from(data.ordinals)).toEqual([4, 1, 8, 3, 9]);
         expect(Array.from(data.groups)).toEqual([
             3, 0, 2, 3, 1, 0,
             8, 2, 1, 4, 1, 3,
