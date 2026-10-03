@@ -3,11 +3,23 @@
     import Sparkles from "@lucide/svelte/icons/sparkles";
 
     import { componentTypeName } from "../../../interface/interface-editor-tree-utils";
+    import type { TreeRow } from "../../../interface/interface-editor-workbench-model";
     import { Button } from "../../components/ui/button";
     import { cn } from "../../lib/utils";
     import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     let { state }: { state: InterfaceEditorState } = $props();
+
+    function rowTitle(row: TreeRow): string {
+        const parts = [`Component ${row.id} · ${componentTypeName(row.type)}`];
+        if (row.metadata?.projectSymbol) parts.push(row.metadata.projectSymbol);
+        if (row.metadata?.provenance) {
+            const source = row.metadata.provenance;
+            parts.push(`${source.sourcePath}${source.line ? `:${source.line}` : ""}`);
+        }
+        if (row.metadata?.diagnostics.length) parts.push(...row.metadata.diagnostics);
+        return parts.join("\n");
+    }
 </script>
 
 <div class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground">
@@ -63,9 +75,18 @@
                         state.selectedComponentNodeKey === row.nodeKey && "bg-cyan-500/10",
                     )}
                     style:padding-left="{12 + row.depth * 14}px"
+                    title={rowTitle(row)}
                 >
                     <span class="shrink-0 font-mono text-muted-foreground">{row.id}</span>
-                    <span class="truncate">{componentTypeName(row.type)}{row.dynamicCreated ? " *" : ""}</span>
+                    <span class="min-w-0 flex-1 truncate">
+                        {row.metadata?.displayName ?? componentTypeName(row.type)}{row.dynamicCreated ? " *" : ""}
+                    </span>
+                    {#if row.metadata?.displayName}
+                        <span class="shrink-0 text-[10px] text-muted-foreground">{componentTypeName(row.type)}</span>
+                    {/if}
+                    {#if row.metadata?.diagnostics.length}
+                        <span class="shrink-0 text-[10px] font-semibold text-amber-500" aria-label="Metadata warning">!</span>
+                    {/if}
                 </button>
             {/each}
         {/if}

@@ -5,6 +5,7 @@ import type { CacheType } from "@/lib/cache-types";
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 
 import type { InterfaceViewer } from "./InterfaceViewer";
+import type { InterfaceComponentMetadata, InterfaceMetadata } from "./interface-metadata-source";
 
 export type RsInterfaceMode = "fixed" | "resizable";
 export type InterfaceLegacyFilter = "all" | "new" | "legacy";
@@ -21,6 +22,7 @@ export type InterfaceListEntry = {
   id: number;
   name: string;
   iflegacy: boolean | null;
+  metadata: InterfaceMetadata;
 };
 
 export type TreeNode = {
@@ -30,6 +32,7 @@ export type TreeNode = {
   dynamicCreated: boolean;
   nodeKey: string;
   component: ComponentType;
+  metadata?: InterfaceComponentMetadata;
   children: TreeNode[];
 };
 

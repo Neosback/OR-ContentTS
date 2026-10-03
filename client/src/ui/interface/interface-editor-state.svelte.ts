@@ -1,5 +1,9 @@
 import { cacheProxyHeaders, syncCacheTypeCookie } from "../../lib/cache-proxy-client";
 import {
+    getActiveOpenRuneProjectSnapshot,
+    subscribeActiveOpenRuneProjectRuntime,
+} from "../../lib/active-openrune-project-runtime";
+import {
     BASE_CACHE_TYPES,
     LOCALHOST_CACHE_TYPE,
     LOCAL_STORAGE_KEY,
@@ -17,10 +21,12 @@ import {
 import { collectOnLoadScriptDiagnostics } from "../../lib/interface-renderer/cs2/on-load-script-diagnostics";
 import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../lib/interface-renderer/cs2/runtime-context";
 import { openInterface, setCs1InterfaceEntry } from "../../lib/interface-renderer/interface-manager";
-import { GameValGroupType } from "../../rs/config/gameval/GameValGroupType";
-import type { Interface as InterfaceGameVal } from "../../rs/config/gameval/impl/Interface";
 import type { VarbitDefinitionLookup } from "../../rs/config/vartype/bit/VarBitTypeLoader";
 import type { InterfaceViewer } from "../../interface/InterfaceViewer";
+import {
+    createInterfaceMetadataSource,
+    type InterfaceMetadataSource,
+} from "../../interface/interface-metadata-source";
 import {
     buildComponentTree,
     flattenTree,
@@ -73,7 +79,7 @@ function applySetter<T>(current: T, value: T | ((previous: T) => T)): T {
 export class InterfaceEditorState {
     readonly selectedCacheType = resolveSelectedCacheType();
     readonly revision: string | number;
-    readonly entries: InterfaceListEntry[];
+    entries = $state<InterfaceListEntry[]>([]);
     readonly varbitDefinitionLookup: VarbitDefinitionLookup | null;
 
     search = $state("");
@@ -106,19 +112,36 @@ export class InterfaceEditorState {
     exportInterfaceId = $state<number | null>(null);
 
     private loadController?: AbortController;
+    private metadataSource: InterfaceMetadataSource;
+    private metadataVersion = $state(0);
+    private unsubscribeOpenRuneRuntime?: () => void;
 
     constructor(readonly viewer: InterfaceViewer) {
         this.revision = viewer.loadedCache.info.revision ?? "latest";
+        this.metadataSource = createInterfaceMetadataSource(
+            viewer.gamevals,
+            getActiveOpenRuneProjectSnapshot()?.gameVals ?? null,
+        );
         this.entries = this.buildEntries();
         const defs = viewer.varbitDefinitions;
         this.varbitDefinitionLookup = defs == null ? null : (id: number) => defs.get(id) ?? null;
         syncCacheTypeCookie(this.selectedCacheType);
         setCs2ConsoleSink((line) => this.appendCs2LogLine(line));
+        this.unsubscribeOpenRuneRuntime = subscribeActiveOpenRuneProjectRuntime((runtime) => {
+            this.metadataSource = createInterfaceMetadataSource(
+                this.viewer.gamevals,
+                runtime?.snapshot.gameVals ?? null,
+            );
+            this.entries = this.buildEntries();
+            this.metadataVersion++;
+        });
     }
 
     dispose(): void {
         this.loadController?.abort("interface-editor-dispose");
         this.loadController = undefined;
+        this.unsubscribeOpenRuneRuntime?.();
+        this.unsubscribeOpenRuneRuntime = undefined;
         setCs2ConsoleSink(null);
     }
 
@@ -132,8 +155,15 @@ export class InterfaceEditorState {
     }
 
     get componentTreeRows(): TreeRow[] {
+        void this.metadataVersion;
         if (!this.interfaceData || this.selectedId == null) return [];
-        return flattenTree(buildComponentTree(this.interfaceData, this.selectedId));
+        return flattenTree(
+            buildComponentTree(
+                this.interfaceData,
+                this.selectedId,
+                this.metadataSource,
+            ),
+        );
     }
 
     get componentTreeRowsForList(): TreeRow[] {
@@ -300,27 +330,19 @@ export class InterfaceEditorState {
     };
 
     private buildEntries(): InterfaceListEntry[] {
-        const gamevals = this.viewer.gamevals;
-        try {
-            gamevals?.get(GameValGroupType.IFTYPES);
-        } catch {
-            // Fall back to numeric names.
-        }
-
         return Object.keys(this.viewer.interfaces)
             .map(Number)
             .filter(Number.isFinite)
             .sort((a, b) => a - b)
             .map((id) => {
                 const iface = this.viewer.interfaces[id]!;
-                const name =
-                    gamevals?.getFastAs<InterfaceGameVal>(GameValGroupType.IFTYPES, id)?.name?.trim() ??
-                    "";
+                const metadata = this.metadataSource.getInterface(id);
                 const fileIds = Object.keys(iface.components).map(Number);
                 return {
                     id,
-                    name: name || `Interface ${id}`,
+                    name: metadata.displayName,
                     iflegacy: interfaceRootLegacy(this.viewer.legacy, id, fileIds),
+                    metadata,
                 };
             });
     }
