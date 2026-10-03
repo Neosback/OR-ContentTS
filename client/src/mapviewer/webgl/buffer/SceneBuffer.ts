@@ -43,6 +43,8 @@ export type DrawCommand = {
     offset: number;
     elements: number;
     instances: ModelInfo[];
+    /** One byte per triangle. 0xff means the source model had no explicit face-priority array. */
+    faceRenderPriorities?: Uint8Array;
 };
 
 export type SceneModel = {
@@ -135,16 +137,18 @@ export class SceneBuffer {
      * `faces` is the caller's already-partitioned face list for this pass, used by the TypeScript path to skip
      * recomputing it; the wasm kernel does its own filtering.
      */
-    addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): void {
+    addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): Uint8Array {
+        const selectedFaces =
+            faces ??
+            getModelFaces(model, this.faceDepth).filter(
+                (face) => isModelFaceTransparent(this.textureLoader, face) === transparent,
+            );
         if (this.packer) {
             packModel(this.packer, model, transparent, offset, true, this.faceDepth);
-            return;
+        } else {
+            this.addModel(model, selectedFaces, offset);
         }
-        this.addModel(
-            model,
-            faces ?? getModelFaces(model, this.faceDepth).filter((face) => isModelFaceTransparent(this.textureLoader, face) === transparent),
-            offset,
-        );
+        return packFaceRenderPriorities(selectedFaces);
     }
 
     addTerrainTile(tile: SceneTile, offsetX: number, offsetY: number): void {
@@ -347,10 +351,12 @@ export class SceneBuffer {
             sceneModel: SceneModel,
             offset: number,
             elements: number,
+            faceRenderPriorities: Uint8Array,
         ): void => {
             const drawCommand: DrawCommand = {
                 offset,
                 elements,
+                faceRenderPriorities,
                 instances: [
                     {
                         sceneX: Math.max(0, sceneModel.sceneX),
@@ -422,10 +428,21 @@ export class SceneBuffer {
                         true,
                         this.faceDepth,
                     );
+                    const faceRenderPriorities = packFaceRenderPriorities(
+                        getModelFaces(model, this.faceDepth).filter(
+                            (face) =>
+                                isModelFaceTransparent(this.textureLoader, face) === group.transparent,
+                        ),
+                    );
                     let offset = firstOffset;
                     for (let i = 0; i < runLength; i++) {
                         const elements = counts[i]!;
-                        addInteractionCommand(group.models[modelIndex + i]!, offset, elements);
+                        addInteractionCommand(
+                            group.models[modelIndex + i]!,
+                            offset,
+                            elements,
+                            faceRenderPriorities,
+                        );
                         offset += elements * 4;
                     }
                     modelIndex = runEnd;
@@ -442,9 +459,13 @@ export class SceneBuffer {
                 vertexOffset[1] = -sceneModel.heightOffset;
             }
             const offset = this.indexByteOffset();
-            this.addModelPass(model, group.transparent, vertexOffset);
+            const faceRenderPriorities = this.addModelPass(
+                model,
+                group.transparent,
+                vertexOffset,
+            );
             const elements = (this.indexByteOffset() - offset) / 4;
-            addInteractionCommand(sceneModel, offset, elements);
+            addInteractionCommand(sceneModel, offset, elements, faceRenderPriorities);
             modelIndex++;
         }
 
@@ -620,9 +641,20 @@ export class SceneBuffer {
 export type ModelFace = {
     index: number;
     alpha: number;
+    /** Value packed into the shared vertex depth field (legacy priority or authored faceBias). */
     priority: number;
+    /** Original OSRS face render priority; 0xff means the model has no per-face priority array. */
+    renderPriority: number;
     textureId: number;
 };
+
+export function packFaceRenderPriorities(faces: readonly ModelFace[]): Uint8Array {
+    const priorities = new Uint8Array(faces.length);
+    for (let i = 0; i < faces.length; i++) {
+        priorities[i] = faces[i].renderPriority;
+    }
+    return priorities;
+}
 
 export function isModelFaceTransparent(textureLoader: TextureLoader, face: ModelFace): boolean {
     return (
@@ -670,6 +702,9 @@ export function getModelFaces(model: Model, depthSource?: FaceDepthSource): Mode
             index,
             alpha,
             priority,
+            renderPriority: model.faceRenderPriorities
+                ? model.faceRenderPriorities[index] & 0xff
+                : 0xff,
             textureId,
         });
     }
