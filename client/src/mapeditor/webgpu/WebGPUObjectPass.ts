@@ -59,12 +59,18 @@ export interface ObjectPassFrame {
     hideRoofs: boolean;
 }
 
+export type ObjectIndexSource = "original" | "priority";
+
 export interface ObjectPassStats {
     frames: number;
     /** CPU time spent recording and submitting the last frame, ms. */
     cpuMs: number;
-    /** GPU time of the last resolved frame, ms; undefined when the adapter has no timestamp queries. */
+    /** Total GPU time from priority compute start through render end, ms. */
     gpuMs?: number;
+    /** GPU time spent in the face-priority compute pass, ms. */
+    computeGpuMs?: number;
+    /** GPU time spent in the object render pass, ms. */
+    renderGpuMs?: number;
     drawCalls: number;
     indices: number;
 }
@@ -110,6 +116,7 @@ export class WebGPUObjectPass {
     private materialsTexture?: GPUTexture;
     private depthTexture?: GPUTexture;
     private depthSize = "";
+    private indexSource: ObjectIndexSource = "original";
 
     private readonly timestamps?: {
         querySet: GPUQuerySet;
@@ -146,9 +153,9 @@ export class WebGPUObjectPass {
         });
         if (hasTimestamps) {
             this.timestamps = {
-                querySet: device.createQuerySet({ type: "timestamp", count: 2 }),
-                resolveBuffer: device.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC }),
-                readBuffer: device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+                querySet: device.createQuerySet({ type: "timestamp", count: 4 }),
+                resolveBuffer: device.createBuffer({ size: 32, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC }),
+                readBuffer: device.createBuffer({ size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
                 reading: false,
             };
         }
@@ -516,6 +523,18 @@ export class WebGPUObjectPass {
     }
 
     /**
+     * Selects which static index stream the render pass consumes. The default remains "original" until priority
+     * sorting has completed visual and performance validation.
+     */
+    setIndexSource(source: ObjectIndexSource): void {
+        this.indexSource = source;
+    }
+
+    getIndexSource(): ObjectIndexSource {
+        return this.indexSource;
+    }
+
+    /**
      * Debug/validation hook. Call after at least one render so the compute pass has populated the sorted and scratch
      * buffers. The returned comparison uses the CPU RuneLite reference fed by the exact depths computed in WGSL.
      */
@@ -615,7 +634,12 @@ export class WebGPUObjectPass {
 
         // Validation stage: execute the priority sorter every frame, but keep the render pass on indexBuffer until
         // the computed stream is compared against the CPU reference and representative WebGL2 captures.
-        const priorityPass = encoder.beginComputePass({ label: "object face priority sort" });
+        const priorityPass = encoder.beginComputePass({
+            label: "object face priority sort",
+            timestampWrites: this.timestamps
+                ? { querySet: this.timestamps.querySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 }
+                : undefined,
+        });
         priorityPass.setPipeline(this.priorityPipeline);
         priorityPass.setBindGroup(0, this.sceneBindGroup);
         for (const [id, map] of this.maps) {
@@ -656,7 +680,10 @@ export class WebGPUObjectPass {
             if (map.data.mesh.opaqueCount === 0) continue;
             pass.setBindGroup(1, map.bindGroup);
             pass.setVertexBuffer(0, map.vertexBuffer);
-            pass.setIndexBuffer(map.indexBuffer, "uint32");
+            pass.setIndexBuffer(
+                this.indexSource === "priority" ? map.sortedIndexBuffer : map.indexBuffer,
+                "uint32",
+            );
             pass.drawIndexed(map.data.mesh.opaqueCount, 1, 0, 0, 0);
             drawCalls++;
             indices += map.data.mesh.opaqueCount;
@@ -668,7 +695,10 @@ export class WebGPUObjectPass {
             if (map.data.mesh.alphaCount === 0) continue;
             pass.setBindGroup(1, map.bindGroup);
             pass.setVertexBuffer(0, map.vertexBuffer);
-            pass.setIndexBuffer(map.indexBuffer, "uint32");
+            pass.setIndexBuffer(
+                this.indexSource === "priority" ? map.sortedIndexBuffer : map.indexBuffer,
+                "uint32",
+            );
             pass.drawIndexed(map.data.mesh.alphaCount, 1, map.data.mesh.opaqueCount, 0, 0);
             drawCalls++;
             indices += map.data.mesh.alphaCount;
@@ -678,8 +708,8 @@ export class WebGPUObjectPass {
         const timestamps = this.timestamps;
         let resolveGpu = false;
         if (timestamps && !timestamps.reading) {
-            encoder.resolveQuerySet(timestamps.querySet, 0, 2, timestamps.resolveBuffer, 0);
-            encoder.copyBufferToBuffer(timestamps.resolveBuffer, 0, timestamps.readBuffer, 0, 16);
+            encoder.resolveQuerySet(timestamps.querySet, 0, 4, timestamps.resolveBuffer, 0);
+            encoder.copyBufferToBuffer(timestamps.resolveBuffer, 0, timestamps.readBuffer, 0, 32);
             resolveGpu = true;
         }
         device.queue.submit([encoder.finish()]);
@@ -691,7 +721,9 @@ export class WebGPUObjectPass {
                 .then(() => {
                     const times = new BigUint64Array(timestamps.readBuffer.getMappedRange().slice(0));
                     timestamps.readBuffer.unmap();
-                    this.stats.gpuMs = Number(times[1] - times[0]) / 1e6;
+                    this.stats.computeGpuMs = Number(times[1] - times[0]) / 1e6;
+                    this.stats.renderGpuMs = Number(times[3] - times[2]) / 1e6;
+                    this.stats.gpuMs = Number(times[3] - times[0]) / 1e6;
                 })
                 .catch(() => undefined)
                 .finally(() => {
