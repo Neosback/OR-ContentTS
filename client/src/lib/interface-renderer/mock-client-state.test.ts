@@ -18,6 +18,7 @@ import { method3416, runScript } from "./cs2/run-script";
 import { Script } from "./cs2/Script";
 import { ScriptEvent } from "./cs2/script-event";
 import { ScriptOpcodes } from "./cs2/ScriptOpcodes";
+import { handleSocialOpcode } from "./cs2/social-opcodes";
 
 function cachedScript(id: number, opcodes: number[], intOperands: number[], stringOperands: (string | null)[] = []): Script {
   const script = new Script();
