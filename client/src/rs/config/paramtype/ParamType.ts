@@ -1,5 +1,6 @@
 import { ByteBuffer } from "../../io/ByteBuffer";
 import { Type } from "../Type";
+import { cacheVarLiteralByChar, cacheVarLiteralById, type CacheVarLiteral } from "../CacheVarLiteral";
 
 export class ParamType extends Type {
     private static SCRIPT_VAR_TYPES = [
@@ -37,10 +38,12 @@ export class ParamType extends Type {
         "Ÿ",
     ];
 
-    // ScriptVarType
+    // ScriptVarType character retained for existing callers.
     type!: string;
+    varType?: CacheVarLiteral;
 
     defaultInt: number = 0;
+    defaultLong: bigint = 0n;
 
     defaultString!: string;
 
@@ -66,12 +69,23 @@ export class ParamType extends Type {
     override decodeOpcode(opcode: number, buffer: ByteBuffer): void {
         if (opcode === 1) {
             this.type = ParamType.getJagexChar(buffer.readUnsignedByte());
+            this.varType = cacheVarLiteralByChar(this.type);
         } else if (opcode === 2) {
             this.defaultInt = buffer.readInt();
         } else if (opcode === 4) {
             this.autoDisable = false;
         } else if (opcode === 5) {
             this.defaultString = buffer.readString();
+        } else if (opcode === 7) {
+            this.defaultLong = buffer.readLong();
+        } else if (opcode === 8) {
+            const typeId = buffer.readUnsignedByte();
+            const literal = cacheVarLiteralById(typeId);
+            if (!literal) {
+                throw new Error(`ParamType: Unknown CacheVarLiteral id ${typeId}. ID: ${this.id}`);
+            }
+            this.varType = literal;
+            this.type = literal.char;
         }
     }
 
