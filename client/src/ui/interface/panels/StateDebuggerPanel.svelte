@@ -13,9 +13,9 @@
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
     import { Label } from "../../components/ui/label";
-    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
 
-    let { state }: { state: InterfaceEditorState } = $props();
+    let { state: editor }: { state: InterfaceEditorState } = $props();
 
     let varpIdText = $state("0");
     let varpValueText = $state("0");
@@ -36,26 +36,26 @@
     let containerCapacityText = $state("28");
     let localPlayerName = $state("");
 
-    const pending = $derived(snapshotMockClientChanges(state.cs1SimState));
+    const pending = $derived(snapshotMockClientChanges(editor.cs1SimState));
 
     const currentVarp = $derived.by(() => {
         const id = parseInteger(varpIdText, -1);
-        return id < 0 ? 0 : state.cs1SimState.varps.getVarp(id);
+        return id < 0 ? 0 : editor.cs1SimState.varps.getVarp(id);
     });
 
     const currentVarbit = $derived.by(() => {
         const id = parseInteger(varbitIdText, -1);
-        return id < 0 ? 0 : state.cs1SimState.varps.getVarbit(id, state.varbitDefinitionLookup);
+        return id < 0 ? 0 : editor.cs1SimState.varps.getVarbit(id, editor.varbitDefinitionLookup);
     });
 
     const currentVarcInt = $derived.by(() => {
         const id = parseInteger(varcIntIdText, -1);
-        return id < 0 ? -1 : state.cs1SimState.varcs.getInt(id);
+        return id < 0 ? -1 : editor.cs1SimState.varcs.getInt(id);
     });
 
     const currentVarcString = $derived.by(() => {
         const id = parseInteger(varcStringIdText, -1);
-        return id < 0 ? "" : state.cs1SimState.varcs.getString(id);
+        return id < 0 ? "" : editor.cs1SimState.varcs.getString(id);
     });
 
     function parseInteger(raw: string, fallback = 0): number {
@@ -64,7 +64,7 @@
     }
 
     function mutate(mutator: Parameters<InterfaceEditorState["mutateMockClientState"]>[0]): void {
-        state.mutateMockClientState(mutator);
+        editor.mutateMockClientState(mutator);
     }
 
     function setClientNumber(
@@ -101,7 +101,7 @@
                 client,
                 id,
                 parseInteger(varbitValueText),
-                state.varbitDefinitionLookup,
+                editor.varbitDefinitionLookup,
             ),
         );
     }
@@ -182,17 +182,17 @@
         </div>
         <span
             class={`ml-auto rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                state.runtimeMode === "simulate"
+                editor.runtimeMode === "simulate"
                     ? "border-emerald-500/50 text-emerald-400"
                     : "border-border text-muted-foreground"
             }`}
         >
-            {state.runtimeMode === "simulate" ? "Simulation" : "Edit"}
+            {editor.runtimeMode === "simulate" ? "Simulation" : "Edit"}
         </span>
     </div>
 
     <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-2 text-[11px]">
-        {#if state.runtimeMode === "edit"}
+        {#if editor.runtimeMode === "edit"}
             <div class="rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[10px] leading-snug text-amber-200">
                 State changes are staged while Edit mode is active. Enter Simulation to run onLoad, timer,
                 transmit and pointer hooks against these values.
@@ -204,28 +204,28 @@
             <div class="grid grid-cols-2 gap-2 border-t p-2">
                 <label class="space-y-1">
                     <span class="text-muted-foreground">World</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.worldId)} oninput={(event) => setClientNumber("worldId", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.worldId)} oninput={(event) => setClientNumber("worldId", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Cycle</span>
-                    <Input class="h-7 font-mono text-[10px]" value={String(state.cs1SimState.clientCycle)} disabled />
+                    <Input class="h-7 font-mono text-[10px]" value={String(editor.cs1SimState.clientCycle)} disabled />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Combat</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.combatLevel)} oninput={(event) => setClientNumber("combatLevel", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.combatLevel)} oninput={(event) => setClientNumber("combatLevel", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Run energy</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.runEnergy)} oninput={(event) => setClientNumber("runEnergy", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.runEnergy)} oninput={(event) => setClientNumber("runEnergy", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Weight</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.weight)} oninput={(event) => setClientNumber("weight", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.weight)} oninput={(event) => setClientNumber("weight", event.currentTarget.value)} />
                 </label>
                 <label class="flex items-end gap-2 pb-1">
                     <input
                         type="checkbox"
-                        checked={state.cs1SimState.isMembersWorld}
+                        checked={editor.cs1SimState.isMembersWorld}
                         onchange={(event) =>
                             mutate((client) => {
                                 client.isMembersWorld = event.currentTarget.checked;
@@ -235,27 +235,27 @@
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Tile X</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.localTileX)} oninput={(event) => setClientNumber("localTileX", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.localTileX)} oninput={(event) => setClientNumber("localTileX", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Tile Y</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.localTileY)} oninput={(event) => setClientNumber("localTileY", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.localTileY)} oninput={(event) => setClientNumber("localTileY", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Plane</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" min="0" max="3" value={String(state.cs1SimState.localPlane)} oninput={(event) => setClientNumber("localPlane", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" min="0" max="3" value={String(editor.cs1SimState.localPlane)} oninput={(event) => setClientNumber("localPlane", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Staff mod</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.staffModLevel)} oninput={(event) => setClientNumber("staffModLevel", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.staffModLevel)} oninput={(event) => setClientNumber("staffModLevel", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">Reboot timer</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.rebootTimer)} oninput={(event) => setClientNumber("rebootTimer", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.rebootTimer)} oninput={(event) => setClientNumber("rebootTimer", event.currentTarget.value)} />
                 </label>
                 <label class="space-y-1">
                     <span class="text-muted-foreground">World flags</span>
-                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(state.cs1SimState.worldFlags)} oninput={(event) => setClientNumber("worldFlags", event.currentTarget.value)} />
+                    <Input class="h-7 font-mono text-[10px]" type="number" value={String(editor.cs1SimState.worldFlags)} oninput={(event) => setClientNumber("worldFlags", event.currentTarget.value)} />
                 </label>
             </div>
         </details>
@@ -280,7 +280,7 @@
                         <Button type="button" size="sm" class="h-7 px-2 text-[10px]" onclick={applyVarbit}>Set</Button>
                     </div>
                     <div class="font-mono text-[10px] text-muted-foreground">
-                        current: {currentVarbit}{state.varbitDefinitionLookup ? "" : " · no varbit definitions"}
+                        current: {currentVarbit}{editor.varbitDefinitionLookup ? "" : " · no varbit definitions"}
                     </div>
                 </div>
             </div>
@@ -348,9 +348,9 @@
                     <Button type="button" size="sm" class="h-7 px-2 text-[10px]" onclick={applyLocalPlayerName}>Set</Button>
                 </div>
                 <div class="grid grid-cols-3 gap-1 text-center text-[10px] text-muted-foreground">
-                    <div class="rounded bg-muted/30 p-1">friends {state.cs1SimState.social.friends.length}</div>
-                    <div class="rounded bg-muted/30 p-1">ignores {state.cs1SimState.social.ignores.length}</div>
-                    <div class="rounded bg-muted/30 p-1">chat {state.cs1SimState.social.friendsChat?.members.length ?? 0}</div>
+                    <div class="rounded bg-muted/30 p-1">friends {editor.cs1SimState.social.friends.length}</div>
+                    <div class="rounded bg-muted/30 p-1">ignores {editor.cs1SimState.social.ignores.length}</div>
+                    <div class="rounded bg-muted/30 p-1">chat {editor.cs1SimState.social.friendsChat?.members.length ?? 0}</div>
                 </div>
             </div>
         </details>
@@ -371,7 +371,7 @@
                 </div>
                 <div class="flex gap-2">
                     <Button type="button" variant="outline" size="sm" class="h-7 flex-1 text-[10px]" onclick={clearPending}>Clear pending</Button>
-                    <Button type="button" variant="destructive" size="sm" class="h-7 flex-1 text-[10px]" onclick={state.resetMockClientState}>Reset state</Button>
+                    <Button type="button" variant="destructive" size="sm" class="h-7 flex-1 text-[10px]" onclick={editor.resetMockClientState}>Reset state</Button>
                 </div>
             </div>
         </details>
