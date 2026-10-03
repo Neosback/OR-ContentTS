@@ -307,7 +307,7 @@ Current implementation through PR #69:
 
 Optional backend/JVM enrichment is permitted only if it adds information the portable project index cannot provide. It belongs behind the same framework-neutral metadata seam, not directly in Svelte.
 
-The next Interface/cache decoder work is DBTable/DBRow support and the remaining lossy/missing-definition audit. Do not reintroduce cache-proxy reads for data already available from the selected `CacheSystem`.
+DBTable/DBRow/DBColumn decoding now comes directly from the selected `CacheSystem` in PR #71. The next Interface/cache decoder work is the remaining lossy/missing-definition audit. Do not reintroduce cache-proxy reads for data already available from the selected `CacheSystem`.
 
 ## OpenRune map/cache ownership
 
