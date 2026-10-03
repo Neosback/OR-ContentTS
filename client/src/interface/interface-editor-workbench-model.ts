@@ -8,6 +8,7 @@ import type { InterfaceViewer } from "./InterfaceViewer";
 import type { InterfaceComponentMetadata, InterfaceMetadata } from "./interface-metadata-source";
 
 export type RsInterfaceMode = "fixed" | "resizable";
+export type InterfaceRuntimeMode = "edit" | "simulate";
 export type InterfaceLegacyFilter = "all" | "new" | "legacy";
 
 /** React Dispatch compatible, but framework-neutral for Svelte and plain TS consumers. */
@@ -65,12 +66,16 @@ export type InterfaceEditorWorkbench = {
   setViewportColor: StateSetter<string>;
 
   viewportColor: string;
+  runtimeMode: InterfaceRuntimeMode;
+  setRuntimeMode: StateSetter<InterfaceRuntimeMode>;
   interactiveMode: boolean;
   setInteractiveMode: StateSetter<boolean>;
 
   isInterfaceLoaded: boolean;
   interfaceLoadError: string | null;
   interfaceData: InterfaceEntry | null;
+  simulationInterfaceData: InterfaceEntry | null;
+  previewInterfaceData: InterfaceEntry | null;
   setInterfaceData: StateSetter<InterfaceEntry | null>;
   rootWidgetV3: boolean | null;
 
