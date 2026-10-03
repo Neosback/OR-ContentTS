@@ -76,11 +76,13 @@ OpenRune Server itself is a compatibility/reference target, not the repository w
 
 The moved backend is validated independently for compile, protocol, API/security, OpenRune inspection/indexing, Gradle/process boundaries, and runnable distribution packaging. It is retained for explicit JVM/OpenRune capabilities such as bounded Gradle builds/tests, OpenRune-FileStore `PackMaps + PackWorldMap` publication, and FileStore verification, and should be started lazily when needed.
 
-`ProjectStore`, project lifecycle/replay, `CacheSource`, `WorldSource`, future `ProjectFileSystem`, GameVal/RSCM services, source-aware TOML adapters, and map codecs remain local-first frontend seams.
+`ProjectStore`, project lifecycle/replay, `CacheSource`, `WorldSource`, `ProjectFileSystem`, the unified GameVal/RSCM registry, source-aware TOML adapters, Interface metadata, and map codecs remain local-first frontend seams.
 
 When OpenRune already provides an authoritative source form, Studio should update it and let OpenRune build the caches. LIVE is the full/base generated cache; SERVER is derived from LIVE and augmented with server-specific sources.
 
-See [docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md](docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md) for the map/cache/GameVal ownership model and [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the optional backend lifecycle/security plan.
+Current implementation through PR #69 includes local Interface/CS2 cache access, project-aware Interface GameVal/RSCM metadata, and rev-240 core NPC/Obj/Param decoder parity. The next decoder milestone is DBTable/DBRow.
+
+See [docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md](docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md) for the map/cache/GameVal ownership model, [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the optional backend lifecycle/security plan, and [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) for the exact takeover checklist.
 
 ## Credits
 

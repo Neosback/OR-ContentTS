@@ -1,9 +1,11 @@
 # Map editor roadmap (from the reference editors)
 
-What the editor still lacks, ranked, with where to look in the three references. Sources:
-**T** = `/Users/tylercovalt/Documents/Java Deob/Terraini-deob/src/com/rspsi/…` (the most complete one),
-**R** = `/Users/tylercovalt/Documents/ChatGPT/RSPSi-master/Client/src/main/…/com/rspsi/editor` (the `Editor/` module is only the legacy ImGui shell),
+What the editor still lacks, ranked, with where to look in the reference implementations. The original research used:
+**T** = the Terraini/RSPSi Java editor reference (most complete terrain/editor behavior),
+**R** = the RSPSi editor reference implementation (the `Editor/` module is only the legacy ImGui shell),
 **C** = `reference/tsps-client` (the older TypeScript editor this one grew from; mostly superseded).
+
+Do not depend on machine-specific absolute paths. If the external T/R references are unavailable, use the checked-in reference material and current project contracts; do not guess missing behavior from this roadmap alone.
 
 Already built: tile painter, height tool (basic), Delete/Move/Place/Replace with ghosts, region stamp, history with jump,
 layouts, Rendering panel, status bar, command palette, virtualized object catalog, drag-to-place. See

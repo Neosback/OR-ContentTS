@@ -1,5 +1,7 @@
 # OpenRune map/cache integration: source-first, TypeScript-first architecture
 
+> **Implementation checkpoint (through PR #69):** ProjectFileSystem/session/runtime, unified GameVal DAT/TOML/RSCM indexing, source-aware PackConfig/map/server TOML adapters, direct filesystem-backed cache access, Interface metadata, local CS2 object/enum data, and core rev-240 NPC/Obj/Param decoder parity are implemented. The immediate next cache-definition milestone is DBTable/DBRow/DBColumn. Terrain/static-loc encoders, Build Cache UI/client integration, and bounded PackMaps publication remain future work.
+
 ## Status and intent
 
 This document defines how OpenRune Content Studio should integrate with an ordinary compatible OpenRune Server checkout for cache editing, map editing, GameVals/RSCM, source authoring, and build/publish workflows.

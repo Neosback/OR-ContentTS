@@ -1,5 +1,7 @@
 # OpenRune Combat Pathing Parity Plan
 
+> **Archived historical plan:** the legacy TypeScript game server was removed from this repository. The `server/` paths and commands below are no longer part of the active Content Studio architecture. Keep this document only as historical research; do not recreate a game server in this repository or use these instructions for current Studio work.
+
 This folder breaks the combat-pathing parity work into ten reviewable changes. The plans are intentionally narrow: implement them in order, one plan per branch or commit, and do not combine cleanup from later plans into an earlier change.
 
 The target is OpenRune's observable combat-pathing behaviour, while retaining this repository's TypeScript architecture, plugin policies, WebSocket protocol, private areas, and custom map-region replacement.

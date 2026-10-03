@@ -2,6 +2,10 @@
 
 This directory contains framework-neutral project/persistence contracts used by the Studio. They are portable TypeScript contracts; optional backend workflows may consume them but do not own them.
 
+## Current implementation checkpoint
+
+As of PR #69, the portable project layer includes the unified GameVal registry, guarded OpenRune source adapters, retained `OpenRuneProjectSession`, active runtime binding, Interface metadata projection, and filesystem-backed cache access. The immediate next cache-definition work is DBTable/DBRow/DBColumn decoding; see the takeover checklist in `../../../DEVELOPER_HANDOFF.md`.
+
 ## Edit Format v1
 
 - `edit-format-v1.schema.json` is the authoritative machine-readable JSON shape.
@@ -140,7 +144,7 @@ RSCM rules used by the Studio:
 
 The parser retains source path and line number for every mapping. The aggregate index provides symbol and namespace/id lookups while reporting duplicate symbols, conflicting symbol assignments, and namespace-local id collisions as structured issues instead of silently selecting a declaration.
 
-This layer is read-only. RSCM assignment/writes remain OpenRune-owned workflow behavior, and the future unified GameVal registry should merge this provenance with module `gamevals.toml` and generated/base DAT mappings under explicit precedence and validation rules.
+This layer is read-only. RSCM assignment/writes remain OpenRune-owned workflow behavior. The unified `gameval-registry.ts` now merges this provenance with module `gamevals.toml` and generated/base DAT mappings under explicit precedence and validation rules.
 
 
 ## GameVal DAT parser and baseline validation
@@ -180,7 +184,7 @@ The aggregate index provides deterministic symbol and table/id lookups and repor
 
 Project discovery also skips generated `build/`, `out/`, and `target/` trees so compiled/copied `gamevals.toml` files are not indexed as additional authoring sources. This matches OpenRune's generated-output exclusion.
 
-This remains a read-only semantic layer. Cross-source precedence between base DAT, generated DAT, module TOML, and RSCM belongs in the unified GameVal registry rather than being hidden inside the individual parsers.
+This remains a read-only semantic layer. Cross-source precedence between base DAT, generated DAT, module TOML, and RSCM is owned by the implemented unified GameVal registry rather than being hidden inside the individual parsers.
 
 ## Unified GameVal registry
 
@@ -262,7 +266,7 @@ Svelte components must not access this IndexedDB database directly. `ProjectLife
 
 ### Validation baseline
 
-The ProjectStore slice is covered by the normal client gate. The current green baseline includes 11 Vitest files / 42 tests, including real IndexedDB API behavior through `fake-indexeddb`. Run `npm run validate` from `client/` before merging project-contract changes.
+The ProjectStore/project-filesystem slice is covered by the normal client gate, including real IndexedDB API behavior through `fake-indexeddb`, source-indexing tests, guarded-write races, project-session/runtime refresh tests, and cache-source integration. Do not hard-code a test-count baseline here because the suite is expanding rapidly; run `npm run validate` from `client/` before merging project-contract changes.
 
 
 ## ProjectLifecycle

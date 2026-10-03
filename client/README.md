@@ -61,3 +61,7 @@ The frontend is source-first when connected to an OpenRune checkout:
 - use the optional backend only for explicit OpenRune/JVM operations such as build/test, FileStore `PackMaps + PackWorldMap` publication, and output verification.
 
 See [OPENRUNE_MAP_CACHE_ARCHITECTURE.md](../docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md) for the complete cache/source ownership model.
+
+## Current engineering checkpoint
+
+Through PR #69, the client has local-cache Interface/CS2 object+enum support, project-aware Interface GameVal/RSCM metadata, and rev-240 core NPC/Obj/Param decoder parity. The next decoder slice is DBTable/DBRow/DBColumn using the shared `src/rs/config/CacheVarLiteral.ts` mapping. See the root `DEVELOPER_HANDOFF.md` before starting that work.

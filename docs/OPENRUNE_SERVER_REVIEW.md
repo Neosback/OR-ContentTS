@@ -124,20 +124,22 @@ Run them in the same operation or deliberately request a full world-map rebuild.
 
 ### 7. LIVE and SERVER have a parent/derivative relationship
 
-SERVER is reseeded from compl## Recommended integration order
+SERVER is reseeded from LIVE by OpenRune-FileStore and then augmented by server-specific packers. Treat SERVER as generated derivative output, not an independent authoring tree.
 
-1. Keep the completed local frontend `ProjectLifecycle`, `ProjectStore`, `CacheSource`, and `WorldSource` seams stable.
-2. Add `ProjectFileSystem` and direct Tauri filesystem integration.
-3. Add optional browser File System Access with import/download fallback.
-4. Implement TypeScript RSCM/GameVal registry and OpenRune project indexing.
-5. Implement source-aware config/server/map TOML adapters.
-6. Implement TypeScript terrain file-0 and static-loc file-1 encoders.
-7. Add portable raw/region package export.
-8. Narrow `StudioBackendClient` to explicit build/test/map-publish/FileStore/JVM verification.
-9. Add bounded `PackMaps + PackWorldMap` publication into LIVE.
-10. Use the existing explicit cache-build operation to derive SERVER from updated LIVE.
-11. Defer generic writable JS5/DAT2 support until standalone requirements justify it.
-12. Keep OpenRune Server changes optional/upstream-friendly and never required for Studio compatibility.
+## Recommended integration order
+
+The original local-foundation steps are now implemented: ProjectFileSystem/Tauri/browser access, unified GameVal/RSCM indexing, OpenRune source adapters, retained project sessions, Interface metadata, and core rev-240 NPC/Obj/Param parity.
+
+Continue with:
+
+1. DBTable/DBRow/DBColumn decoding and the remaining decoder parity audit.
+2. TypeScript terrain file-0 and static-loc file-1 encoders with golden round-trip fixtures.
+3. Portable raw/region package export.
+4. A narrow `StudioBackendClient` bridge for explicit allowlisted OpenRune build/test/verification operations.
+5. Bounded `PackMaps + PackWorldMap` publication into LIVE.
+6. Explicit OpenRune cache build when SERVER output is requested.
+7. Defer generic writable JS5/DAT2 support until a standalone use case proves it necessary.
+8. Keep OpenRune Server unchanged and external/reference-only.
 
 ## Security boundary
 
