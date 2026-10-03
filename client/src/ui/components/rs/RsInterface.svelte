@@ -211,15 +211,6 @@
         Interpreter.mousedOverWidgetIf1 = null;
     }
 
-    function componentLocalPosition(component: ComponentType, x: number, y: number): { x: number; y: number } {
-        const bounds = manager?.getComponentDrawBoundsFor(component);
-        if (!bounds) return { x, y };
-        return {
-            x: x - bounds.x,
-            y: y - bounds.y,
-        };
-    }
-
     function pickComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
         const currentManager = manager;
         if (!currentManager) return null;
@@ -406,8 +397,9 @@
         eventDispatcher = dispatcher;
         let cancelled = false;
 
-        // The client invokes var-transmit listeners with trigger lists once when a
-        // group becomes active, before ordinary changed-id processing begins.
+        // Match the client activation sequence: onLoad first, then initial
+        // trigger-backed var-transmit listeners, before ordinary changed-id ticks.
+        void dispatcher.dispatchOnLoad(data, interfaceId ?? -1);
         void dispatcher.dispatchInitialVarTransmit(data);
 
         const runTick = async (): Promise<void> => {
