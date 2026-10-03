@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #71 DBTable/DBRow decoder checkpoint:
+As of the PR #73 Mock Client State checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -688,9 +688,9 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, active retained runtime binding, Interface metadata projection, core rev-240 NPC/Obj/Param parity, and selected-cache DBTable/DBRow/DBColumn decoding are in place. **The immediate next code PR should continue the remaining lossy/missing decoder audit**, not backend publication or terrain encoding.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, active retained runtime binding, Interface metadata projection, core rev-240 NPC/Obj/Param parity, selected-cache DBTable/DBRow/DBColumn decoding, Interface preview stabilization, and the shared Mock Client State foundation are in place. **For the current Interface-realism track, the immediate next code PR should be widget event/transmit dispatch over the PR #73 change journal**, not a second simulation state or a full game-server emulator.
 
-For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, enum definitions, DB tables, and DB rows come from the selected cache; symbolic names/provenance come from the selected cache plus the retained OpenRune project metadata layer. The next Interface/cache priority is the remaining lossy/missing decoder audit before optional backend enrichment.
+For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, enum definitions, DB tables, and DB rows come from the selected cache; symbolic names/provenance come from the selected cache plus the retained OpenRune project metadata layer. Runtime state now comes from the PR #73 Mock Client State. The next Interface priority is on-load/transmit/timer/mouse/click hook dispatch with correct trigger-list filtering. The remaining lossy/missing decoder audit remains the parallel cache-definition track and should stay separate from Interface event work.
 
 ### Next-developer checklist and traps
 
