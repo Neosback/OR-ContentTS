@@ -81,12 +81,13 @@ export function normalizeWidgetScriptArgs(raw: unknown): unknown[] | null {
 export function transmitTriggersMatch(
   triggers: readonly number[] | null | undefined,
   changedIds: readonly number[],
+  changeEventCount = changedIds.length,
 ): boolean {
-  if (changedIds.length === 0) return false;
+  if (changeEventCount <= 0) return false;
   // The client only keeps a 32-entry circular change buffer. Once more than 32
-  // values changed since a widget last processed transmits, trigger filtering
+  // writes occurred since a widget last processed transmits, trigger filtering
   // cannot be trusted and the listener fires unconditionally.
-  if (changedIds.length > 32 || triggers == null || triggers.length === 0) return true;
+  if (changeEventCount > 32 || triggers == null || triggers.length === 0) return true;
 
   const changed = new Set(changedIds);
   return triggers.some((id) => changed.has(id));
@@ -185,21 +186,25 @@ export class WidgetEventDispatcher {
 
       if (
         component.onVarTransmit
-        && transmitTriggersMatch(component.onVarTransmitList, changes.varps)
+        && transmitTriggersMatch(component.onVarTransmitList, changes.varps, changes.varpEventCount)
       ) {
         void this.enqueue(component, component.onVarTransmit);
       }
 
       if (
         component.onInvTransmit
-        && transmitTriggersMatch(component.onInvTransmitList, changes.inventories)
+        && transmitTriggersMatch(
+          component.onInvTransmitList,
+          changes.inventories,
+          changes.inventoryEventCount,
+        )
       ) {
         void this.enqueue(component, component.onInvTransmit);
       }
 
       if (
         component.onStatTransmit
-        && transmitTriggersMatch(component.onStatTransmitList, changes.skills)
+        && transmitTriggersMatch(component.onStatTransmitList, changes.skills, changes.skillEventCount)
       ) {
         void this.enqueue(component, component.onStatTransmit);
       }
