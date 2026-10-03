@@ -27,7 +27,7 @@ function installRuntime(events: Event[]): void {
       events.push({ type: "sort", list });
     },
   };
-  applyCs2RuntimeFromSim(null, "test", {}, null, null, null, null, null, null, runtime);
+  applyCs2RuntimeFromSim(null, "test", {}, null, null, null, null, null, null, null, runtime);
 }
 
 function pushInt(value: number): void {

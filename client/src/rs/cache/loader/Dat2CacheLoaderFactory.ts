@@ -4,6 +4,7 @@ import {
     DummyBasTypeLoader,
 } from "../../config/bastype/BasTypeLoader";
 import { GraphicsDefaults } from "../../config/defaults/GraphicsDefaults";
+import { ArchiveEnumTypeLoader, EnumTypeLoader } from "../../config/enumtype/EnumTypeLoader";
 import {
     ArchiveOverlayFloorTypeLoader,
     ArchiveUnderlayFloorTypeLoader,
@@ -79,6 +80,13 @@ export class Dat2CacheLoaderFactory implements CacheLoaderFactory {
         const underlaysArchive = configIndex.getArchive(ConfigType.DAT2.underlays);
         return new ArchiveUnderlayFloorTypeLoader(this.cacheInfo, underlaysArchive);
     }
+
+    getEnumTypeLoader(): EnumTypeLoader {
+        const configIndex = this.cacheSystem.getIndex(IndexType.DAT2.configs);
+        const enumsArchive = configIndex.getArchive(ConfigType.DAT2.enums);
+        return new ArchiveEnumTypeLoader(this.cacheInfo, enumsArchive);
+    }
+
 
     getOverlayTypeLoader(): OverlayFloorTypeLoader {
         const configIndex = this.cacheSystem.getIndex(IndexType.DAT2.configs);

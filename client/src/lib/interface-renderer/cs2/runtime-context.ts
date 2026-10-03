@@ -1,3 +1,4 @@
+import type { EnumTypeLoader } from "@/rs/config/enumtype/EnumTypeLoader";
 import type { ObjTypeLoader } from "@/rs/config/objtype/ObjTypeLoader";
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import type { Cs1SimState } from "../cs1-interpreter";
@@ -24,6 +25,8 @@ export type Cs2RuntimeContext = {
   clientScriptIndex: CacheIndex | null;
   /** Object definitions from the exact cache being previewed; used by OC_* clientscript opcodes. */
   objTypeLoader: ObjTypeLoader | null;
+  /** Enum definitions from the exact cache being previewed; used by ENUM_* clientscript opcodes. */
+  enumTypeLoader: EnumTypeLoader | null;
   /** Optional live/simulated social-list state for stateful 3628-3657 opcodes. */
   socialRuntime: Cs2SocialRuntime | null;
   varps: Varps;
@@ -40,6 +43,7 @@ let ctx: Cs2RuntimeContext = {
   cacheHeaders: {},
   clientScriptIndex: null,
   objTypeLoader: null,
+  enumTypeLoader: null,
   socialRuntime: null,
   varps: defaultVarps,
   varbitLookup: null,
@@ -62,6 +66,7 @@ export function applyCs2RuntimeFromSim(
   canvasHeight: number | null | undefined = null,
   clientScriptIndex: CacheIndex | null | undefined = null,
   objTypeLoader: ObjTypeLoader | null | undefined = null,
+  enumTypeLoader: EnumTypeLoader | null | undefined = null,
   socialRuntime: Cs2SocialRuntime | null | undefined = null,
 ): void {
   ctx = {
@@ -69,6 +74,7 @@ export function applyCs2RuntimeFromSim(
     cacheHeaders,
     clientScriptIndex: clientScriptIndex ?? null,
     objTypeLoader: objTypeLoader ?? null,
+    enumTypeLoader: enumTypeLoader ?? null,
     socialRuntime: socialRuntime ?? null,
     varps: sim?.varps ?? defaultVarps,
     varbitLookup: varbitLookup ?? null,

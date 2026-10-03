@@ -172,7 +172,7 @@ Next:
 - [x] Distinguish valid fresh OpenRune checkouts that need LIVE bootstrap from invalid/unavailable projects; source editing is allowed before LIVE exists.
 - [x] Remove the pinned OpenRS2 startup cache target/bootstrap and the user-facing Studio-local-cache preset path.
 - [ ] Bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement; IndexedDB import remains the universal browser fallback.
-- [ ] Move remaining Interface/CS2 cache-proxy lookups (for example enum definitions) behind local CacheSystem loaders first, with proxy/backend only as optional fallback.
+- [x] Move Interface/CS2 enum lookups behind the selected cache: `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now use a local `EnumTypeLoader`; the old enum cache-proxy path is removed.
 - [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
 - [ ] Add a framework-neutral Interface metadata source backed first by the TypeScript GameValRegistry/project index.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.

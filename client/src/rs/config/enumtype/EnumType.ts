@@ -3,23 +3,29 @@ import { ByteBuffer } from "../../io/ByteBuffer";
 import { Type } from "../Type";
 
 export class EnumType extends Type {
-    inputType!: string;
-    outputType!: string;
+    inputType: string;
+    outputType: string;
 
     defaultString: string;
-    defaultInt!: number;
+    defaultInt: number;
 
     outputCount: number;
 
-    keys!: number[];
+    keys: number[];
 
-    intValues!: number[];
-    stringValues!: string[];
+    intValues: number[];
+    stringValues: string[];
 
     constructor(id: number, cacheInfo: CacheInfo) {
         super(id, cacheInfo);
+        this.inputType = "\0";
+        this.outputType = "\0";
         this.defaultString = "null";
+        this.defaultInt = 0;
         this.outputCount = 0;
+        this.keys = [];
+        this.intValues = [];
+        this.stringValues = [];
     }
 
     override decodeOpcode(opcode: number, buffer: ByteBuffer): void {
