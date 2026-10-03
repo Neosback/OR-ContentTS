@@ -111,7 +111,7 @@
     }
 
     function resetAll(): void {
-        editor.cs1SimState = Cs1Interpreter.defaultState();
+        editor.setCs1SimState(Cs1Interpreter.defaultState());
     }
 
     function generalSprite(id: number): string {
