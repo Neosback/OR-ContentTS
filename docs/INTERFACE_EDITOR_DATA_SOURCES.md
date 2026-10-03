@@ -61,7 +61,8 @@ Recent parity work includes:
 - PR #65: social comparator opcodes 3628-3657;
 - PR #66: client-parity runtime-widget defaults;
 - PR #67: local cache-backed enum opcodes;
-- PR #69: rev-240 core NPC/Obj/Param decoder parity.
+- PR #69: rev-240 core NPC/Obj/Param decoder parity;
+- PR #72: stabilized the Svelte preview/render boundary, preserved selected-cache enum/object loaders during redraw, added deterministic mock social queries for 3600-3627, and virtualized the interface list.
 
 Do not reintroduce network/cache-proxy reads for data already available from the selected `CacheSystem`.
 
@@ -190,6 +191,21 @@ The immediate cache-definition priority is:
 3. only then optional JVM enrichment where it adds unique value.
 
 For DB support, see the exact takeover notes in `DEVELOPER_HANDOFF.md`.
+
+### Mock client state and CS2 simulation direction
+
+A realistic Interface Editor does not require a full simulated game server for ordinary rendering. The server-originated inputs that affect client layout can be represented as explicit mock client state and events while interface structure, ClientScript2 bytecode, varbits, objects, enums, sprites, fonts and models continue to come from the selected cache.
+
+The next Interface runtime milestone should therefore remain framework-neutral and add:
+
+- one mock client state harness for varps/varbits, varcs, skills, inventories, social state, player/client flags and other script-visible state;
+- event dispatch for on-load, var/inventory/stat transmit, timer, mouse-over/leave and other widget listeners;
+- broader CS2 opcode coverage driven by real cache scripts, retaining correct int/string stack effects and runtime-created widget semantics;
+- explicit Edit and Simulation modes so runtime-created components can be inspected without accidentally treating them as serializable cache definitions;
+- a State Debugger panel that can change mock state and immediately retrigger the appropriate client hooks;
+- an optional declarative mock network layer for testing button-to-state round trips without requiring OpenRune Server.
+
+Keep this in TypeScript behind stable runtime interfaces first. Rust/WASM is appropriate later for measured hot paths such as large decode/layout/VM workloads, but it should not become a prerequisite for Interface correctness or Basic Cache operation.
 
 Other Interface-specific follow-ups may include:
 
