@@ -98,6 +98,7 @@ describe("Mock client state harness", () => {
     setMockClientItemContainer(state, 93, {
       itemIds: [4151, 995, -1],
       itemQuantities: [1, 25_000, 0],
+      capacity: 28,
     });
     applyCs2RuntimeFromSim(state, "test", {}, null);
 
@@ -114,6 +115,11 @@ describe("Mock client state harness", () => {
     Interpreter.Interpreter_intStack[1] = 995;
     expect(method3416(ScriptOpcodes.INV_TOTAL, opcodeScript, false)).toBe(1);
     expect(Interpreter.Interpreter_intStack[0]).toBe(25_000);
+
+    Interpreter.Interpreter_intStackSize = 1;
+    Interpreter.Interpreter_intStack[0] = 93;
+    expect(method3416(ScriptOpcodes.INV_SIZE, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(28);
 
     Interpreter.Interpreter_intStackSize = 1;
     Interpreter.Interpreter_intStack[0] = 0;
@@ -159,6 +165,7 @@ describe("Mock client state harness", () => {
     setMockClientItemContainer(state, 93, {
       itemIds: [4161, -1],
       itemQuantities: [1, 0],
+      capacity: 28,
     });
     setMockClientSocialState(state, {
       localPlayerName: "Local",
@@ -170,6 +177,7 @@ describe("Mock client state harness", () => {
     expect(state.itemContainers[93]).toEqual({
       itemIds: [4161, -1],
       itemQuantities: [1, 0],
+      capacity: 28,
     });
     expect(state.social.friends[0]?.name).toBe("Friend");
     expect(snapshotMockClientChanges(state)).toMatchObject({
