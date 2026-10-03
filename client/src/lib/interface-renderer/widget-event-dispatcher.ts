@@ -97,6 +97,7 @@ function pointerArgs(component: ComponentType, kind: WidgetPointerEventKind): Co
  */
 export class WidgetEventDispatcher {
   private tail: Promise<void> = Promise.resolve();
+  private active = true;
 
   private enqueue(
     component: ComponentType,
@@ -107,6 +108,7 @@ export class WidgetEventDispatcher {
     if (!args) return this.tail;
 
     const execute = async (): Promise<void> => {
+      if (!this.active) return;
       const event = new ScriptEvent();
       event.widget = component;
       event.args = args;
@@ -176,5 +178,9 @@ export class WidgetEventDispatcher {
 
   flush(): Promise<void> {
     return this.tail;
+  }
+
+  dispose(): void {
+    this.active = false;
   }
 }
