@@ -5,6 +5,37 @@ import { BasTypeLoader } from "../bastype/BasTypeLoader";
 import { VarManager } from "../vartype/VarManager";
 import { NpcTypeLoader } from "./NpcTypeLoader";
 
+export type NpcBackgroundSound = {
+    id: number;
+    range: number;
+    volume: number;
+};
+
+export type NpcBackgroundSoundFade = {
+    dropoffEasing: number;
+    easeInType: number;
+    easeInDuration: number;
+    easeOutType: number;
+    easeOutDuration: number;
+};
+
+export type NpcRandomSound = {
+    minDelay: number;
+    maxDelay: number;
+    minVolume: number;
+    maxVolume: number;
+    soundIds: number[];
+};
+
+export type ConditionalEntityOp = {
+    index: number;
+    varpId: number;
+    varbitId: number;
+    minValue: number;
+    maxValue: number;
+    text: string;
+};
+
 export class NpcType extends Type {
     name: string;
 
@@ -32,11 +63,18 @@ export class NpcType extends Type {
     drawMapDot: boolean;
 
     combatLevel: number;
+    attack: number;
+    defence: number;
+    strength: number;
+    hitpoints: number;
+    ranged: number;
+    magic: number;
 
     widthScale: number;
     heightScale: number;
 
     isVisible: boolean;
+    renderPriority: number;
 
     ambient: number;
     contrast: number;
@@ -53,6 +91,7 @@ export class NpcType extends Type {
 
     isInteractable: boolean;
     isClickable: boolean;
+    lowPriorityFollowerOps: boolean;
     isFollower: boolean;
 
     runSeqId: number;
@@ -69,6 +108,19 @@ export class NpcType extends Type {
 
     loginScreenProps: number;
     spawnDirection: number;
+
+    height: number;
+    footprintSize: number;
+    readyAnimDuringAnim: boolean;
+    canHideForOverlap: boolean;
+    overlapTintHSL: number;
+    zbuf: boolean;
+    bgSound?: NpcBackgroundSound;
+    bgSoundFade?: NpcBackgroundSoundFade;
+    crossWorldSound: number;
+    randomSound?: NpcRandomSound;
+    recolAll: number;
+    conditionalActions: ConditionalEntityOp[];
 
     basTypeId: number;
 
@@ -88,9 +140,16 @@ export class NpcType extends Type {
         this.actions = new Array<string>(5);
         this.drawMapDot = true;
         this.combatLevel = -1;
+        this.attack = 1;
+        this.defence = 1;
+        this.strength = 1;
+        this.hitpoints = 1;
+        this.ranged = 1;
+        this.magic = 1;
         this.widthScale = 128;
         this.heightScale = 128;
         this.isVisible = false;
+        this.renderPriority = 0;
         this.ambient = 0;
         this.contrast = 0;
         this.headIconPrayer = -1;
@@ -99,6 +158,7 @@ export class NpcType extends Type {
         this.transformVarp = -1;
         this.isInteractable = true;
         this.isClickable = true;
+        this.lowPriorityFollowerOps = false;
         this.isFollower = false;
         this.runSeqId = -1;
         this.runBackSeqId = -1;
@@ -112,6 +172,15 @@ export class NpcType extends Type {
         this.loginScreenProps = 0;
         // this.spawnDirection = 7;
         this.spawnDirection = 6;
+        this.height = -1;
+        this.footprintSize = -1;
+        this.readyAnimDuringAnim = false;
+        this.canHideForOverlap = false;
+        this.overlapTintHSL = 39188;
+        this.zbuf = true;
+        this.crossWorldSound = 2;
+        this.recolAll = -1;
+        this.conditionalActions = [];
         this.basTypeId = -1;
     }
 
@@ -182,6 +251,8 @@ export class NpcType extends Type {
                 this.retextureFrom[i] = buffer.readUnsignedShort();
                 this.retextureTo[i] = buffer.readUnsignedShort();
             }
+        } else if (opcode === 42) {
+            this.recolAll = buffer.readUnsignedShort();
         } else if (opcode === 44 || opcode === 45) {
             buffer.readUnsignedShort();
         } else if (opcode === 60) {
@@ -210,8 +281,13 @@ export class NpcType extends Type {
                 this.chatheadModelIds[i] = buffer.readInt();
             }
         } else if (opcode >= 74 && opcode <= 79) {
-            // stats
-            buffer.readUnsignedShort();
+            const value = buffer.readUnsignedShort();
+            if (opcode === 74) this.attack = value;
+            else if (opcode === 75) this.defence = value;
+            else if (opcode === 76) this.strength = value;
+            else if (opcode === 77) this.hitpoints = value;
+            else if (opcode === 78) this.ranged = value;
+            else this.magic = value;
         } else if (opcode === 93) {
             this.drawMapDot = false;
         } else if (opcode === 95) {
@@ -222,6 +298,7 @@ export class NpcType extends Type {
             this.heightScale = buffer.readUnsignedShort();
         } else if (opcode === 99) {
             this.isVisible = true;
+            this.renderPriority = 1;
         } else if (opcode === 100) {
             this.ambient = buffer.readByte();
         } else if (opcode === 101) {
@@ -290,7 +367,8 @@ export class NpcType extends Type {
             this.isClickable = false;
         } else if (opcode === 111) {
             if (this.cacheInfo.game === "oldschool") {
-                this.isFollower = true;
+                if (this.cacheInfo.revision <= 232) this.isFollower = true;
+                else this.renderPriority = 2;
             } else {
                 // hasShadow = false
             }
@@ -337,28 +415,29 @@ export class NpcType extends Type {
             }
         } else if (opcode === 122) {
             if (this.cacheInfo.game === "oldschool") {
-                this.isFollower = true;
+                this.lowPriorityFollowerOps = true;
             } else {
-                if (this.isLargeModelId()) {
-                    const hitBarSpriteId = buffer.readBigSmart();
-                } else {
-                    const hitBarSpriteId = buffer.readUnsignedShort();
-                }
+                if (this.isLargeModelId()) buffer.readBigSmart();
+                else buffer.readUnsignedShort();
             }
         } else if (opcode === 123) {
             if (this.cacheInfo.game === "oldschool") {
-                // lowPriorityFollowerOps = true;
+                this.isFollower = true;
             } else {
-                const iconHeight = buffer.readUnsignedShort();
+                buffer.readUnsignedShort();
             }
+        } else if (opcode === 124) {
+            this.height = buffer.readUnsignedShort();
         } else if (opcode === 125) {
             this.spawnDirection = buffer.readByte();
+        } else if (opcode === 126) {
+            this.footprintSize = buffer.readUnsignedShort();
         } else if (opcode === 127) {
             this.basTypeId = buffer.readUnsignedShort();
         } else if (opcode === 128) {
             buffer.readUnsignedByte();
         } else if (opcode === 130) {
-            // readyanimduringanim = true;
+            this.readyAnimDuringAnim = true;
         } else if (opcode === 134) {
             const idleSound = buffer.readUnsignedShort();
             const crawlSound = buffer.readUnsignedShort();
@@ -395,14 +474,54 @@ export class NpcType extends Type {
             const bool = true;
         } else if (opcode === 144) {
             buffer.readUnsignedShort();
-        } else if (opcode === 145) {
-            // bool = true;
-        } else if (opcode === 146) {
-            buffer.readUnsignedShort();
-        } else if (opcode === 147) {
-            // unknown = false;
+        } else if (opcode === 145 && this.cacheInfo.game === "oldschool") {
+            this.canHideForOverlap = true;
+        } else if (opcode === 146 && this.cacheInfo.game === "oldschool") {
+            this.overlapTintHSL = buffer.readUnsignedShort();
+        } else if (opcode === 147 && this.cacheInfo.game === "oldschool") {
+            this.zbuf = false;
+        } else if (opcode === 148 && this.cacheInfo.game === "oldschool") {
+            this.bgSound = {
+                id: buffer.readUnsignedShort(),
+                range: buffer.readUnsignedByte(),
+                volume: buffer.readUnsignedByte(),
+            };
+        } else if (opcode === 149 && this.cacheInfo.game === "oldschool") {
+            const fade = this.bgSoundFade ?? {
+                dropoffEasing: 0,
+                easeInType: 0,
+                easeInDuration: 0,
+                easeOutType: 0,
+                easeOutDuration: 0,
+            };
+            fade.dropoffEasing = buffer.readUnsignedByte();
+            this.bgSoundFade = fade;
+        } else if (opcode === 150 && this.cacheInfo.game === "oldschool") {
+            const fade = this.bgSoundFade ?? {
+                dropoffEasing: 0,
+                easeInType: 0,
+                easeInDuration: 0,
+                easeOutType: 0,
+                easeOutDuration: 0,
+            };
+            fade.easeInType = buffer.readUnsignedByte();
+            fade.easeInDuration = buffer.readUnsignedShort();
+            fade.easeOutType = buffer.readUnsignedByte();
+            fade.easeOutDuration = buffer.readUnsignedShort();
+            this.bgSoundFade = fade;
+        } else if (opcode === 151 && this.cacheInfo.game === "oldschool") {
+            this.crossWorldSound = buffer.readUnsignedByte();
+        } else if (opcode === 152 && this.cacheInfo.game === "oldschool") {
+            const minDelay = buffer.readUnsignedShort();
+            const maxDelay = buffer.readUnsignedShort();
+            const minVolume = buffer.readUnsignedByte();
+            const maxVolume = buffer.readUnsignedByte();
+            const count = buffer.readUnsignedByte();
+            const soundIds = new Array<number>(count);
+            for (let i = 0; i < count; i++) soundIds[i] = buffer.readUnsignedShort();
+            this.randomSound = { minDelay, maxDelay, minVolume, maxVolume, soundIds };
         } else if (opcode >= 150 && opcode < 155) {
-            // member only options
+            // Legacy non-OSRS member-only options.
             this.actions[opcode - 150] = this.readString(buffer);
             const isMember = true;
             if (!isMember || this.actions[opcode - 150].toLowerCase() === "hidden") {
@@ -439,13 +558,26 @@ export class NpcType extends Type {
             buffer.readUnsignedShort();
         } else if (opcode === 249) {
             this.params = Type.readParamsMap(buffer, this.params);
+        } else if (
+            opcode === 252 &&
+            this.cacheInfo.game === "oldschool" &&
+            this.cacheInfo.revision >= 237
+        ) {
+            this.conditionalActions.push({
+                index: buffer.readUnsignedByte(),
+                varpId: buffer.readUnsignedShort(),
+                varbitId: buffer.readUnsignedShort(),
+                minValue: buffer.readInt(),
+                maxValue: buffer.readInt(),
+                text: buffer.readString(),
+            });
         } else if (opcode === 251) {
-            // subop
+            // Legacy non-OSRS subop.
             buffer.readUnsignedByte();
             buffer.readUnsignedByte();
             buffer.readString();
         } else if (opcode === 252) {
-            // multiop
+            // Legacy non-OSRS conditional op.
             buffer.readUnsignedByte();
             buffer.readUnsignedShort();
             buffer.readUnsignedShort();
