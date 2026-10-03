@@ -57,4 +57,39 @@ describe("priority-sort readback validation", () => {
             firstMismatch: 0,
         });
     });
+
+    it("rewrites only explicit priority ranges and preserves neighboring triangles", () => {
+        const source: StaticObjectMesh = {
+            words: new Uint32Array(0),
+            indices: Uint32Array.from([
+                0, 1, 2,
+                3, 4, 5,
+                6, 7, 8,
+                9, 10, 11,
+                12, 13, 14,
+            ]),
+            faceRenderPriorities: Uint8Array.from([0xff, 2, 0, 0xff, 0xff]),
+            faceOrdinals: Uint32Array.from([0, 1, 2, 3, 4]),
+            priorityGroups: Uint32Array.from([0, 1, 2, 0, 0]),
+            slotInfo: new Uint16Array(0),
+            opaqueCount: 12,
+            alphaCount: 3,
+            slotCount: 1,
+        };
+        const gpu = buildPrioritySortGpuData(source);
+        const scratch = Int32Array.from([
+            2, 20,
+            1, 10,
+        ]);
+
+        const expected = buildPriorityReferenceIndices(source, gpu.groups, scratch);
+
+        expect(Array.from(expected)).toEqual([
+            0, 1, 2,
+            6, 7, 8,
+            3, 4, 5,
+            9, 10, 11,
+            12, 13, 14,
+        ]);
+    });
 });
