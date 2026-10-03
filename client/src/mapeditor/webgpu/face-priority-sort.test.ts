@@ -20,12 +20,22 @@ describe("prioritySortOrder", () => {
         ]);
     });
 
-    it("uses integer threshold averages and stable depth ties", () => {
+    it("uses integer threshold averages and original model order for stable depth ties", () => {
         const priorities = Uint8Array.from([10, 1, 2, 0]);
         const depths = Int32Array.from([4, 5, 4, 4]);
+        const ordinals = Uint32Array.from([7, 4, 8, 2]);
 
         // avg(1,2) truncates to 4, so priority 10 at depth 4 does not jump priority 0.
-        expect(Array.from(prioritySortOrder(priorities, depths))).toEqual([3, 1, 2, 0]);
+        // The equal-depth z bucket itself follows original model face order, not opaque/alpha packing order.
+        expect(Array.from(prioritySortOrder(priorities, depths, ordinals))).toEqual([3, 1, 2, 0]);
+    });
+
+    it("uses original ordinals to break equal-depth ties", () => {
+        const priorities = Uint8Array.from([0, 0, 0]);
+        const depths = Int32Array.from([10, 10, 10]);
+        const ordinals = Uint32Array.from([9, 2, 5]);
+
+        expect(Array.from(prioritySortOrder(priorities, depths, ordinals))).toEqual([1, 2, 0]);
     });
 
     it("rejects invalid OSRS face priorities", () => {
