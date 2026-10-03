@@ -534,6 +534,10 @@ export class WebGPUObjectPass {
         return this.indexSource;
     }
 
+    hasGpuTimestamps(): boolean {
+        return this.timestamps !== undefined;
+    }
+
     /**
      * Debug/validation hook. Call after at least one render so the compute pass has populated the sorted and scratch
      * buffers. The returned comparison uses the CPU RuneLite reference fed by the exact depths computed in WGSL.
