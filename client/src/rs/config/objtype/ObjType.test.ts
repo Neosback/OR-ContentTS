@@ -72,6 +72,26 @@ describe("ObjType rev-240 decoding", () => {
         expect(buffer.offset).toBe(buffer.length);
     });
 
+    it("decodes additional rev-240 object flags without falling back to legacy meanings", () => {
+        const { type, buffer } = decode([
+            15,
+            65,
+            75, ...u16(65530),
+            94, ...u16(12),
+            99, ...u16(321),
+            12, ...i32(25),
+            0,
+        ]);
+
+        expect(type.isTradable).toBe(false);
+        expect(type.stockMarket).toBe(true);
+        expect(type.weight).toBe(65530);
+        expect(type.category).toBe(12);
+        expect(type.recolAll).toBe(321);
+        expect(type.price).toBe(25);
+        expect(buffer.offset).toBe(buffer.length);
+    });
+
     it("decodes all extended entity-op payloads and preserves alignment", () => {
         const { type, buffer } = decode([
             200,
