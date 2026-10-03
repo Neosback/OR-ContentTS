@@ -818,6 +818,11 @@ export class InterfaceManager {
         if (!var10.v3) text = method3864(text, var10);
         if (!text) continue;
 
+        // The client uses -1 as "no font assigned". Runtime-created text widgets
+        // start this way until a clientscript sets a font, so they should not
+        // render or generate a missing-font warning in the meantime.
+        if (var10.textFont === -1) continue;
+
         this.rast.drawText(
           text,
           x,
