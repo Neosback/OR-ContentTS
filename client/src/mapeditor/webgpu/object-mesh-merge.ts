@@ -1,5 +1,9 @@
 import type { EditorMapObjectChunkData } from "../webgl/loader/EditorMapObjectChunkData";
-import { SLOT_INFO_STRIDE, SLOT_VERTEX_STRIDE } from "../webgl/loader/object-slot-mesh";
+import {
+    PRIORITY_GROUP_WORDS,
+    SLOT_INFO_STRIDE,
+    SLOT_VERTEX_STRIDE,
+} from "../webgl/loader/object-slot-mesh";
 
 /**
  * One map square's static object geometry in slot form, independent of any graphics API: the same merge
@@ -13,6 +17,8 @@ export interface StaticObjectMesh {
     indices: Uint32Array;
     /** One original OSRS face render priority per triangle, opaque first then transparent. */
     faceRenderPriorities: Uint8Array;
+    /** PRIORITY_GROUP_WORDS uint32 per model instance with explicit OSRS face priorities. */
+    priorityGroups: Uint32Array;
     /** SLOT_INFO_STRIDE uint16 per slot. */
     slotInfo: Uint16Array;
     opaqueCount: number;
@@ -25,17 +31,20 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
     let slotTotal = 0;
     let opaqueTotal = 0;
     let alphaTotal = 0;
+    let priorityGroupTotal = 0;
     for (const chunk of chunks) {
         if (!chunk) continue;
         vertexTotal += chunk.vertices.length / SLOT_VERTEX_STRIDE;
         slotTotal += chunk.slotCount;
         opaqueTotal += chunk.staticOpaqueCount;
         alphaTotal += chunk.staticAlphaCount;
+        priorityGroupTotal += chunk.priorityGroups.length / PRIORITY_GROUP_WORDS;
     }
 
     const words = new Uint32Array(vertexTotal * 4);
     const indices = new Uint32Array(opaqueTotal + alphaTotal);
     const faceRenderPriorities = new Uint8Array((opaqueTotal + alphaTotal) / 3).fill(0xff);
+    const priorityGroups = new Uint32Array(priorityGroupTotal * PRIORITY_GROUP_WORDS);
     const slotInfo = new Uint16Array(Math.max(slotTotal, 1) * SLOT_INFO_STRIDE);
 
     let vertexBase = 0;
@@ -44,6 +53,7 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
     let alphaCursor = opaqueTotal;
     let opaquePriorityCursor = 0;
     let alphaPriorityCursor = opaqueTotal / 3;
+    let priorityGroupCursor = 0;
     for (const chunk of chunks) {
         if (!chunk) continue;
         const vertexCount = chunk.vertices.length / SLOT_VERTEX_STRIDE;
@@ -76,6 +86,25 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
             chunk.faceRenderPriorities.subarray(opaqueTriangles, opaqueTriangles + alphaTriangles),
             alphaPriorityCursor,
         );
+
+        for (let group = 0; group < chunk.priorityGroups.length / PRIORITY_GROUP_WORDS; group++) {
+            const sourceBase = group * PRIORITY_GROUP_WORDS;
+            const targetBase = priorityGroupCursor++ * PRIORITY_GROUP_WORDS;
+            const opaqueCount = chunk.priorityGroups[sourceBase + 2];
+            const alphaCount = chunk.priorityGroups[sourceBase + 4];
+            priorityGroups[targetBase] = chunk.priorityGroups[sourceBase] + slotBase;
+            priorityGroups[targetBase + 1] =
+                opaqueCount > 0
+                    ? opaquePriorityCursor + chunk.priorityGroups[sourceBase + 1]
+                    : 0;
+            priorityGroups[targetBase + 2] = opaqueCount;
+            priorityGroups[targetBase + 3] =
+                alphaCount > 0
+                    ? alphaPriorityCursor + (chunk.priorityGroups[sourceBase + 3] - opaqueTriangles)
+                    : 0;
+            priorityGroups[targetBase + 4] = alphaCount;
+        }
+
         opaquePriorityCursor += opaqueTriangles;
         alphaPriorityCursor += alphaTriangles;
 
@@ -88,6 +117,7 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
         words,
         indices,
         faceRenderPriorities,
+        priorityGroups,
         slotInfo,
         opaqueCount: opaqueTotal,
         alphaCount: alphaTotal,
