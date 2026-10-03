@@ -1,6 +1,7 @@
 import type { ComponentType, InterfaceEntry } from "@/lib/interface-renderer/component-types";
 
 import type { TreeNode, TreeRow } from "./interface-editor-workbench-model";
+import type { InterfaceMetadataSource } from "./interface-metadata-source";
 
 /** Legacy flag for the interface group, matching index-3 combined ids used in ComponentDecoder.loadLegacyMap. */
 export function interfaceRootLegacy(
@@ -27,6 +28,7 @@ function runtimeId(component: ComponentType): number {
 export function buildComponentTree(
   entry: InterfaceEntry | null,
   fallbackRootLayer: number,
+  metadataSource?: InterfaceMetadataSource,
 ): TreeNode[] {
   if (!entry) return [];
 
@@ -59,13 +61,19 @@ export function buildComponentTree(
 
   const makeNode = (component: ComponentType, keyPath: string): TreeNode => {
     const rid = runtimeId(component);
+    const dynamicCreated = isDynamicCreated(component);
+    const componentId = rid >= 0 ? rid & 0xffff : component.id & 0xffff;
     const node: TreeNode = {
       id: component.id,
       runtimeId: rid,
       type: component.type,
-      dynamicCreated: isDynamicCreated(component),
+      dynamicCreated,
       nodeKey: keyPath,
       component,
+      metadata:
+        !dynamicCreated && metadataSource
+          ? metadataSource.getComponent(fallbackRootLayer, componentId, rid)
+          : undefined,
       children: [],
     };
     if (visited.has(component)) return node;
