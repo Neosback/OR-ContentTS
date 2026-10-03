@@ -12,7 +12,7 @@
     } from "../../../lib/interface-renderer/interface-manager";
     import type { ComponentType, InterfaceEntry } from "../../../lib/interface-renderer/component-types";
     import type { Cs1SimState } from "../../../lib/interface-renderer/cs1-interpreter";
-    import { applyCs2RuntimeFromSim } from "../../../lib/interface-renderer/cs2/runtime-context";
+    import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../../lib/interface-renderer/cs2/runtime-context";
     import type { CacheIndex } from "../../../rs/cache/CacheIndex";
     import type { EnumTypeLoader } from "../../../rs/config/enumtype/EnumTypeLoader";
     import type { ObjTypeLoader } from "../../../rs/config/objtype/ObjTypeLoader";
@@ -172,6 +172,7 @@
         setCs1SimState(cs1SimState ?? null);
         setCs1InterfaceEntry(data);
         setCs1VarbitDefinitionLookup(cs1VarbitDefinitionLookup ?? null);
+        const { socialRuntime } = getCs2RuntimeContext();
         applyCs2RuntimeFromSim(
             cs1SimState,
             revision,
@@ -183,6 +184,7 @@
             clientScriptIndex,
             objTypeLoader,
             enumTypeLoader,
+            socialRuntime,
         );
 
         context.setTransform(1, 0, 0, 1, 0, 0);
