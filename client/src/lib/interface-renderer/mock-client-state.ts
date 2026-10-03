@@ -131,7 +131,7 @@ export function createMockClientState(): MockClientState {
     clientCycle: 0,
     worldId: 301,
     staffModLevel: 0,
-    rebootTimer: 0,
+    rebootTimer: -1,
     playerMod: false,
     worldFlags: 0,
     changes: emptyJournal(),
@@ -251,7 +251,17 @@ export function getMockClientItemTotal(state: MockClientState, containerId: numb
 }
 
 export function getMockClientInventorySize(state: MockClientState, containerId: number): number {
-  return state.itemContainers[containerId]?.itemIds.length ?? 0;
+  const explicit = state.itemContainers[containerId]?.itemIds.length;
+  if (explicit !== undefined) return explicit;
+
+  const commonCapacities: Readonly<Record<number, number>> = {
+    90: 28,
+    93: 28,
+    94: 14,
+    95: 1410,
+    516: 300,
+  };
+  return commonCapacities[containerId] ?? 0;
 }
 
 export function setMockClientSkill(
