@@ -186,9 +186,8 @@ Svelte must not directly call Ktor endpoints or parse arbitrary OpenRune project
 
 The immediate cache-definition priority is:
 
-1. remaining lossy/missing cache-definition decoding after PR #71 DBTable/DBRow/DBColumn support;
-2. remaining lossy/missing-definition parity work;
-3. only then optional JVM enrichment where it adds unique value.
+1. continue the remaining lossy/missing-definition parity audit after PR #71 DBTable/DBRow/DBColumn support;
+2. only then add optional JVM enrichment where it provides information the portable selected-cache runtime cannot.
 
 For DB support, see the exact takeover notes in `DEVELOPER_HANDOFF.md`.
 
