@@ -454,6 +454,61 @@ export class MapImageRenderer {
         }
     }
 
+    /**
+     * The map function icons (bank, altar, shop, ...) a scene shows at `level`. Any object kind can carry one (a bank booth
+     * is a normal object, an altar can be a wall decoration), so every tag on a tile is checked, once per icon per tile.
+     */
+    mapFunctionPlacements(
+        scene: Scene,
+        level: number,
+    ): Array<{ mapFunctionId: number; tileX: number; tileY: number; sizeX: number; sizeY: number }> {
+        const placements: Array<{ mapFunctionId: number; tileX: number; tileY: number; sizeX: number; sizeY: number }> = [];
+        for (let tileX = 0; tileX < scene.sizeX; tileX++) {
+            for (let tileY = 0; tileY < scene.sizeY; tileY++) {
+                let realLevel = level;
+                if ((scene.tileRenderFlags[1][tileX][tileY] & 0x2) === 2) realLevel++;
+                const levels: number[] = [];
+                if ((scene.tileRenderFlags[level][tileX][tileY] & 0x18) === 0) levels.push(realLevel);
+                if (level < 3 && realLevel < 3 && (scene.tileRenderFlags[level + 1][tileX][tileY] & 0x8) !== 0) levels.push(realLevel + 1);
+
+                for (const tileLevel of levels) {
+                    const tile = scene.tiles[tileLevel]?.[tileX]?.[tileY];
+                    if (!tile) continue;
+                    const tags = [tile.wall?.tag, tile.wallDecoration?.tag, tile.floorDecoration?.tag, scene.getLocTag(tileLevel, tileX, tileY)];
+                    const seen = new Set<number>();
+                    for (const tag of tags) {
+                        if (!tag) continue;
+                        const locType = this.locTypeLoader.load(getIdFromTag(tag));
+                        if (locType.mapFunctionId === -1 || seen.has(locType.mapFunctionId)) continue;
+                        seen.add(locType.mapFunctionId);
+                        placements.push({
+                            mapFunctionId: locType.mapFunctionId,
+                            tileX,
+                            tileY,
+                            sizeX: locType.sizeX,
+                            sizeY: locType.sizeY,
+                        });
+                    }
+                }
+            }
+        }
+        return placements;
+    }
+
+    /** Draws the map function icons into a finished minimap raster (4 pixels per tile). */
+    drawMapFunctionIcons(scene: Scene, level: number, pixels: Int32Array): void {
+        const placements = this.mapFunctionPlacements(scene, level);
+        if (placements.length === 0) return;
+        SpritePixels.fromPixels(pixels, scene.sizeX * 4, scene.sizeY * 4).setRaster();
+        for (const placement of placements) {
+            const mapFunction = this.mapFunctions[placement.mapFunctionId];
+            if (!mapFunction) continue;
+            const x = ((placement.sizeX * 4 - mapFunction.subWidth) / 2) | 0;
+            const y = ((placement.sizeY * 4 - mapFunction.subHeight) / 2) | 0;
+            mapFunction.drawAt(placement.tileX * 4 + x, y + (scene.sizeY - placement.tileY - placement.sizeY) * 4);
+        }
+    }
+
     drawLoc(
         scene: Scene,
         pixels: Int32Array,

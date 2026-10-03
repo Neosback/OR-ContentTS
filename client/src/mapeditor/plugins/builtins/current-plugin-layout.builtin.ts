@@ -7,6 +7,7 @@ import {
 } from "./brushes/brushes.registry";
 import { heightEditorTool } from "./height.plugin";
 import { objectSelectorEditorTool } from "./object-selector.plugin";
+import { objectPlaceEditorTool } from "./object-place.plugin";
 import { objectDeleteEditorTool } from "./object-delete.plugin";
 import { regionStampEditorTool } from "./region-stamp.plugin";
 import { overlayEditorTool } from "./overlay.plugin";
@@ -20,6 +21,7 @@ export const BUILTIN_EDITOR_TOOL_PLUGINS: readonly EditorToolPlugin[] = [
     heightEditorTool,
     tileFlagsEditorTool,
     objectSelectorEditorTool,
+    objectPlaceEditorTool,
     objectDeleteEditorTool,
     regionStampEditorTool,
     tileBrushEditorTool,
@@ -31,6 +33,7 @@ const editorToolPluginById: Record<MapEditorTool, EditorToolPlugin> = {
     height: heightEditorTool,
     smooth: heightEditorTool,
     "object-selector": objectSelectorEditorTool,
+    "object-place": objectPlaceEditorTool,
     "object-delete": objectDeleteEditorTool,
     "region-stamp": regionStampEditorTool,
     "tile-flags": tileFlagsEditorTool,

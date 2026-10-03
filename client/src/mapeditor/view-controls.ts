@@ -3,6 +3,7 @@ import { executeEditorCommand } from "./commands/editor-command-registry";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
 import { storeGrid, type GridKind } from "./grid-settings";
 import { isStatusBarVisible, setStatusBarVisible } from "./status-bar-model";
+import { isViewportMinimapVisible, setViewportMinimapVisible } from "./viewport-minimap-model";
 import { getTileBrushModel } from "./plugins/builtins/tile-brush-model";
 import { getTileFlagsToolModel } from "./plugins/builtins/tile-flags-tool-model";
 
@@ -110,6 +111,14 @@ const baseControls: readonly ViewControl[] = [
     gridControl("tile", "Tile grid", "Outline every tile on the ground (faint)"),
     gridControl("square", "Map square grid", "Outline every 64 x 64 map square on the ground"),
     gridControl("chunk", "Chunk grid", "Outline every 8 x 8 chunk on the ground"),
+    {
+        id: "viewport-minimap",
+        group: "scene",
+        label: "Minimap",
+        description: "Show the round minimap inside the 3D view (click its globe for the world map)",
+        get: (host) => isViewportMinimapVisible(host),
+        set: (host, value) => setViewportMinimapVisible(host, value),
+    },
     {
         id: "status-bar",
         group: "scene",

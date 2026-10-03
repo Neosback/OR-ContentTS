@@ -5,6 +5,8 @@ export type MapEditorTool =
     | "height"
     | "smooth"
     | "object-selector"
+    /** Puts copies of an object (the clipboard, or one picked from the catalog) onto tiles; Select keeps picking. */
+    | "object-place"
     | "object-delete"
     | "region-stamp"
     | "tile-flags"

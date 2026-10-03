@@ -5,7 +5,7 @@ import type { MapEditorTool } from "../../mapeditor/map-editor-kinds";
  * opens with; it picks both tiles and objects. Dividers separate the groups.
  */
 export const TOOL_RAIL_GROUPS: readonly (readonly MapEditorTool[])[] = [
-    ["object-selector"],
+    ["object-selector", "object-place"],
     ["tile-brush", "height"],
     ["object-delete", "region-stamp"],
 ];

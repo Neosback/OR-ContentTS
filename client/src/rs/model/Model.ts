@@ -46,6 +46,7 @@ export class Model extends Entity {
     changedLight: boolean = false;
 
     faceRenderPriorities!: Int8Array;
+    faceBias?: Int8Array;
     faceAlphas!: Int8Array;
 
     textureCoords!: Int8Array;
@@ -188,6 +189,7 @@ export class Model extends Entity {
 
     merge(models: Model[], count: number): void {
         let hasRenderPriority = false;
+        let hasFaceBias = false;
         let hasAlpha = false;
         let hasTexture = false;
         let hasTextureCoord = false;
@@ -202,6 +204,7 @@ export class Model extends Entity {
                 this.verticesCount += model.verticesCount;
                 this.faceCount += model.faceCount;
                 this.texTriangleCount += model.texTriangleCount;
+                hasFaceBias ||= !!model.faceBias;
                 if (model.faceRenderPriorities) {
                     hasRenderPriority = true;
                 } else {
@@ -232,6 +235,10 @@ export class Model extends Entity {
         this.faceColors = new Uint16Array(this.faceCount);
         if (hasRenderPriority) {
             this.faceRenderPriorities = new Int8Array(this.faceCount);
+        }
+
+        if (hasFaceBias) {
+            this.faceBias = new Int8Array(this.faceCount);
         }
 
         if (hasAlpha) {
@@ -282,6 +289,10 @@ export class Model extends Entity {
                         } else {
                             this.faceRenderPriorities[this.faceCount] = model.priority;
                         }
+                    }
+
+                    if (hasFaceBias && model.faceBias && this.faceBias) {
+                        this.faceBias[this.faceCount] = model.faceBias[f];
                     }
 
                     if (hasAlpha && model.faceAlphas) {
@@ -506,6 +517,7 @@ export class Model extends Entity {
             model.faceColors3 = this.faceColors3;
             model.faceColors = this.faceColors;
             model.faceRenderPriorities = this.faceRenderPriorities;
+            model.faceBias = this.faceBias;
             model.faceAlphas = this.faceAlphas;
             model.textureCoords = this.textureCoords;
             model.faceTextures = this.faceTextures;

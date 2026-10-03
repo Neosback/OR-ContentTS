@@ -68,6 +68,7 @@
                 clientScriptIndex={state.viewer.clientScriptIndex}
                 objTypeLoader={state.viewer.objTypeLoader}
                 enumTypeLoader={state.viewer.enumTypeLoader}
+                itemIcons={state.viewer.itemIcons}
                 viewportColor={state.viewportColor}
                 showOverlays={state.showOverlays}
                 showViewportBorder={state.showViewportBorder}

@@ -46,7 +46,7 @@
         event.dataTransfer.setData(LOC_DRAG_TYPE, String(id));
         event.dataTransfer.setData("text/plain", `object:${id}`);
         event.dataTransfer.effectAllowed = "copy";
-        host.setEditorTool("object-selector");
+        host.setEditorTool("object-place");
         getObjectActionModel(host).startPlace(id);
     }
     function endDrag(): void {

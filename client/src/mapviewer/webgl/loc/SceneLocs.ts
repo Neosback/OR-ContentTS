@@ -4,6 +4,7 @@ import { LocTypeLoader } from "../../../rs/config/loctype/LocTypeLoader";
 import { Model } from "../../../rs/model/Model";
 import { Scene } from "../../../rs/scene/Scene";
 import { SceneLoc } from "../../../rs/scene/SceneLoc";
+import { embeddedWallDecorationShift, wallDecorationNudge } from "../../../rs/scene/WallDecorationOffset";
 import { getIdFromTag } from "../../../rs/scene/entity/EntityTag";
 import { LocEntity } from "../../../rs/scene/entity/LocEntity";
 import { INVALID_HSL_COLOR } from "../../../rs/util/ColorUtil";
@@ -373,8 +374,21 @@ export function getSceneLocsForChunk(
                 }
 
                 if (tile.wallDecoration && tileInChunk(tileX, tileY)) {
-                    const offsetX = tile.wallDecoration.offsetX;
-                    const offsetY = tile.wallDecoration.offsetY;
+                    const decorationType = tile.wallDecoration.flags & 0x3f;
+                    const decorationRotation = (tile.wallDecoration.flags >> 6) & 3;
+                    const nudge = wallDecorationNudge(decorationType, decorationRotation);
+                    const wall = tile.wall;
+                    const shift = wall
+                        ? embeddedWallDecorationShift(
+                              decorationType,
+                              decorationRotation,
+                              wall.flags & 0x3f,
+                              (wall.flags >> 6) & 3,
+                              locTypeLoader.load(getIdFromTag(wall.tag)).decorDisplacement,
+                          )
+                        : { x: 0, y: 0 };
+                    const offsetX = tile.wallDecoration.offsetX + nudge.x + shift.x;
+                    const offsetY = tile.wallDecoration.offsetY + nudge.y + shift.y;
                     if (tile.wallDecoration.entity0 instanceof Model) {
                         locs.push(
                             createSceneModel(

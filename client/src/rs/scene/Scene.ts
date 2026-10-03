@@ -444,7 +444,8 @@ export class Scene {
                     normalizedTileNormalX * LIGHT_DIR_X +
                     normalizedTileNormalY * LIGHT_DIR_Y +
                     normalizedTileNormalZ * LIGHT_DIR_Z;
-                const sunLight = (dot / lightIntensity + LIGHT_INTENSITY_BASE) | 0;
+                // Integer division first, then the base (class470): adding first and truncating darkens shaded tiles a level.
+                const sunLight = ((dot / lightIntensity) | 0) + LIGHT_INTENSITY_BASE;
 
                 // Now that we have the computed light contribution, take light occlusion from other objects
                 // into account. These tile light occlusions are computed dinamically based on walls, roofs

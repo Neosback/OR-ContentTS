@@ -1,8 +1,8 @@
 <script lang="ts">
     import type { DockviewGroupPanel } from "dockview-core";
+    import Settings2 from "@lucide/svelte/icons/settings-2";
     import Redo2 from "@lucide/svelte/icons/redo-2";
     import Search from "@lucide/svelte/icons/search";
-    import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
     import Undo2 from "@lucide/svelte/icons/undo-2";
 
     import { VIEWPORT_BAR, VIEWPORT_BAR_PREFIX } from "../../../mapeditor/bar-kinds";
@@ -16,9 +16,8 @@
     import { openCustomizeBar } from "../customize-bar.svelte";
     import { useEditorState } from "../editor-state.svelte";
     import { SCENE_PANEL_ID } from "../workbench-controller.svelte";
-    import QuickControlsMenu from "./QuickControlsMenu.svelte";
 
-    /** The toolbar at the right end of the 3D view's tab row. Shown only on the group that holds the 3D panel. */
+    /** The toolbar at the right end of the 3D view's tab row (plane, undo, ... and customize). Shown only on the group that holds the 3D panel. */
     let { group }: { group: DockviewGroupPanel } = $props();
 
     const editor = useEditorState();
@@ -66,8 +65,6 @@
                     <span class="w-3 text-center font-mono tabular-nums">{plane}</span>
                     <button type="button" class={iconButton} aria-label="Increase view plane" disabled={plane >= 3} onclick={() => setPlane(plane + 1)}>+</button>
                 </div>
-            {:else if id === "quick"}
-                <QuickControlsMenu />
             {:else if id === "undo"}
                 <button type="button" class={iconButton} aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.canUndo} onclick={() => executeEditorCommand("workbench.undo", { host })}>
                     <Undo2 class="size-3.5" aria-hidden="true" />
@@ -96,7 +93,7 @@
             {/if}
         {/each}
         <button type="button" class={iconButton} aria-label="Customize the viewport bar" title="Customize this bar" onclick={() => openCustomizeBar("viewport")}>
-            <SlidersHorizontal class="size-3.5" aria-hidden="true" />
+            <Settings2 class="size-3.5" aria-hidden="true" />
         </button>
     </div>
 {/if}

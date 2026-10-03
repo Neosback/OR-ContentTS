@@ -19,7 +19,7 @@
     const side = $derived(radius * 2 + 1);
 </script>
 
-<div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-xs">
+<div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto! p-3 text-xs">
     <section class="grid gap-1.5">
         <h3 class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">What a click removes</h3>
         <div class="grid grid-cols-2 gap-1" role="radiogroup" aria-label="Delete mode">

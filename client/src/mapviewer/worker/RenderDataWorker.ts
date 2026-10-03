@@ -16,7 +16,7 @@ import {
 } from "../../mapeditor/webgl/loader/EditorMapDataLoader";
 import { EditorMapObjectChunkData } from "../../mapeditor/webgl/loader/EditorMapObjectChunkData";
 import type { SceneData } from "../../mapeditor/webgl/loader/EditorMapData";
-import type { SceneLocData } from "../../mapeditor/webgl/sceneLocData";
+import { applySceneLocData, type SceneLocData } from "../../mapeditor/webgl/sceneLocData";
 import { EditorMapTerrainData } from "../../mapeditor/webgl/loader/EditorMapTerrainData";
 import { CacheSystem } from "../../rs/cache/CacheSystem";
 import { ConfigType } from "../../rs/cache/ConfigType";
@@ -363,7 +363,10 @@ const worker = {
 
         // Editor minimap should stay in SD mode (flat minimap renderer) to match the requested look.
         workerState.sceneBuilder.addTileModels(scene, false);
+        // The scene above is terrain only. Give it the placed objects so walls, map scenes and map function icons show.
+        if (payload.locs) applySceneLocData(scene, payload.locs);
         const pixelCache = workerState.mapImageRenderer.renderMinimap(scene, payload.selectedLevel);
+        workerState.mapImageRenderer.drawMapFunctionIcons(scene, payload.selectedLevel, pixelCache);
         const minimapBlob = await minimapHdPixelsToBlob(
             pixelCache,
             scene.sizeX,

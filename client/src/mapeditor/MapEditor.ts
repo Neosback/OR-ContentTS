@@ -56,6 +56,7 @@ import {
 import { TOOL_RAIL, VIEWPORT_BAR } from "./bar-kinds";
 import { barSnapshot } from "./bar-model";
 import { getStatusBarWorkbenchSnapshot } from "./status-bar-model";
+import { getViewportMinimapWorkbenchSnapshot } from "./viewport-minimap-model";
 import { getObjectActionModel, getObjectActionWorkbenchSnapshot } from "./plugins/builtins/object-action-model";
 import { getObjectDeleteWorkbenchSnapshot } from "./plugins/builtins/object-delete-model";
 import { getMapEditorPanelDisplaySnapshot } from "./map-editor-panel-display";
@@ -440,10 +441,15 @@ export class MapEditor {
         if (this.editorTool === tool) {
             return;
         }
-        if (this.editorTool === "object-selector" && tool !== "object-selector") {
+        const inObjectFamily = (name: MapEditorTool): boolean => name === "object-selector" || name === "object-place";
+        if (inObjectFamily(this.editorTool) && !inObjectFamily(tool)) {
+            // Leaving for a paint/delete/stamp tool ends the placement in progress; the clipboard stays for next time.
             this.cancelObjectCopyPlacement();
             this.clearSelectedObject();
             this.clearSelectedTile();
+        } else if (this.editorTool === "object-place" && tool === "object-selector") {
+            // Back to Select: stop putting things down, keep the clipboard (V pastes it again).
+            this.cancelObjectCopyPlacement();
         }
         if (tool === "object-delete" || this.editorTool === "object-delete") {
             this.hoveredObject = undefined;
@@ -463,6 +469,10 @@ export class MapEditor {
             this.clearRegionStampSelection();
         }
         this.editorTool = tool;
+        if (tool === "object-place" && this.objectCopyTemplate && !this.objectCopyPlacementActive) {
+            // Opening Place with something on the clipboard puts it in hand straight away.
+            this.objectCopyPlacementActive = true;
+        }
         this.notifyEditorToolListeners();
     }
 
@@ -472,8 +482,16 @@ export class MapEditor {
         }
     }
 
+    /** Select and Place share one engine (picking, ghosts, placement clicks); Place just never picks on click. */
     isObjectSelectorToolActive(): boolean {
-        return this.editorTool === "object-selector" && this.isEditorToolPluginEnabled("object-selector");
+        return (
+            (this.editorTool === "object-selector" && this.isEditorToolPluginEnabled("object-selector")) ||
+            this.isObjectPlaceToolActive()
+        );
+    }
+
+    isObjectPlaceToolActive(): boolean {
+        return this.editorTool === "object-place" && this.isEditorToolPluginEnabled("object-place");
     }
 
     isObjectDeleteToolActive(): boolean {
@@ -757,7 +775,7 @@ export class MapEditor {
             return true;
         }
         this.enabledEditorToolPlugins.delete(tool);
-        if (tool === "object-selector") {
+        if (tool === "object-selector" || tool === "object-place") {
             this.cancelObjectCopyPlacement();
             this.clearSelectedObject();
         }
@@ -985,7 +1003,7 @@ export class MapEditor {
         const tileBrushWorkbench = `${getTileBrushWorkbenchSnapshot(this.pluginHost)}#${this.brushSize}:${this.brushType}#${this.selectedUnderlayId}:${this.selectedOverlayId}`;
         const gridFlags = this.renderer as unknown as { drawGrid?: boolean; drawChunkGrid?: boolean; drawTileGrid?: boolean };
         const grids = `${gridFlags.drawGrid ? 1 : 0}${gridFlags.drawChunkGrid ? 1 : 0}${gridFlags.drawTileGrid ? 1 : 0}`;
-        const objectDeleteWorkbench = `${getObjectDeleteWorkbenchSnapshot(this.pluginHost)}#${getObjectActionWorkbenchSnapshot(this.pluginHost)}#${getStatusBarWorkbenchSnapshot(this.pluginHost)}#${grids}#${barSnapshot(VIEWPORT_BAR)}#${barSnapshot(TOOL_RAIL)}`;
+        const objectDeleteWorkbench = `${getObjectDeleteWorkbenchSnapshot(this.pluginHost)}#${getObjectActionWorkbenchSnapshot(this.pluginHost)}#${getStatusBarWorkbenchSnapshot(this.pluginHost)}#${getViewportMinimapWorkbenchSnapshot(this.pluginHost)}#${grids}#${barSnapshot(VIEWPORT_BAR)}#${barSnapshot(TOOL_RAIL)}`;
         const underlayWorkbench = getUnderlayGradientWorkbenchSnapshot(this.pluginHost);
         const overlayWorkbench = getOverlayGradientWorkbenchSnapshot(this.pluginHost);
         const objectVisibility = this.objectsVisible ? "1" : "0";
@@ -1268,6 +1286,7 @@ export class MapEditor {
         return this.objectCopyTemplate;
     }
 
+    /** Copies the selected object to the clipboard and switches to the Place tool to put copies down. */
     startObjectCopyPlacement(): boolean {
         const ref = this.selectedObject;
         if (!ref || !this.isObjectSelectorToolActive() || !isCopyableObjectKind(ref.kind)) {
@@ -1275,15 +1294,44 @@ export class MapEditor {
         }
         this.objectCopyTemplate = { ...ref };
         this.objectCopyPlacementActive = true;
-        this.selectedObject = undefined;
+        // The selection stays: the object panel keeps showing what was copied, and the wireframe keeps marking the original.
+        if (this.editorTool !== "object-place" && this.isEditorToolPluginEnabled("object-place")) {
+            this.setEditorTool("object-place");
+        }
         this.notifyWorkbenchStateChanged();
         return true;
     }
 
+    hasObjectClipboard(): boolean {
+        return this.objectCopyTemplate != null;
+    }
+
+    /** Puts the clipboard back in hand (V, or opening the Place tool). */
+    resumeObjectCopyPlacement(): boolean {
+        if (!this.objectCopyTemplate) {
+            return false;
+        }
+        this.objectCopyPlacementActive = true;
+        if (this.editorTool !== "object-place" && this.isEditorToolPluginEnabled("object-place")) {
+            this.setEditorTool("object-place");
+        }
+        this.notifyWorkbenchStateChanged();
+        return true;
+    }
+
+    /** Ends putting copies down. The copied object stays on the clipboard. */
     cancelObjectCopyPlacement(): void {
         // Leaving the tool (or starting another placement) also ends a Move/Place in progress.
         getObjectActionModel(this.pluginHost).cancel();
-        if (!this.objectCopyPlacementActive && !this.objectCopyTemplate) {
+        if (!this.objectCopyPlacementActive) {
+            return;
+        }
+        this.objectCopyPlacementActive = false;
+        this.notifyWorkbenchStateChanged();
+    }
+
+    clearObjectClipboard(): void {
+        if (!this.objectCopyTemplate && !this.objectCopyPlacementActive) {
             return;
         }
         this.objectCopyPlacementActive = false;
@@ -1360,6 +1408,7 @@ export class MapEditor {
                 nextTools.add("tile-flags");
                 nextTools.add("tile-brush");
                 nextTools.add("object-selector");
+                nextTools.add("object-place");
                 nextTools.add("object-delete");
                 nextTools.add("region-stamp");
                 if (nextTools.size > 0) {
@@ -1441,6 +1490,9 @@ export class MapEditor {
         if (import.meta.env.DEV && typeof window !== "undefined") {
             // Dev-only console/devtools handle for inspecting scene data.
             (window as unknown as { __mapEditor?: MapEditor }).__mapEditor = this;
+            // WebGPU object-pass A/B harness (docs/WGPU_RENDERER_PLAN.md, phase 0): `await __webgpuHarness()`.
+            (window as unknown as { __webgpuHarness?: () => Promise<unknown> }).__webgpuHarness = () =>
+                import("./webgpu/object-pass-harness").then((module) => module.startObjectPassHarness(this));
         }
         this.renderer = new WebGLMapEditorRenderer(this.pluginHost);
         this.ready = this.initCache(cache);
@@ -2034,13 +2086,10 @@ export class MapEditor {
         }
         const mapManager = this.renderer.mapManager;
         const mapId = getMapSquareId(mapX, mapY);
+        // Only regions that are loaded in the editor show up: the minimap never streams in or renders its own neighbours.
         const loaded = mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
-        if (loaded) {
-            void this.queueLiveMinimapImage(mapX, mapY);
-        } else {
-            mapManager.loadMap(mapX, mapY);
-            void this.queueMinimapImage(mapX, mapY);
-        }
+        if (!loaded) return undefined;
+        void this.queueLiveMinimapImage(mapX, mapY);
         return this.minimapImageUrls.get(mapId);
     }
 
@@ -2242,11 +2291,7 @@ export class MapEditor {
         const mapManager = this.renderer.mapManager;
         const mapId = getMapSquareId(mapX, mapY);
         const map = mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
-        if (!map) {
-            mapManager.loadMap(mapX, mapY);
-            void this.queueMinimapImage(mapX, mapY);
-            return;
-        }
+        if (!map) return;
         if (
             this.loadingMinimapImageIds.size > this.workerPool.size * 4 ||
             this.minimapImageUrls.has(mapId) ||
@@ -2283,6 +2328,7 @@ export class MapEditor {
                     const patchReq: LiveMinimapWorkerRequest = {
                         mode: "patch",
                         scene: sceneData,
+                        locs: map.sceneLocData,
                         selectedLevel: this.selectedLevel,
                         borderSize: map.borderSize,
                         pixels: patchPixels,
@@ -2328,6 +2374,7 @@ export class MapEditor {
         const fullReq: LiveMinimapWorkerRequest = {
             mode: "full",
             scene: sceneData,
+            locs: map.sceneLocData,
             selectedLevel: this.selectedLevel,
             borderSize: map.borderSize,
         };

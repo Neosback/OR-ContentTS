@@ -7,14 +7,17 @@ import { getObjectDeleteModel, parseStoredDeleteSettings } from "./plugins/built
 import { canPlaceAsNormalObject, placementProblem } from "./plugins/builtins/object-edit-runtime";
 import { ObjectPickIndex, type EditorObjectRef } from "./webgl/sceneLocPicker";
 
-const host = (): IEditorPluginHost & { notified: number; copyCancelled: number } => {
+const host = (): IEditorPluginHost & { notified: number; copyCancelled: number; tool: string } => {
     const fake = {
         notified: 0,
         copyCancelled: 0,
+        tool: "object-selector",
         notifyWorkbenchStateChanged() { fake.notified++; },
         cancelObjectCopyPlacement() { fake.copyCancelled++; },
+        isObjectPlaceToolActive() { return fake.tool === "object-place"; },
+        setEditorTool(tool: string) { fake.tool = tool; },
     };
-    return fake as unknown as IEditorPluginHost & { notified: number; copyCancelled: number };
+    return fake as unknown as IEditorPluginHost & { notified: number; copyCancelled: number; tool: string };
 };
 
 const loc = (overrides: Partial<LocType>): LocType => ({ models: [[1]], types: undefined, ...overrides }) as unknown as LocType;
@@ -46,6 +49,8 @@ describe("object action model", () => {
         const h = host();
         const actions = getObjectActionModel(h);
         actions.startPlace(7);
+        // placing happens in the Place tool, not in Select
+        expect(h.tool).toBe("object-place");
         expect(getObjectActionModel(h).mode).toBe("place");
         expect(getObjectActionModel(h).candidate).toBe(7);
         for (let i = 0; i < 5; i++) getObjectActionModel(h).rotatePlacement();

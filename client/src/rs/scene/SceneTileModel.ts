@@ -45,6 +45,8 @@ const tileShapeFaces = [
 
 type SceneTileFace = {
     vertices: [SceneTileVertex, SceneTileVertex, SceneTileVertex];
+    /** Whether the shape table gives this face to the overlay (otherwise the underlay). */
+    overlay: boolean;
 };
 
 type SceneTileVertex = {
@@ -436,6 +438,7 @@ export class SceneTileModel {
             const v2 = (this.vertexZ[c] - tileY) / TILE_SIZE;
 
             this.faces.push({
+                overlay: isOverlay,
                 vertices: [
                     {
                         x: this.vertexX[a],

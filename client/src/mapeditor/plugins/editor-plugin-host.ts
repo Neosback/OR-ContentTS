@@ -178,6 +178,8 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     setViewMode(mode: MapEditorViewMode): void;
 
     getMinimapImageUrl(mapX: number, mapY: number): string | undefined;
+    /** A full-size minimap picture of any region (loaded ones from the live scene), for the world map. */
+    loadMinimapPreviewBlob(mapX: number, mapY: number): Promise<Blob | undefined>;
     scheduleMinimapRefreshAfterEdit(): void;
     accumulateMinimapDirtyFromEditedTiles(
         mapId: number,
@@ -250,6 +252,11 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     paintMouseButton: "left" | "right";
     objectsVisible: boolean;
     isObjectSelectorToolActive(): boolean;
+    isObjectPlaceToolActive(): boolean;
+    /** Whether something has been copied (it outlives the active tool; V or the Place tool puts it down). */
+    hasObjectClipboard(): boolean;
+    resumeObjectCopyPlacement(): boolean;
+    clearObjectClipboard(): void;
     isObjectDeleteToolActive(): boolean;
     isRegionStampToolActive(): boolean;
     getRegionStampSelectBounds(): import("./builtins/region-stamp-types").WorldTileBounds | undefined;
@@ -601,6 +608,9 @@ export class EditorPluginHost implements IEditorPluginHost {
         this._e.setViewMode(mode);
     }
 
+    loadMinimapPreviewBlob(mapX: number, mapY: number): Promise<Blob | undefined> {
+        return this._e.loadMinimapPreviewBlob(mapX, mapY);
+    }
     getMinimapImageUrl(mapX: number, mapY: number): string | undefined {
         return this._e.getMinimapImageUrl(mapX, mapY);
     }
@@ -815,6 +825,18 @@ export class EditorPluginHost implements IEditorPluginHost {
     }
     isObjectSelectorToolActive(): boolean {
         return this._e.isObjectSelectorToolActive();
+    }
+    isObjectPlaceToolActive(): boolean {
+        return this._e.isObjectPlaceToolActive();
+    }
+    hasObjectClipboard(): boolean {
+        return this._e.hasObjectClipboard();
+    }
+    resumeObjectCopyPlacement(): boolean {
+        return this._e.resumeObjectCopyPlacement();
+    }
+    clearObjectClipboard(): void {
+        this._e.clearObjectClipboard();
     }
     isObjectDeleteToolActive(): boolean {
         return this._e.isObjectDeleteToolActive();

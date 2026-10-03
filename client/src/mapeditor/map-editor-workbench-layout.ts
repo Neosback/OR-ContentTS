@@ -11,6 +11,7 @@ import { BUILTIN_WORKBENCH_UI_PLUGINS } from "./plugins/builtins/current-plugin-
 const ALL_MAP_EDITOR_TOOLS: readonly MapEditorTool[] = [
     "tile-brush",
     "object-selector",
+    "object-place",
     "object-delete",
     "region-stamp",
 ];

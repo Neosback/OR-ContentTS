@@ -88,7 +88,7 @@ export function buildPaletteItems(deps: PaletteDeps, query: string): PaletteItem
                 title: `Place ${entry.name}`,
                 subtitle: `Object #${entry.id}: pick it, then click the map`,
                 run: () => {
-                    host.setEditorTool("object-selector");
+                    host.setEditorTool("object-place");
                     getObjectActionModel(host).startPlace(entry.id);
                 },
             });

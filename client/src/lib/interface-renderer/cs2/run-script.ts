@@ -22,6 +22,7 @@ import { handleObjectOpcode } from "./object-opcodes";
 import { handleSocialOpcode } from "./social-opcodes";
 import { createDynamicWidget, type RuntimeWidget } from "./runtime-widget";
 import { handleEnumOpcode } from "./enum-opcodes";
+import { resolveWidgetLayout } from "../widget-layout";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
@@ -258,6 +259,18 @@ function getWidget(entry: InterfaceEntry, id: number): RuntimeWidget | null {
   return null;
 }
 
+/** Resolved (laid-out) x, y, width, height of a widget: what scripts read back, as opposed to its raw fields. */
+function resolvedLayout(entry: InterfaceEntry | null, widget: RuntimeWidget | null): { x: number; y: number; width: number; height: number } {
+  if (!widget) return { x: 0, y: 0, width: 0, height: 0 };
+  const { viewportWidth, viewportHeight, canvasWidth, canvasHeight } = getCs2RuntimeContext();
+  const viewport = { width: viewportWidth ?? canvasWidth ?? 512, height: viewportHeight ?? canvasHeight ?? 334 };
+  return resolveWidgetLayout(
+    widget as ComponentType,
+    (child) => (entry && child.layer !== -1 && Number.isFinite(child.layer) ? (getWidget(entry, child.layer) as ComponentType | null) : null),
+    viewport,
+  );
+}
+
 function getWidgetChild(entry: InterfaceEntry, parentId: number, childIndex: number): RuntimeWidget | null {
   const parent = getWidget(entry, parentId);
   if (!parent || !parent.children) return null;
@@ -344,6 +357,33 @@ export function method898(var0: number, var1: Script, var2: boolean): number {
     }
     invalidateWidgetRuntime(var6);
     return 1;
+  } else if (var0 === ScriptOpcodes.CC_CLONE) {
+    // Only the bank tab strip (script 505) uses it: child 0 is the tab graphic, children 1..9 are copies of it.
+    if (Interpreter.Interpreter_intStackSize < 3) {
+      Interpreter.Interpreter_intStackSize = 0;
+      return 1;
+    }
+    Interpreter.Interpreter_intStackSize -= 3;
+    const base = Interpreter.Interpreter_intStackSize;
+    const layerId = Number(Interpreter.Interpreter_intStack[base]);
+    const sourceIndex = Number(Interpreter.Interpreter_intStack[base + 1]);
+    const targetIndex = Number(Interpreter.Interpreter_intStack[base + 2]);
+    const layer = getWidget(entry, layerId);
+    const source = layer?.children?.[sourceIndex] as RuntimeWidget | null | undefined;
+    if (!layer || !source || !Number.isInteger(targetIndex) || targetIndex < 0) return 1;
+    if (!prepareParentForCcCreate(layer, targetIndex, false, var1)) return 1;
+    const copy = {
+      ...source,
+      op: [...(source.op ?? [])],
+      children: null,
+      childIndex: targetIndex,
+      __dynamicCreated: true,
+    } as RuntimeWidget;
+    layer.children![targetIndex] = copy;
+    if (var2) scriptDotWidget = copy;
+    else scriptActiveWidget = copy;
+    invalidateWidgetRuntime(layer);
+    return 1;
   } else {
     let var3: RuntimeWidget | null;
     if (var0 === ScriptOpcodes.CC_DELETE) {
@@ -413,16 +453,16 @@ export function method3514(var0: number, var1: Script, var2: boolean): number {
   if (!var3) return 2;
 
   if (var0 === ScriptOpcodes.IF_GETX) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3.x;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(entry, var3).x;
     return 1;
   } else if (var0 === ScriptOpcodes.IF_GETY) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3.y;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(entry, var3).y;
     return 1;
   } else if (var0 === ScriptOpcodes.IF_GETWIDTH) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3.width;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(entry, var3).width;
     return 1;
   } else if (var0 === ScriptOpcodes.IF_GETHEIGHT) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3.height;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(entry, var3).height;
     return 1;
   } else if (var0 === ScriptOpcodes.IF_GETHIDE) {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3.hide ? 1 : 0;
@@ -1131,17 +1171,18 @@ export function method1204(var0: number, var1: Script, var2: boolean): number {
   void var1;
   const var3 = (var2 ? scriptDotWidget : scriptActiveWidget) as RuntimeWidget | null;
 
+  const layoutEntry = getCs2RuntimeContext().interfaceEntry;
   if (var0 === ScriptOpcodes.CC_GETX) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.x ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(layoutEntry, var3).x;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETY) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.y ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(layoutEntry, var3).y;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETWIDTH) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.width ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(layoutEntry, var3).width;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETHEIGHT) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.height ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = resolvedLayout(layoutEntry, var3).height;
     return 1;
   } else if (var0 === ScriptOpcodes.CC_GETHIDE) {
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var3?.hide ? 1 : 0;

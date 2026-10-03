@@ -201,6 +201,30 @@
         {/if}
 
         <details class="overflow-hidden rounded border border-border bg-background" open>
+            <summary class="cursor-pointer px-2.5 py-2 text-xs font-semibold hover:bg-muted/40">Scenario</summary>
+            <div class="space-y-2 border-t p-2">
+                <p class="text-[10px] leading-snug text-muted-foreground">
+                    Fills the client with a lived-in account so interfaces look real: bank, inventory, skill levels. Opening a bank
+                    in Simulation applies "Bank: sample account" for you.
+                </p>
+                <div class="flex flex-col gap-1.5">
+                    {#each editor.availableScenarios as scenario (scenario.id)}
+                        <button
+                            type="button"
+                            class={`rounded border px-2 py-1.5 text-left transition-colors hover:bg-muted/50 ${
+                                editor.scenarioId === scenario.id ? "border-primary bg-primary/10" : "border-border"
+                            }`}
+                            onclick={() => editor.applyScenario(scenario.id)}
+                        >
+                            <span class="block text-[11px] font-medium">{scenario.label}</span>
+                            <span class="block text-[10px] text-muted-foreground">{scenario.description}</span>
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        </details>
+
+        <details class="overflow-hidden rounded border border-border bg-background" open>
             <summary class="cursor-pointer px-2.5 py-2 text-xs font-semibold hover:bg-muted/40">Runtime</summary>
             <div class="grid grid-cols-2 gap-2 border-t p-2">
                 <label class="space-y-1">

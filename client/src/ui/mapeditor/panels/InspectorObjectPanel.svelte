@@ -81,7 +81,7 @@
 </script>
 
 <PanelFrame>
-    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2.5 py-2.5 text-xs [&>*]:shrink-0">
+    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto! px-2.5 py-2.5 text-xs [&>*]:shrink-0">
         {#if copyActive}
             <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100/90">
                 Copy placement active — click the map to place · <span class="font-medium">Esc</span> to cancel

@@ -100,6 +100,11 @@ export class EditorObjectMesh {
         this.drawCallAlpha?.uniform("u_hideRoofs", value);
     }
 
+    /** The CPU-side chunk data this mesh was built from (read by the WebGPU harness; not copied). */
+    get chunkData(): readonly (EditorMapObjectChunkData | undefined)[] {
+        return this.chunks;
+    }
+
     get hasGeometry(): boolean {
         return this.rangesOpaque.length > 0 || this.rangesAlpha.length > 0;
     }

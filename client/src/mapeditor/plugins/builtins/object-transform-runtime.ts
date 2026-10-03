@@ -25,6 +25,7 @@ import {
     type WallData,
     type WallDecorationData,
 } from "../../webgl/sceneLocData";
+import { refreshWallDecorationsForEntries } from "../../webgl/wall-decoration-sync";
 import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync";
 import { ObjectPickIndex, type EditorObjectKind, type EditorObjectRef } from "../../webgl/sceneLocPicker";
 import type { WebGLMapEditorRenderer } from "../../webgl/WebGLMapEditorRenderer";
@@ -537,6 +538,8 @@ function applyTileObjectMutation(
         return false;
     }
 
+    // A decoration that turned or changed wall (or a wall that left one) sits at a different distance from it now.
+    refreshWallDecorationsForEntries(map.scene, [originalEntry, nextEntry], host.locTypeLoader);
     refreshSceneLocIndex(map, mapId);
     markAffectedObjectChunks(
         map,

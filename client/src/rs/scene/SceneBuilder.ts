@@ -14,6 +14,7 @@ import { generateHeight } from "../util/HeightCalc";
 import { CollisionMap } from "./CollisionMap";
 import { Scene } from "./Scene";
 import { SceneTileModel } from "./SceneTileModel";
+import { wallDecorationOffset } from "./WallDecorationOffset";
 import { Entity } from "./entity/Entity";
 import { EntityType, calculateEntityTag, getIdFromTag } from "./entity/EntityTag";
 import { LocEntity } from "./entity/LocEntity";
@@ -33,11 +34,6 @@ function readTerrainValue(buffer: ByteBuffer, newFormat: boolean, signed: boolea
 
 export class SceneBuilder {
     static readonly BLEND_RADIUS = 5;
-
-    private static readonly displacementX: number[] = [1, 0, -1, 0];
-    private static readonly displacementY: number[] = [0, -1, 0, 1];
-    private static readonly diagonalDisplacementX: number[] = [1, -1, -1, 1];
-    private static readonly diagonalDisplacementY: number[] = [-1, -1, 1, 1];
 
     static readonly WATER_OVERLAY_ID = 5;
 
@@ -888,8 +884,11 @@ export class SceneBuilder {
                 );
             }
 
-            const displacementX = displacement * SceneBuilder.displacementX[rotation];
-            const displacementY = displacement * SceneBuilder.displacementY[rotation];
+            const { x: displacementX, y: displacementY } = wallDecorationOffset(
+                type,
+                rotation,
+                displacement,
+            );
 
             scene.newWallDecoration(
                 level,
@@ -904,11 +903,10 @@ export class SceneBuilder {
                 flags,
             );
         } else if (type === LocModelType.WALL_DECORATION_DIAGONAL_OUTSIDE) {
-            let displacement = LocType.DEFAULT_DECOR_DISPLACEMENT / 2;
+            let displacement = LocType.DEFAULT_DECOR_DISPLACEMENT;
             const wallTag = scene.getWallTag(level, tileX, tileY);
             if (wallTag !== 0n) {
-                displacement =
-                    (this.locTypeLoader.load(getIdFromTag(wallTag)).decorDisplacement / 2) | 0;
+                displacement = this.locTypeLoader.load(getIdFromTag(wallTag)).decorDisplacement;
             }
 
             let entity: Entity | undefined;
@@ -932,8 +930,11 @@ export class SceneBuilder {
                 );
             }
 
-            const displacementX = displacement * SceneBuilder.diagonalDisplacementX[rotation];
-            const displacementY = displacement * SceneBuilder.diagonalDisplacementY[rotation];
+            const { x: displacementX, y: displacementY } = wallDecorationOffset(
+                type,
+                rotation,
+                displacement,
+            );
 
             scene.newWallDecoration(
                 level,
@@ -984,11 +985,10 @@ export class SceneBuilder {
                 flags,
             );
         } else if (type === LocModelType.WALL_DECORATION_DIAGONAL_DOUBLE) {
-            let displacement = LocType.DEFAULT_DECOR_DISPLACEMENT / 2;
+            let displacement = LocType.DEFAULT_DECOR_DISPLACEMENT;
             const wallTag = scene.getWallTag(level, tileX, tileY);
             if (wallTag !== 0n) {
-                displacement =
-                    (this.locTypeLoader.load(getIdFromTag(wallTag)).decorDisplacement / 2) | 0;
+                displacement = this.locTypeLoader.load(getIdFromTag(wallTag)).decorDisplacement;
             }
 
             const insideRotation = (rotation + 2) & 3;
@@ -1031,8 +1031,11 @@ export class SceneBuilder {
                 );
             }
 
-            const displacementX = displacement * SceneBuilder.diagonalDisplacementX[rotation];
-            const displacementY = displacement * SceneBuilder.diagonalDisplacementY[rotation];
+            const { x: displacementX, y: displacementY } = wallDecorationOffset(
+                type,
+                rotation,
+                displacement,
+            );
 
             scene.newWallDecoration(
                 level,

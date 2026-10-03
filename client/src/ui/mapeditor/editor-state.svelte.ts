@@ -108,6 +108,8 @@ export class EditorState {
     readonly snapshot: { readonly current: string };
     /** The dock workbench, once it exists (panels use it for placement and menus). */
     layout = $state.raw<Workbench | undefined>();
+    /** The world map (opened from the minimap's globe) over the editor. */
+    worldMapOpen = $state(false);
     readonly tool: { readonly current: MapEditorTool };
     readonly history: { readonly current: MapEditorHistorySnapshot };
 
@@ -125,6 +127,14 @@ export class EditorState {
     read<T>(getter: () => T): T {
         void this.snapshot.current;
         return getter();
+    }
+
+    openWorldMap(): void {
+        this.worldMapOpen = true;
+    }
+
+    closeWorldMap(): void {
+        this.worldMapOpen = false;
     }
 
     dispose(): void {

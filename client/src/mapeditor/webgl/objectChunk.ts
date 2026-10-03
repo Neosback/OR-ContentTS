@@ -52,6 +52,23 @@ export function getObjectChunkIdsForTileRect(
     return ids;
 }
 
+/**
+ * How far an object edit reaches into neighbouring tiles: walls and large objects share normals with what stands next to
+ * them (so joins shade smoothly and embedded end caps hide), which means a neighbour's mesh changes when this one does.
+ */
+export const OBJECT_NORMAL_MERGE_MARGIN_TILES = 2;
+
+/** The chunks to rebuild after editing objects inside a tile rectangle: the rectangle's chunks plus those it blends into. */
+export function getObjectChunkIdsAffectedByEdit(
+    localMinX: number,
+    localMinY: number,
+    localMaxX: number,
+    localMaxY: number,
+): number[] {
+    const margin = OBJECT_NORMAL_MERGE_MARGIN_TILES;
+    return getObjectChunkIdsForTileRect(localMinX - margin, localMinY - margin, localMaxX + margin, localMaxY + margin);
+}
+
 export function sceneTileIntersectsChunk(
     sceneTileX: number,
     sceneTileY: number,

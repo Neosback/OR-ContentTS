@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 import { cacheProxy } from "./vite/cache-proxy.mts";
+import { studioProjectFiles } from "./vite/studio-project-files.mts";
 import { glslAsString, serveCaches, wasmBz2Url } from "./vite/plugins.mts";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +31,7 @@ export default defineConfig(({ command, mode }) => ({
         wasmBz2Url(command, appRoot),
         serveCaches(cachesDir),
         cacheProxy(),
+        studioProjectFiles(),
     ],
     resolve: {
         alias: { "@": path.resolve(appRoot, "src") },

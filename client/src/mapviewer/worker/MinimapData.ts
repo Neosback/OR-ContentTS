@@ -53,5 +53,7 @@ export async function loadMinimapBlob(
     const minimapPixels = renderSd
         ? mapImageRenderer.renderMinimap(scene, level)
         : mapImageRenderer.renderMinimapHd(scene, level, drawMapFunctions);
+    // The flat renderer has no icons of its own; the HD one only drew floor decorations. Draw every icon the same way.
+    if (renderSd && drawMapFunctions) mapImageRenderer.drawMapFunctionIcons(scene, level, minimapPixels);
     return minimapHdPixelsToBlob(minimapPixels, scene.sizeX, scene.sizeY, borderSize);
 }

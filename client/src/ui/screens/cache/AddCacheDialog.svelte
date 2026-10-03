@@ -25,7 +25,12 @@
         selectBrowserProjectDirectory,
         type BrowserDirectoryHandle,
     } from "../../../project/browser-project-filesystem";
-    import { join } from "@tauri-apps/api/path";
+    import { createSystemPathFileSystem, joinSystemPath, studioServerSession } from "../../../lib/system-project-access";
+    import {
+        RemoteProjectFileSystem,
+        pickFolderViaStudioServer,
+        type StudioServerSession,
+    } from "../../../project/remote-project-filesystem";
     import {
         describeOpenRuneProject,
         type OpenRuneProjectOverview as ProjectOverview,
@@ -65,8 +70,23 @@
 
     const tauri = isTauriRuntime();
     const browserProjectAccess = getBrowserProjectAccessMode();
-    const openRuneFolderAccess =
-        tauri || browserProjectAccess === "filesystem";
+    /** Present when this page was served by Studio's own server: any browser can then open a folder by its path. */
+    let studio = $state<StudioServerSession | undefined>();
+    const serverAccess = $derived(!tauri && studio !== undefined);
+    const openRuneFolderAccess = $derived(
+        tauri || serverAccess || browserProjectAccess === "filesystem",
+    );
+    let serverPath = $state("");
+    $effect(() => {
+        if (tauri || !open) return;
+        let cancelled = false;
+        void studioServerSession().then((session) => {
+            if (!cancelled) studio = session;
+        });
+        return () => {
+            cancelled = true;
+        };
+    });
 
     let setupKind = $state<CacheSetupKind>("basic");
     let name = $state("");
@@ -254,8 +274,8 @@
         if (subPath) {
             fileSystem = new ScopedProjectFileSystem(source.fileSystem, subPath);
             if (source.accessMode === "system-path" && source.rootPath) {
-                rootPath = await join(source.rootPath, ...subPath.split("/"));
-                fileSystem = new TauriProjectFileSystem(rootPath);
+                rootPath = joinSystemPath(source.rootPath, ...subPath.split("/"));
+                fileSystem = (await createSystemPathFileSystem(rootPath)) ?? fileSystem;
                 label = rootPath;
             } else if (source.browserHandle) {
                 let handle = source.browserHandle;
@@ -290,7 +310,37 @@
         if (project?.gameConfig?.revision !== undefined) revision = String(project.gameConfig.revision);
     }
 
+    /** Opens the folder at `path` through the Studio server (any browser; read and write). */
+    async function openServerFolder(path: string): Promise<void> {
+        const trimmed = path.trim();
+        if (!trimmed) return;
+        sourceError = null;
+        await handlePickedFolder({
+            fileSystem: new RemoteProjectFileSystem(trimmed),
+            label: trimmed,
+            accessMode: "system-path",
+            rootPath: trimmed,
+        });
+    }
+
+    /** The Studio server opens the operating system's folder dialog, so this works where the browser has no picker. */
+    async function pickServerFolder(): Promise<void> {
+        if (!studio) return;
+        try {
+            const picked = await pickFolderViaStudioServer(studio);
+            if (!picked) return;
+            serverPath = picked;
+            await openServerFolder(picked);
+        } catch (error) {
+            sourceError = errorMessage(error);
+        }
+    }
+
     async function onPickOpenRuneRoot(): Promise<void> {
+        if (serverAccess) {
+            await pickServerFolder();
+            return;
+        }
         if (tauri) {
             const path = await pickOpenRuneProjectDirectory();
             if (!path) return;
@@ -474,11 +524,13 @@
                         </span>
                     </button>
                 </div>
-                {#if !tauri && browserProjectAccess === "filesystem"}
+                {#if serverAccess}
+                    <p class="text-xs text-emerald-400">Studio's server is running: project folders open by path, with read and write, in any browser.</p>
+                {:else if !tauri && browserProjectAccess === "filesystem"}
                     <p class="text-xs text-emerald-400">Direct project read/write is available in this browser.</p>
                 {:else if !tauri}
                     <p class="text-xs text-amber-400">
-                        This browser cannot grant direct project-folder access. Use a Chromium browser or the desktop app for OpenRune projects.
+                        This browser cannot grant direct project-folder access. Open Studio from its own server (<code>npm run dev</code>), use a Chromium browser, or use the desktop app for OpenRune projects.
                     </p>
                 {/if}
             </div>
@@ -498,6 +550,31 @@
                               ? "Choose a different folder"
                               : "Choose the OpenRune Server folder"}
                     </button>
+                    {#if serverAccess}
+                        <div class="rounded-md border border-border/70 bg-background/50 p-2.5">
+                            <label class="mb-1 block text-[11px] font-medium text-muted-foreground" for="server-project-path">Or type the folder's path</label>
+                            <div class="flex gap-2">
+                                <input
+                                    id="server-project-path"
+                                    class={cn(fieldClass, "min-w-0 flex-1 font-mono text-xs")}
+                                    placeholder="/Users/you/OpenRune-Server-main"
+                                    bind:value={serverPath}
+                                    onkeydown={(event) => event.key === "Enter" && void openServerFolder(serverPath)}
+                                />
+                                <button
+                                    type="button"
+                                    class="shrink-0 rounded-md border border-input bg-secondary px-3 text-xs disabled:opacity-60"
+                                    disabled={!serverPath.trim() || inspectingOpenRune}
+                                    onclick={() => void openServerFolder(serverPath)}
+                                >
+                                    Use folder
+                                </button>
+                            </div>
+                            <p class="mt-1.5 text-[11px] text-muted-foreground">
+                                This browser opens the folder through Studio's own server, so it works in Firefox and Safari too, with the same safe saves and backups as the desktop app.
+                            </p>
+                        </div>
+                    {/if}
                     {#if !locationNotes && !inspectingOpenRune}
                         <p class="text-xs text-muted-foreground">
                             Choose the repository root (the folder with <code>settings.gradle.kts</code>). If you choose a folder that contains it, Studio will find it.

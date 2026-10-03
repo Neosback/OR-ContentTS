@@ -488,3 +488,35 @@ It should contain:
 That PR answers the only question that matters at the start:
 
 > Is wgpu sufficiently better or strategically useful on the Studio's real object data to justify a renderer migration?
+
+## Phase 0 status (TypeScript WebGPU, editor object pass)
+
+Decision: the first experiment is **WebGPU written in TypeScript (WGSL)**, not Rust `wgpu`. Every input is already a
+TypeScript typed array, picking and UI are TypeScript, and wgpu/WASM would add a Rust build chain and a per-frame
+JS/WASM hop for no extra capability. Rust stays for CPU kernels. wgpu is revisited only if a native render surface is
+wanted. WebGPU also gives us compute shaders, which the RuneLite-style per-model face-priority sort needs (WebGL2 has none).
+
+What exists (`client/src/mapeditor/webgpu/`):
+
+| File | What |
+| --- | --- |
+| `object-pass.wgsl` | Line-for-line port of `main.vert.glsl` + `main.frag.glsl`, `VERTEX_SLOT` variant: vertex decode, HSL to RGB, texture animation, plane visibility, contouring, fog, wall push-back and depth bias. Opaque and alpha fragment entry points. |
+| `WebGPUObjectPass.ts` | Device/canvas setup, texture array with CPU mips, per-map vertex/index/slot buffers, height and render-flag textures, opaque then alpha draw per map, CPU and GPU timing (timestamp queries when available). |
+| `object-mesh-merge.ts` | The chunk-to-map-square merge `EditorObjectMesh` does, as a pure function (tested). `EditorObjectMesh.chunkData` exposes its input. |
+| `texture-mips.ts` | Box-filter mip chain (tested). |
+| `object-pass-harness.ts` | Dev-only A/B harness. `await __webgpuHarness()` in the dev console lays a WebGPU canvas over the editor's; `setMode("overlay" \| "only" \| "diff" \| "off")`. |
+
+Result on region 12342 (one map square, about 685k indices): the `diff` mode (CSS difference blend against the WebGL2
+canvas with the terrain draw stubbed) is black across all object pixels. Amplified 30x only faint texture-filter noise
+and a few edge pixels remain. WebGPU frame cost in the same scene: median CPU 0.025 ms, p95 0.05 ms, GPU about 0.8 ms,
+2 draw calls.
+
+Known differences and gaps:
+
+- Texture sampling is trilinear with 16x anisotropy (WebGPU needs all-linear filters for anisotropy); WebGL2 uses
+  `LINEAR_MIPMAP_NEAREST` + anisotropy. This is the speckle in the amplified diff.
+- Static frame only: animated locs, picking (the interact-id output) and terrain are not ported yet.
+- WebGL2 stays the reference renderer and the fallback.
+
+Next: face-priority ordering as a compute pass (port of RuneLite `FacePrioritySorter` / `priority_render.glsl`), then
+the picking target and animated index updates (phases 2 and 3 above).

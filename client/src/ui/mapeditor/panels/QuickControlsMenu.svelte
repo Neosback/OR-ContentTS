@@ -14,6 +14,8 @@
     } from "../../components/ui/dropdown-menu";
     import { useEditorState } from "../editor-state.svelte";
 
+    let { side = "bottom" }: { side?: "top" | "bottom" } = $props();
+
     const editor = useEditorState();
     const host = editor.host;
 
@@ -40,7 +42,7 @@
             </Button>
         {/snippet}
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" side="bottom" collisionPadding={8} class="w-56">
+    <DropdownMenuContent align="end" {side} collisionPadding={8} class="w-56">
         <div class="px-2 py-1.5 text-sm font-semibold">Quick controls</div>
         {#each items as { control, on } (control.id)}
             <!-- Stays open so several switches can be flipped in one go. -->

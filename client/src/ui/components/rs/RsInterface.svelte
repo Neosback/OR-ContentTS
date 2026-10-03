@@ -3,6 +3,7 @@
 
     import {
         InterfaceManager,
+        type ItemIconProvider,
         Interpreter,
         nudgeScrollY,
         setCs1InterfaceEntry,
@@ -40,6 +41,7 @@
         clientScriptIndex = null,
         objTypeLoader = null,
         enumTypeLoader = null,
+        itemIcons = null,
         class: className = "",
         viewportColor = "rgb(76,68,32)",
         showOverlays = true,
@@ -63,6 +65,7 @@
         clientScriptIndex?: CacheIndex | null;
         objTypeLoader?: ObjTypeLoader | null;
         enumTypeLoader?: EnumTypeLoader | null;
+        itemIcons?: ItemIconProvider | null;
         class?: string;
         viewportColor?: string;
         showOverlays?: boolean;
@@ -280,6 +283,8 @@
             objTypeLoader,
             enumTypeLoader,
             socialRuntime,
+            viewportWidth,
+            viewportHeight,
         );
 
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -358,12 +363,26 @@
         if (!context) return;
 
         const nextManager = new InterfaceManager(context, sprites);
+        nextManager.setItemIcons(untrack(() => itemIcons));
         manager = nextManager;
 
         // Rendering mutates runtime widget layout fields (tempWidth/tempHeight/x1/y1).
         // Keep those client-runtime writes outside Svelte dependency tracking so this
         // effect does not subscribe to the same state it mutates and recurse forever.
-        const renderFrame = (): void => untrack(() => draw(context, nextManager, data, id));
+        let lastDrawError = "";
+        const renderFrame = (): void => {
+            try {
+                untrack(() => draw(context, nextManager, data, id));
+            } catch (error) {
+                // A throwing draw used to end the requestAnimationFrame chain, leaving a blank canvas until the next
+                // reload. Report each distinct error once and keep the loop alive.
+                const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+                if (message !== lastDrawError) {
+                    lastDrawError = message;
+                    console.error("[RsInterface] draw failed:", error);
+                }
+            }
+        };
         const frame = (): void => {
             renderFrame();
             renderRaf = requestAnimationFrame(frame);

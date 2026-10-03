@@ -2,6 +2,7 @@ import { Model } from "../../rs/model/Model";
 import { LocModelType } from "../../rs/config/loctype/LocModelType";
 import { Loc } from "../../rs/scene/Loc";
 import { Scene } from "../../rs/scene/Scene";
+import { rotateWallDecorationOffset } from "../../rs/scene/WallDecorationOffset";
 import type { SceneTile } from "../../rs/scene/SceneTile";
 import { Entity } from "../../rs/scene/entity/Entity";
 import { getIdFromTag } from "../../rs/scene/entity/EntityTag";
@@ -670,9 +671,18 @@ export function rotateFloorDecorationData(floorDecoration: FloorDecorationData):
 
 export function rotateWallDecorationData(wallDecoration: WallDecorationData): WallDecorationData {
     const newFlags = nextRotationFlags(wallDecoration.flags);
+    // The offset pushes the decoration off its wall in the direction it faces, so it turns with the decoration.
+    const offset = rotateWallDecorationOffset(
+        newFlags & 0x3f,
+        rotationFromLocFlags(newFlags),
+        wallDecoration.offsetX,
+        wallDecoration.offsetY,
+    );
     return {
         ...wallDecoration,
         flags: newFlags,
+        offsetX: offset.x,
+        offsetY: offset.y,
         entity0: {
             ...wallDecoration.entity0,
             rotation: entityRotationForFlags(newFlags, 0),

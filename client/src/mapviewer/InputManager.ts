@@ -57,6 +57,9 @@ export function getAxisDeadzone(axis: number, zone: number): number {
     }
 }
 
+const MODIFIER_CODES: readonly string[] = ["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"];
+const MODIFIER_CODE_SET = new Set(MODIFIER_CODES);
+
 export class InputManager {
     element?: HTMLElement;
 
@@ -64,6 +67,12 @@ export class InputManager {
 
     /** Non-repeating keydown codes this frame; cleared in `onFrameEnd`. */
     keysPressedThisFrame: Set<string> = new Set();
+
+    /**
+     * Keys whose keyup the browser may never send (Escape leaving pointer lock, any key pressed with Cmd held on macOS).
+     * They count as held for the frame that sees them, then are released, so they cannot stay "down" forever.
+     */
+    private releaseAfterFrame: Set<string> = new Set();
 
     mouseX: number = -1;
     mouseY: number = -1;
@@ -138,6 +147,8 @@ export class InputManager {
         window.addEventListener("keydown", this.onKeyDown, true);
         window.addEventListener("keyup", this.onKeyUp, true);
         window.addEventListener("blur", this.onWindowBlur);
+        document.addEventListener("pointerlockchange", this.onPointerLockChange);
+        document.addEventListener("visibilitychange", this.onVisibilityChange);
 
         element.addEventListener("mousedown", this.onMouseDown);
         element.addEventListener("mousemove", this.onMouseMove);
@@ -167,6 +178,8 @@ export class InputManager {
         window.removeEventListener("keydown", this.onKeyDown, true);
         window.removeEventListener("keyup", this.onKeyUp, true);
         window.removeEventListener("blur", this.onWindowBlur);
+        document.removeEventListener("pointerlockchange", this.onPointerLockChange);
+        document.removeEventListener("visibilitychange", this.onVisibilityChange);
 
         this.element.removeEventListener("mousedown", this.onMouseDown);
         this.element.removeEventListener("mousemove", this.onMouseMove);
@@ -275,13 +288,51 @@ export class InputManager {
         }
     };
 
+    /** Modifier state the browser reports on every key event is the truth: drop modifiers whose keyup was missed. */
+    private reconcileModifiers(event: KeyboardEvent): void {
+        if (!event.shiftKey) {
+            this.keys.delete("ShiftLeft");
+            this.keys.delete("ShiftRight");
+        }
+        if (!event.ctrlKey) {
+            this.keys.delete("ControlLeft");
+            this.keys.delete("ControlRight");
+        }
+        if (!event.altKey) {
+            this.keys.delete("AltLeft");
+            this.keys.delete("AltRight");
+        }
+        if (!event.metaKey) {
+            this.keys.delete("MetaLeft");
+            this.keys.delete("MetaRight");
+        }
+    }
+
+    /** Releases every held key except modifiers and mouse buttons (focus changed, pointer lock left, Cmd released). */
+    private releaseHeldKeys(): void {
+        for (const code of [...this.keys.keys()]) {
+            if (MODIFIER_CODE_SET.has(code) || code.startsWith("Mouse")) continue;
+            this.keys.delete(code);
+        }
+        this.releaseAfterFrame.clear();
+    }
+
     private onKeyDown = (event: KeyboardEvent) => {
         if (this.inputBlockedForUi) {
             return;
         }
+        this.reconcileModifiers(event);
+        // Escape cancels whatever is in progress: nothing else should keep running underneath it.
+        if (event.code === "Escape") {
+            this.releaseHeldKeys();
+        }
         this.keys.set(event.code, true);
         if (!event.repeat) {
             this.keysPressedThisFrame.add(event.code);
+        }
+        // Escape's keyup is swallowed when it leaves pointer lock, and macOS sends no keyup for keys pressed with Cmd.
+        if (event.code === "Escape" || (event.metaKey && !MODIFIER_CODE_SET.has(event.code))) {
+            this.releaseAfterFrame.add(event.code);
         }
         if (!keyboardEventTargetIsEditable(event.target)) {
             event.preventDefault();
@@ -292,9 +343,27 @@ export class InputManager {
         if (this.inputBlockedForUi) {
             return;
         }
+        this.reconcileModifiers(event);
         this.keys.delete(event.code);
+        this.releaseAfterFrame.delete(event.code);
+        // Letting go of Cmd while a letter is held means that letter's keyup was never delivered.
+        if (event.code === "MetaLeft" || event.code === "MetaRight") {
+            this.releaseHeldKeys();
+        }
         if (!keyboardEventTargetIsEditable(event.target)) {
             event.preventDefault();
+        }
+    };
+
+    private onPointerLockChange = () => {
+        this.releaseHeldKeys();
+    };
+
+    private onVisibilityChange = () => {
+        if (document.visibilityState !== "visible") {
+            this.keys.clear();
+            this.keysPressedThisFrame.clear();
+            this.releaseAfterFrame.clear();
         }
     };
 
@@ -464,6 +533,10 @@ export class InputManager {
 
     onFrameEnd() {
         this.keysPressedThisFrame.clear();
+        for (const code of this.releaseAfterFrame) {
+            this.keys.delete(code);
+        }
+        this.releaseAfterFrame.clear();
         for (const key of this.keys.keys()) {
             this.keys.set(key, false);
         }

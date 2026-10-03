@@ -27,6 +27,7 @@ export const EDITOR_TOOL_DOCK_PANEL: Partial<Record<MapEditorTool, MapEditorDock
     "tile-brush": "editor-tile-painter",
     height: "editor-height",
     "object-selector": "editor-object-selector",
+    "object-place": "editor-object-selector",
     "object-delete": "editor-object-delete",
     "region-stamp": "editor-region-stamp",
 };

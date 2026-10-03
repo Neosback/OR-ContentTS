@@ -52,6 +52,10 @@ export const objectSelectorEditorTool: EditorToolPlugin = {
             id: "copy-object",
             defaultChords: [{ code: "KeyC" }],
         }),
+        editorCommandKeyBinding("object-selector.paste-object", {
+            id: "paste-object",
+            defaultChords: [{ code: "KeyV" }],
+        }),
         {
             id: "copy-object-suppress",
             name: "Copy object (camera suppress)",

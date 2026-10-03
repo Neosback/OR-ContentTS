@@ -118,6 +118,7 @@ export type EditorToolIconName =
     | "mouse-pointer-2"
     | "trash-2"
     | "copy"
+    | "package-plus"
     | "paintbrush";
 
 export interface EditorToolPlugin {

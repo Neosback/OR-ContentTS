@@ -33,6 +33,7 @@ export type EditorCommandId =
     | "tool.select-tile-brush"
     | "tile-brush.eyedropper"
     | "tool.select-object-selector"
+    | "tool.select-object-place"
     | "tool.select-object-delete"
     | "tool.select-region-stamp"
     | "height.mode.raise-lower"
@@ -52,6 +53,7 @@ export type EditorCommandId =
     | "object-selector.clear-selection"
     | "object-selector.rotate-selected"
     | "object-selector.copy-object"
+    | "object-selector.paste-object"
     | "object-selector.move-object"
     | "object-selector.delete-selected"
     | "region-stamp.copy"
@@ -103,6 +105,7 @@ const TOOL_SELECT_COMMANDS: readonly {
     { id: "tool.select-tile-brush", tool: "tile-brush", name: "Select Tile painter", description: "Switch active tool to the Tile painter (underlay, overlay, height and flags in one brush)." },
     { id: "tool.select-tile-flags", tool: "tile-flags", name: "Select Tile flags tool", description: "Switch active paint tool to Tile flags." },
     { id: "tool.select-object-selector", tool: "object-selector", name: "Select Object Selector tool", description: "Switch active tool to Object Selector." },
+    { id: "tool.select-object-place", tool: "object-place", name: "Select Place tool", description: "Switch active tool to Place (put copies of an object onto tiles)." },
     { id: "tool.select-object-delete", tool: "object-delete", name: "Select Object Delete tool", description: "Switch active tool to Object Delete." },
     { id: "tool.select-region-stamp", tool: "region-stamp", name: "Select Region Stamp tool", description: "Switch active tool to Region Stamp." },
 ];
@@ -270,13 +273,21 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
     },
     {
         id: "object-selector.cancel",
-        name: "Deselect / cancel copy",
-        description: "Cancel copy placement, or clear the current object selection.",
+        name: "Deselect / finish placing",
+        description: "Finish placing (Place goes back to Select; the copied object stays on the clipboard), or clear the current object selection.",
         isEnabled: ({ host }) =>
             host.isObjectSelectorToolActive() &&
-            (getObjectActionModel(host).mode !== undefined || host.isObjectCopyPlacementActive() || host.selectedObject != null),
+            (host.isObjectPlaceToolActive() ||
+                getObjectActionModel(host).mode !== undefined ||
+                host.isObjectCopyPlacementActive() ||
+                host.selectedObject != null),
         execute: ({ host }) => {
-            if (getObjectActionModel(host).mode !== undefined) getObjectActionModel(host).cancel();
+            if (host.isObjectPlaceToolActive()) {
+                // Placing is its own tool: Esc ends it and returns to Select. The clipboard is kept for V.
+                getObjectActionModel(host).cancel();
+                host.cancelObjectCopyPlacement();
+                host.setEditorTool("object-selector");
+            } else if (getObjectActionModel(host).mode !== undefined) getObjectActionModel(host).cancel();
             else if (host.isObjectCopyPlacementActive()) host.cancelObjectCopyPlacement();
             else host.clearSelectedObject();
             host.notifyWorkbenchStateChanged();
@@ -353,6 +364,16 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         },
         execute: ({ host }) => {
             host.startObjectCopyPlacement();
+            host.notifyWorkbenchStateChanged();
+        },
+    },
+    {
+        id: "object-selector.paste-object",
+        name: "Paste copied object",
+        description: "Place more copies of the last copied object (switches to the Place tool).",
+        isEnabled: ({ host }) => host.isObjectSelectorToolActive() && host.hasObjectClipboard() && !host.isObjectCopyPlacementActive(),
+        execute: ({ host }) => {
+            host.resumeObjectCopyPlacement();
             host.notifyWorkbenchStateChanged();
         },
     },

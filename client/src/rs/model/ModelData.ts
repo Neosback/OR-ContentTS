@@ -36,6 +36,12 @@ export class ModelData extends Entity {
 
     faceAlphas!: Int8Array;
 
+    /**
+     * Per-face depth bias authored into newer model files (`ModelData.field2718` in the deob client). The GPU plugin
+     * pulls a biased face toward the camera so decorations and other faces that touch a wall draw over it.
+     */
+    faceBias?: Int8Array;
+
     textureCoords?: Int8Array;
 
     faceColors!: Uint16Array;
@@ -297,6 +303,7 @@ export class ModelData extends Entity {
 
         let hasRenderTypes = false;
         let hasRenderPriorities = false;
+        let hasFaceBias = false;
         let hasAlphas = false;
         let hasFaceSkins = false;
         let hasTextures = false;
@@ -309,6 +316,7 @@ export class ModelData extends Entity {
                 this.verticesCount += model.verticesCount;
                 this.faceCount += model.faceCount;
                 this.textureFaceCount += model.textureFaceCount;
+                hasFaceBias ||= !!model.faceBias;
                 if (model.faceRenderPriorities) {
                     hasRenderPriorities = true;
                 } else {
@@ -343,6 +351,10 @@ export class ModelData extends Entity {
 
         if (hasRenderPriorities) {
             this.faceRenderPriorities = new Int8Array(this.faceCount);
+        }
+
+        if (hasFaceBias) {
+            this.faceBias = new Int8Array(this.faceCount);
         }
 
         if (hasAlphas) {
@@ -402,6 +414,10 @@ export class ModelData extends Entity {
                     } else {
                         this.faceRenderPriorities[this.faceCount] = model.priority;
                     }
+                }
+
+                if (hasFaceBias && model.faceBias && this.faceBias) {
+                    this.faceBias[this.faceCount] = model.faceBias[f];
                 }
 
                 if (hasAlphas && model.faceAlphas) {
@@ -858,6 +874,19 @@ export class ModelData extends Entity {
             buf1.readUnsignedShort();
             buf1.readInt();
         }
+
+        this.readFaceBias(buf1, data.length, faceCount);
+    }
+
+    /** The optional trailing per-face bias block: a flag byte (1 = present) then one signed byte per face. */
+    private readFaceBias(buf: ByteBuffer, limit: number, faceCount: number): void {
+        if (buf.offset >= limit || buf.readUnsignedByte() !== 1 || buf.offset + faceCount > limit) {
+            return;
+        }
+        this.faceBias = new Int8Array(faceCount);
+        for (let i = 0; i < faceCount; i++) {
+            this.faceBias[i] = buf.readByte();
+        }
     }
 
     decodeV2(data: Int8Array): void {
@@ -920,7 +949,7 @@ export class ModelData extends Entity {
         var47 += var18;
         const var35 = var47;
         var47 += var19;
-        // const var10000 = var47 + var20;
+        const biasOffset = var47 + var20;
         this.verticesCount = vertexCount;
         this.faceCount = faceCount;
         this.textureFaceCount = texTriangleCount;
@@ -1117,6 +1146,9 @@ export class ModelData extends Entity {
             this.textureMappingM[i] = buf1.readUnsignedShort();
             this.textureMappingN[i] = buf1.readUnsignedShort();
         }
+
+        buf1.offset = biasOffset;
+        this.readFaceBias(buf1, data.length - 23, faceCount);
 
         if (this.textureCoords) {
             let var48 = false;
@@ -2202,6 +2234,7 @@ export class ModelData extends Entity {
         this.faceAlphas = model.faceAlphas;
         this.faceRenderTypes = model.faceRenderTypes;
         this.faceRenderPriorities = model.faceRenderPriorities;
+        this.faceBias = model.faceBias;
         this.textureCoords = model.textureCoords;
         this.priority = model.priority;
         this.textureRenderTypes = model.textureRenderTypes;
@@ -2250,6 +2283,7 @@ export class ModelData extends Entity {
         model.indices2 = this.indices2;
         model.indices3 = this.indices3;
         model.faceRenderPriorities = this.faceRenderPriorities;
+        model.faceBias = this.faceBias;
         model.faceAlphas = this.faceAlphas;
         model.textureCoords = this.textureCoords;
         model.faceColors = this.faceColors;
@@ -2342,6 +2376,7 @@ export class ModelData extends Entity {
         model.indices3 = this.indices3;
         model.faceRenderTypes = this.faceRenderTypes;
         model.faceRenderPriorities = this.faceRenderPriorities;
+        model.faceBias = this.faceBias;
         model.faceAlphas = this.faceAlphas;
         model.textureCoords = this.textureCoords;
         model.faceColors = this.faceColors;
@@ -2824,6 +2859,9 @@ export class ModelData extends Entity {
         }
         const magnitude = Math.sqrt(lightZ * lightZ + lightX * lightX + lightY * lightY) | 0;
         const lightIntensity = (magnitude * contrast) >> 8;
+        // The client divides as integers (truncating toward zero) before adding the ambient; adding first and
+        // truncating the sum leaves faces on the shaded side a level darker.
+        const shade = (dot: number, divisor: number): number => (dot / divisor) | 0;
         const model = new Model();
         model.faceColors1 = new Int32Array(this.faceCount);
         model.faceColors2 = new Int32Array(this.faceCount);
@@ -2930,8 +2968,7 @@ export class ModelData extends Entity {
                     }
                     let var14 =
                         (ambient +
-                            (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                                (lightIntensity * normal.magnitude)) <<
+                            shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude)) <<
                         17;
                     model.faceColors1[i] = var14 | ModelData.adjustLightness(color, var14 >> 17);
 
@@ -2942,8 +2979,7 @@ export class ModelData extends Entity {
                     }
                     var14 =
                         (ambient +
-                            (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                                (lightIntensity * normal.magnitude)) <<
+                            shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude)) <<
                         17;
                     model.faceColors2[i] = var14 | ModelData.adjustLightness(color, var14 >> 17);
 
@@ -2954,16 +2990,14 @@ export class ModelData extends Entity {
                     }
                     var14 =
                         (ambient +
-                            (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                                (lightIntensity * normal.magnitude)) <<
+                            shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude)) <<
                         17;
                     model.faceColors3[i] = var14 | ModelData.adjustLightness(color, var14 >> 17);
                 } else if (type === 1 && this.faceNormals) {
                     const normal = this.faceNormals[i];
                     const var14 =
                         (ambient +
-                            (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                                ((lightIntensity >> 1) + lightIntensity)) <<
+                            shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, (lightIntensity >> 1) + lightIntensity)) <<
                         17;
                     model.faceColors1[i] =
                         var14 | ModelData.adjustLightness(this.faceColors[i] & 0xffff, var14 >> 17);
@@ -2984,8 +3018,7 @@ export class ModelData extends Entity {
 
                 let var14 =
                     ambient +
-                    (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                        (lightIntensity * normal.magnitude);
+                    shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude);
                 model.faceColors1[i] = ModelData.clampLightness(var14);
                 if (this.mergedNormals && this.mergedNormals[this.indices2[i]]) {
                     normal = this.mergedNormals[this.indices2[i]];
@@ -2995,8 +3028,7 @@ export class ModelData extends Entity {
 
                 var14 =
                     ambient +
-                    (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                        (lightIntensity * normal.magnitude);
+                    shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude);
                 model.faceColors2[i] = ModelData.clampLightness(var14);
                 if (this.mergedNormals && this.mergedNormals[this.indices3[i]]) {
                     normal = this.mergedNormals[this.indices3[i]];
@@ -3006,15 +3038,13 @@ export class ModelData extends Entity {
 
                 var14 =
                     ambient +
-                    (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                        (lightIntensity * normal.magnitude);
+                    shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, lightIntensity * normal.magnitude);
                 model.faceColors3[i] = ModelData.clampLightness(var14);
             } else if (type === 1 && this.faceNormals) {
                 const normal = this.faceNormals[i];
                 const var14 =
                     ambient +
-                    (lightY * normal.y + lightZ * normal.z + lightX * normal.x) /
-                        ((lightIntensity >> 1) + lightIntensity);
+                    shade(lightY * normal.y + lightZ * normal.z + lightX * normal.x, (lightIntensity >> 1) + lightIntensity);
                 model.faceColors1[i] = ModelData.clampLightness(var14);
                 model.faceColors3[i] = -1;
             } else {
@@ -3034,6 +3064,7 @@ export class ModelData extends Entity {
         model.indices2 = this.indices2;
         model.indices3 = this.indices3;
         model.faceRenderPriorities = this.faceRenderPriorities;
+        model.faceBias = this.faceBias;
         model.faceAlphas = this.faceAlphas;
         model.priority = this.priority;
         model.vertexLabels = this.vertexLabels;

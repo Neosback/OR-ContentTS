@@ -19,6 +19,7 @@ import {
     type WallData,
     type WallDecorationData,
 } from "../../webgl/sceneLocData";
+import { refreshWallDecorationsForEntries } from "../../webgl/wall-decoration-sync";
 import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync";
 import {
     findLocForRef,
@@ -413,6 +414,7 @@ function placeObjectCopyAtSceneTile(
     if (!applySceneTileLocEntry(map.scene, nextEntry)) {
         return undefined;
     }
+    refreshWallDecorationsForEntries(map.scene, [nextEntry], host.locTypeLoader);
 
     const mapId = getMapSquareId(map.mapX, map.mapY);
     const mapX = map.mapX;

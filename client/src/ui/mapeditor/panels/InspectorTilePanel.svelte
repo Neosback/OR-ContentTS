@@ -54,7 +54,7 @@
 </script>
 
 <PanelFrame>
-    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2.5 py-2.5 text-xs">
+    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto! px-2.5 py-2.5 text-xs">
         <TilePreview {host} target={tileTarget} />
         <div class="flex min-h-[15rem] flex-col gap-2">
             {#if tileTarget}

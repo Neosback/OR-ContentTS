@@ -30,3 +30,18 @@ Each capability is marked **In use** or **Loaded**, plus **Ready / Partly there 
 ## Handoff note
 
 Setup is no longer the next architectural blocker. Preserve its single-root authority and retained-session behavior while adding new editors. A Basic Cache must clear active OpenRune project metadata, and switching OpenRune roots must never expose stale metadata from the previous project.
+
+## Opening a project in any browser (Studio server)
+
+Browsers without the File System Access API (Firefox, Safari) cannot pick a folder themselves. When Studio is served by its own
+server (`npm run dev` or `npm run start`), the page can open a project folder **by its path** through that server instead:
+
+- Add setup → OpenRune project → pick the folder with the operating system's dialog (the server opens it) or type the path.
+- The setup is stored as a normal system-path setup, so it opens the same way in the desktop app and in a browser.
+- Reads and writes go through `client/vite/studio-project-files.mts`, which applies the desktop app's rules: paths are confined to the
+  granted folder (`..` and symlinks leading out are refused), writes are atomic, can be refused when the file changed since it was read
+  (`CONFLICT`), keep a backup of what they replace in `~/.openrune-studio/backups` (newest 10 per file), and changes made elsewhere stream
+  back to the page.
+- Only this computer can use it: the request must come from localhost with a matching origin and carry a token that only same-origin
+  pages can fetch. Do not expose the dev server with `--host`; requests with a non-localhost Host are refused anyway.
+- Browser side: `client/src/project/remote-project-filesystem.ts`; the access mode choice lives in `client/src/lib/system-project-access.ts`.

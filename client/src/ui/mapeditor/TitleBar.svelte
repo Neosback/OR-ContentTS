@@ -1,5 +1,6 @@
 <script lang="ts">
     import Download from "@lucide/svelte/icons/download";
+    import MapPin from "@lucide/svelte/icons/map-pin";
     import File from "@lucide/svelte/icons/file";
     import LayoutGrid from "@lucide/svelte/icons/layout-grid";
     import Save from "@lucide/svelte/icons/save";
@@ -29,6 +30,8 @@
     import { errorMessage, notifyError, notifyMessage, notifySuccess } from "../lib/notify";
     import { useEditorState } from "./editor-state.svelte";
     import type { ProjectSessionController } from "./project-session.svelte";
+    import type { LaunchController } from "./launch.svelte";
+    import ChangeLocationDialog from "./launch/ChangeLocationDialog.svelte";
     import CommandPalette from "./CommandPalette.svelte";
     import PluginHub from "./PluginHub.svelte";
     import SettingsDialog from "./settings/SettingsDialog.svelte";
@@ -37,10 +40,15 @@
     let {
         projectSession,
         onCloseProject,
+        launch,
     }: {
         projectSession: ProjectSessionController;
         onCloseProject: (discardChanges: boolean) => void;
+        /** Present in the app; lets the bar reopen the Region / World Start card without leaving the editor. */
+        launch?: LaunchController;
     } = $props();
+
+    const location = $derived(launch?.currentLocation);
 
     const editor = useEditorState();
     const host = editor.host;
@@ -303,6 +311,21 @@
         <PluginHub />
 
         <div class="flex-1"></div>
+
+        {#if launch}
+            <Button
+                variant="ghost"
+                size="sm"
+                class="gap-1.5 px-2"
+                onclick={() => launch?.requestLocationChange()}
+                title="Change location: pick another region or open the world map"
+                aria-label="Change location"
+            >
+                <MapPin class="size-4" />
+                <span class="hidden sm:inline">{location ? (location.mode === "sandbox" ? "Sandbox" : `Region ${location.regionId} (${location.mapX}, ${location.mapY})`) : "Change location"}</span>
+            </Button>
+            <ChangeLocationDialog {launch} />
+        {/if}
 
         <SettingsDialog bind:open={settingsOpen} bind:tab={settingsTab} />
         <CommandPalette onOpenSettings={openSettings} />

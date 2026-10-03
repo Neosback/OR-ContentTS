@@ -7,10 +7,9 @@ import {
     ensureBrowserProjectPermission,
     loadBrowserProjectHandle,
 } from "./browser-project-handle-store";
-import { isTauriRuntime } from "./tauri/is-tauri";
+import { createSystemPathFileSystem } from "./system-project-access";
 import { BrowserProjectFileSystem } from "../project/browser-project-filesystem";
 import type { ProjectFileSystem } from "../project/project-filesystem";
-import { TauriProjectFileSystem } from "../project/tauri-project-filesystem";
 
 export type ResolveOpenRuneProfileFileSystemOptions = {
     requestBrowserPermission?: boolean;
@@ -48,12 +47,9 @@ export async function resolveOpenRuneProfileFileSystem(
         return new BrowserProjectFileSystem(handle);
     }
 
-    if (
-        mode === "system-path" &&
-        isTauriRuntime() &&
-        profile.openRuneRootPath
-    ) {
-        return new TauriProjectFileSystem(profile.openRuneRootPath);
+    if (mode === "system-path" && profile.openRuneRootPath) {
+        // The desktop app, or the browser through the Studio server; undefined when neither is available.
+        return createSystemPathFileSystem(profile.openRuneRootPath);
     }
 
     return undefined;

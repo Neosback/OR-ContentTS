@@ -49,6 +49,8 @@ export const ScriptOpcodes = {
   CC_CREATE: 100,
   CC_DELETE: 101,
   CC_DELETEALL: 102,
+  /** Rev 240 (OpenRune cache): `cc_clone(layer, sourceChild, newChild)`, copy a child widget into a new child slot. */
+  CC_CLONE: 105,
   CC_FIND: 200,
   IF_FIND: 201,
   CC_SETPOSITION: 1000,

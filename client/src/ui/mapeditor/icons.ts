@@ -6,6 +6,7 @@ import Layers from "@lucide/svelte/icons/layers";
 import Layers2 from "@lucide/svelte/icons/layers-2";
 import LayoutGrid from "@lucide/svelte/icons/layout-grid";
 import MousePointer2 from "@lucide/svelte/icons/mouse-pointer-2";
+import PackagePlus from "@lucide/svelte/icons/package-plus";
 import Paintbrush from "@lucide/svelte/icons/paintbrush";
 import Mountain from "@lucide/svelte/icons/mountain";
 import Sparkles from "@lucide/svelte/icons/sparkles";
@@ -27,6 +28,7 @@ export const TOOL_ICONS: Record<EditorToolIconName, Icon> = {
     "mouse-pointer-2": MousePointer2,
     "trash-2": Trash2,
     copy: Copy,
+    "package-plus": PackagePlus,
     paintbrush: Paintbrush,
 };
 

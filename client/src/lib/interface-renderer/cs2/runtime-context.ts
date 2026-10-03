@@ -51,6 +51,9 @@ export type Cs2RuntimeContext = {
   interfaceEntry: InterfaceEntry | null;
   canvasWidth: number | null;
   canvasHeight: number | null;
+  /** The game viewport that root widgets lay out against (512x334 in fixed mode); defaults when unset. */
+  viewportWidth: number | null;
+  viewportHeight: number | null;
 };
 
 const defaultClientState = createMockClientState();
@@ -68,6 +71,8 @@ let ctx: Cs2RuntimeContext = {
   varbitLookup: null,
   interfaceEntry: null,
   canvasWidth: null,
+  viewportWidth: null,
+  viewportHeight: null,
   canvasHeight: null,
 };
 
@@ -87,6 +92,8 @@ export function applyCs2RuntimeFromSim(
   objTypeLoader: ObjTypeLoader | null | undefined = null,
   enumTypeLoader: EnumTypeLoader | null | undefined = null,
   socialRuntime: Cs2SocialRuntime | null | undefined = null,
+  viewportWidth: number | null | undefined = null,
+  viewportHeight: number | null | undefined = null,
 ): void {
   const clientState = sim ?? createMockClientState();
   ctx = {
@@ -101,6 +108,8 @@ export function applyCs2RuntimeFromSim(
     varcs: clientState.varcs,
     varbitLookup: varbitLookup ?? null,
     interfaceEntry: interfaceEntry ?? null,
+    viewportWidth: typeof viewportWidth === "number" ? viewportWidth : null,
+    viewportHeight: typeof viewportHeight === "number" ? viewportHeight : null,
     canvasWidth: typeof canvasWidth === "number" ? canvasWidth : null,
     canvasHeight: typeof canvasHeight === "number" ? canvasHeight : null,
   };

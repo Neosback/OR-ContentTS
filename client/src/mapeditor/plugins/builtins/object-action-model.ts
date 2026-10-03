@@ -74,6 +74,8 @@ export function getObjectActionModel(host: IEditorPluginHost): ObjectActionModel
         startPlace(locTypeId) {
             const id = locTypeId ?? state.candidate;
             if (id === undefined) return;
+            // Putting things down happens in the Place tool; a copy in hand gives way to the catalog pick.
+            if (!host.isObjectPlaceToolActive()) host.setEditorTool("object-place");
             host.cancelObjectCopyPlacement();
             state.candidate = id;
             state.mode = "place";

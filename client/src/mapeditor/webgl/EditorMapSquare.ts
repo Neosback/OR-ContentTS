@@ -15,6 +15,7 @@ import { Scene, loadTileRenderFlagsTextureData } from "../../rs/scene/Scene";
 import { EditorObjectMesh } from "./EditorObjectMesh";
 import { applySceneLocData, type SceneLocData } from "./sceneLocData";
 import { ObjectPickIndex } from "./sceneLocPicker";
+import { getObjectChunkIdsAffectedByEdit } from "./objectChunk";
 import { EditorMapData } from "./loader/EditorMapData";
 import { EditorMapObjectChunkData } from "./loader/EditorMapObjectChunkData";
 import { createTileRenderFlagsTexture } from "../../mapviewer/webgl/TileRenderFlagsTexture";
@@ -170,14 +171,8 @@ export class EditorMapSquare implements MapSquare {
 
     markObjectChunksDirty(localMinX: number, localMinY: number, localMaxX: number, localMaxY: number): void {
         this.objectUpdated = true;
-        const chunkMinX = Math.max(0, localMinX >> 3);
-        const chunkMinY = Math.max(0, localMinY >> 3);
-        const chunkMaxX = Math.min(7, localMaxX >> 3);
-        const chunkMaxY = Math.min(7, localMaxY >> 3);
-        for (let cy = chunkMinY; cy <= chunkMaxY; cy++) {
-            for (let cx = chunkMinX; cx <= chunkMaxX; cx++) {
-                this.dirtyObjectChunks.add(cy * 8 + cx);
-            }
+        for (const chunkId of getObjectChunkIdsAffectedByEdit(localMinX, localMinY, localMaxX, localMaxY)) {
+            this.dirtyObjectChunks.add(chunkId);
         }
     }
 

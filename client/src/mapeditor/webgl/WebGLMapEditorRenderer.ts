@@ -1153,7 +1153,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             }
             return;
         }
-        if (!this.paintTransactionActive && this.host.editorTool !== "object-selector" && this.host.editorTool !== "object-delete" && this.host.editorTool !== "region-stamp") {
+        if (!this.paintTransactionActive && this.host.editorTool !== "object-selector" && this.host.editorTool !== "object-place" && this.host.editorTool !== "object-delete" && this.host.editorTool !== "region-stamp") {
             this.host.beginEditTransaction(this.host.editorTool);
             this.paintTransactionActive = true;
         }
@@ -2181,7 +2181,9 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
     private updateObjectSelectorState(): void {
         if (this.host.isObjectCopyPlacementActive()) {
-            this.host.debugText = "Copy placement — click to place · Esc to cancel";
+            this.host.debugText = "Place — click to put a copy down · Esc to finish (V pastes again)";
+        } else if (this.host.isObjectPlaceToolActive()) {
+            this.host.debugText = "Place — copy an object in Select (C), or pick one from the catalog";
         }
 
         this.host.setHoveredObject(this.pickHoveredObject());
@@ -2223,6 +2225,8 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                         this.host.notifyWorkbenchStateChanged();
                     }
                 }
+            } else if (this.host.isObjectPlaceToolActive()) {
+                // Place only puts things down; picking is Select's job.
             } else if (this.host.hoveredObject) {
                 this.host.setSelectedObject({ ...this.host.hoveredObject });
             } else if (this.hoverWorldX !== -1 && this.hoverWorldY !== -1) {
@@ -3622,6 +3626,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         }
         if (
             this.host.editorTool === "object-selector" ||
+            this.host.editorTool === "object-place" ||
             this.host.editorTool === "object-delete" ||
             this.host.editorTool === "region-stamp"
         ) {

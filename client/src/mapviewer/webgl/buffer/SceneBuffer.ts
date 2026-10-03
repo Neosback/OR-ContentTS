@@ -135,12 +135,12 @@ export class SceneBuffer {
      */
     addModelPass(model: Model, transparent: boolean, offset?: vec3, faces?: ModelFace[]): void {
         if (this.packer) {
-            packModel(this.packer, model, transparent, offset);
+            packModel(this.packer, model, transparent, offset, true, this.faceDepth);
             return;
         }
         this.addModel(
             model,
-            faces ?? getModelFaces(model).filter((face) => isModelFaceTransparent(this.textureLoader, face) === transparent),
+            faces ?? getModelFaces(model, this.faceDepth).filter((face) => isModelFaceTransparent(this.textureLoader, face) === transparent),
             offset,
         );
     }
@@ -417,6 +417,8 @@ export class SceneBuffer {
                         model,
                         group.transparent,
                         offsets,
+                        true,
+                        this.faceDepth,
                     );
                     let offset = firstOffset;
                     for (let i = 0; i < runLength; i++) {
@@ -626,12 +628,12 @@ export function isModelFaceTransparent(textureLoader: TextureLoader, face: Model
     );
 }
 
-export function getModelFaces(model: Model): ModelFace[] {
+export function getModelFaces(model: Model, depthSource?: FaceDepthSource): ModelFace[] {
     const faces: ModelFace[] = [];
 
     const faceTransparencies = model.faceAlphas;
 
-    const priorities = model.faceRenderPriorities;
+    const priorities = faceDepthValues(model, depthSource);
 
     for (let index = 0; index < model.faceCount; index++) {
         let hslC = model.faceColors3[index];

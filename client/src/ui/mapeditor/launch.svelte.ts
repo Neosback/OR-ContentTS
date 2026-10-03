@@ -234,6 +234,8 @@ export class LaunchController {
     private enteringBounds: Bounds | undefined;
     private sandboxSweepBounds: Bounds | undefined;
     private launchMeta: LaunchMeta | undefined;
+    /** The region (and radius) the editor was last opened on; shown in the title bar. */
+    currentLocation = $state<{ regionId: number; mapX: number; mapY: number; radius: number; mode: LaunchMode } | undefined>();
     private lastSavedSessionKey = "";
     private timers = new Set<number>();
     private abort = new AbortController();
@@ -407,6 +409,7 @@ export class LaunchController {
         host.setSandboxBounds(mode === "sandbox" ? bounds : undefined);
         this.sandboxSweepBounds = mode === "sandbox" ? bounds : undefined;
         this.launchMeta = meta;
+        this.currentLocation = { regionId: meta.regionId, mapX: meta.mapX, mapY: meta.mapY, radius: meta.radius, mode: meta.mode };
 
         // Mount/start the renderer before waiting for map squares. The WebGL map
         // builder advances from the renderer frame loop.
@@ -418,6 +421,44 @@ export class LaunchController {
 
         // Persist immediately so rapid tab switches cannot miss Last Loaded.
         if (persistNow) this.saveLastLoadedEntry(meta, "enter");
+    }
+
+    /** The Change location dialog (title bar button, or the world map when the place picked is not loaded). */
+    locationDialogOpen = $state(false);
+    private locationTargetPreset = false;
+
+    /**
+     * Opens Change location. `regionId` (from the world map) pre-fills the target; without it the card starts on where the
+     * editor is now. Asks first when the project has unsaved changes. Returns whether it opened.
+     */
+    requestLocationChange(regionId?: number): boolean {
+        if (this.projects.snapshot.dirty && !window.confirm("You have unsaved project changes. Change location anyway?")) return false;
+        if (regionId !== undefined) {
+            this.targetRegion = String(regionId);
+            this.targetRegionX = "";
+            this.targetRegionY = "";
+            this.locationTargetPreset = true;
+        }
+        this.locationDialogOpen = true;
+        return true;
+    }
+
+    /** Opens the region card on where the editor currently is, ready to type a different place. */
+    primeForLocationChange(): void {
+        this.activeMode = "region";
+        if (this.locationTargetPreset) {
+            // The world map already chose the target; only the radius comes from the current place.
+            this.locationTargetPreset = false;
+            if (this.currentLocation?.mode === "region") this.regionRadius = this.currentLocation.radius;
+            return;
+        }
+        const current = this.currentLocation;
+        if (current && current.mode === "region") {
+            this.targetRegion = String(current.regionId);
+            this.targetRegionX = "";
+            this.targetRegionY = "";
+            this.regionRadius = current.radius;
+        }
     }
 
     launchRegion(mode: LaunchMode = this.activeMode): void {

@@ -16,6 +16,7 @@ import {
 import { GameVals, GAMEVALS_CACHE_INDEX_ID } from "../rs/config/gameval/GameVals";
 import type { Sprite } from "../rs/sprite/InterfaceCanvasSprite";
 import { preloadInterfaceSprites } from "../rs/sprite/preloadInterfaceSprites";
+import { ItemIconRenderer } from "../lib/interface-renderer/item-icon-renderer";
 
 function tryCreateGameVals(cacheSystem: CacheSystem): GameVals | null {
     if (!cacheSystem.indexExists(GAMEVALS_CACHE_INDEX_ID)) {
@@ -59,6 +60,16 @@ function tryGetObjTypeLoader(cache: LoadedCache, cacheSystem: CacheSystem): ObjT
     }
 }
 
+function tryCreateItemIcons(cache: LoadedCache, cacheSystem: CacheSystem): ItemIconRenderer | null {
+    if (cache.type !== "dat2") return null;
+    try {
+        const factory = new Dat2CacheLoaderFactory(cache.info, cache.type, cacheSystem);
+        return new ItemIconRenderer(factory.getObjTypeLoader(), factory.getModelLoader(), factory.getTextureLoader());
+    } catch {
+        return null;
+    }
+}
+
 function tryGetEnumTypeLoader(cache: LoadedCache, cacheSystem: CacheSystem): EnumTypeLoader | null {
     if (cache.type !== "dat2") return null;
     try {
@@ -96,6 +107,8 @@ export class InterfaceViewer {
     clientScriptIndex!: CacheIndex | null;
     objTypeLoader!: ObjTypeLoader | null;
     enumTypeLoader!: EnumTypeLoader | null;
+    /** Renders the item sprites interface widgets show (bank slots, shops, ...) from the cache's models. */
+    itemIcons!: ItemIconRenderer | null;
     varbitDefinitions!: ReadonlyMap<number, VarbitDefinition> | null;
 
     constructor(cache: LoadedCache) {
@@ -114,6 +127,7 @@ export class InterfaceViewer {
         this.clientScriptIndex = tryGetDat2ClientScriptIndex(this.cacheSystem);
         this.objTypeLoader = tryGetObjTypeLoader(cache, this.cacheSystem);
         this.enumTypeLoader = tryGetEnumTypeLoader(cache, this.cacheSystem);
+        this.itemIcons = tryCreateItemIcons(cache, this.cacheSystem);
     }
 
     load(): void {

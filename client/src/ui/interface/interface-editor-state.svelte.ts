@@ -28,6 +28,14 @@ import {
 import { collectOnLoadScriptDiagnostics } from "../../lib/interface-renderer/cs2/on-load-script-diagnostics";
 import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../lib/interface-renderer/cs2/runtime-context";
 import { openInterface, setCs1InterfaceEntry } from "../../lib/interface-renderer/interface-manager";
+import {
+    CONTAINER_BANK,
+    SIMULATION_SCENARIOS,
+    defaultScenarioFor,
+    scenarioById,
+    type ScenarioSources,
+    type SimulationScenario,
+} from "../../lib/interface-renderer/simulation-scenarios";
 import type { VarbitDefinitionLookup } from "../../rs/config/vartype/bit/VarBitTypeLoader";
 import type { InterfaceViewer } from "../../interface/InterfaceViewer";
 import {
@@ -103,11 +111,16 @@ export class InterfaceEditorState {
 
     isInterfaceLoaded = $state(false);
     interfaceLoadError = $state<string | null>(null);
-    interfaceData = $state<InterfaceEntry | null>(null);
-    simulationInterfaceData = $state<InterfaceEntry | null>(null);
+    // Raw, not deep-reactive: the renderer writes layout fields (tempWidth, ...) onto these component objects while it
+    // draws, which through a proxy re-triggered the draw effect forever and overflowed the stack. Edits replace the
+    // object (see setInterfaceData), which is what notifies readers.
+    interfaceData = $state.raw<InterfaceEntry | null>(null);
+    simulationInterfaceData = $state.raw<InterfaceEntry | null>(null);
     selectedComponentNodeKey = $state<string | null>(null);
 
     cs1SimState = $state<Cs1SimState>(Cs1Interpreter.defaultState());
+    /** The simulation scenario last applied (a bank full of items, ...), shown in the State debugger. */
+    scenarioId = $state<string | null>(null);
     cs2LogLines = $state<Cs2LogLine[]>([]);
     cs2RedrawNonce = $state(0);
 
@@ -127,6 +140,10 @@ export class InterfaceEditorState {
 
     constructor(readonly viewer: InterfaceViewer) {
         this.revision = viewer.loadedCache.info.revision ?? "latest";
+        // Dev-only handle so the simulation can be driven from the console / browser pane.
+        if (import.meta.env.DEV && typeof window !== "undefined") {
+            (window as unknown as { __interfaceEditor?: unknown }).__interfaceEditor = this;
+        }
         this.metadataSource = createInterfaceMetadataSource(
             viewer.gamevals,
             getActiveOpenRuneProjectSnapshot()?.gameVals ?? null,
@@ -275,6 +292,7 @@ export class InterfaceEditorState {
         this.runtimeMode = next;
         this.selectedComponentNodeKey = null;
         this.cs2RedrawNonce++;
+        this.autoApplyScenario();
     };
 
     setInteractiveMode: StateSetter<boolean> = (value) => {
@@ -307,6 +325,41 @@ export class InterfaceEditorState {
         const next = applySetter(previous, value);
         this.cs1SimState = mergeMockClientState(previous, next);
     };
+
+    /** What scenarios can build from: the cache's item definitions and, when one is open, the OpenRune project's shops. */
+    get scenarioSources(): ScenarioSources {
+        const project = getActiveOpenRuneProjectSnapshot();
+        const stock = project
+            ? project.serverToml.inventories.flatMap((inventory) =>
+                  inventory.stock.flatMap((entry) =>
+                      entry.resolvedObjId !== undefined && entry.resolvedObjId >= 0
+                          ? [{ itemId: entry.resolvedObjId, quantity: Math.max(1, entry.count) }]
+                          : [],
+                  ),
+              )
+            : null;
+        return { objTypeLoader: this.viewer.objTypeLoader, openRuneStock: stock, varbitLookup: this.varbitDefinitionLookup };
+    }
+
+    get availableScenarios(): SimulationScenario[] {
+        const sources = this.scenarioSources;
+        return SIMULATION_SCENARIOS.filter((scenario) => scenario.available(sources));
+    }
+
+    applyScenario = (id: string): void => {
+        const scenario = scenarioById(id);
+        const sources = this.scenarioSources;
+        if (!scenario || !scenario.available(sources)) return;
+        this.mutateMockClientState((client) => scenario.apply(client, sources));
+        this.scenarioId = id;
+    };
+
+    /** Opening an interface in Simulation should look lived-in: seed the scenario that suits it unless state is already set. */
+    private autoApplyScenario(): void {
+        if (this.runtimeMode !== "simulate" || this.cs1SimState.itemContainers[CONTAINER_BANK]) return;
+        const scenario = defaultScenarioFor(this.selectedName, this.scenarioSources);
+        if (scenario) this.applyScenario(scenario.id);
+    }
 
     mutateMockClientState = (mutator: (state: Cs1SimState) => void): void => {
         const current = this.cs1SimState;
@@ -470,6 +523,7 @@ export class InterfaceEditorState {
                 ...diagnostics.map((line) => makeCs2LogLine(cs2DiagLineLevel(line), line)),
             ].slice(-500);
             this.isInterfaceLoaded = true;
+            this.autoApplyScenario();
         } catch (error) {
             if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
             this.interfaceData = null;

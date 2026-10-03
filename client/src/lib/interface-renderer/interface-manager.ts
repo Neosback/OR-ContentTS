@@ -1,3 +1,4 @@
+import { alignWidget, alignWidgetPosition, alignWidgetSize } from "./widget-layout";
 import type { ComponentType, InterfaceEntry } from "./component-types";
 import { InterfaceParent, registerInterfaceParent, parseInterfaceParentsLookup } from "./interface-parent";
 import { Cs1Interpreter, type Cs1SimState } from "./cs1-interpreter";
@@ -288,86 +289,6 @@ function colorStartTag(color: number): string {
   return `<col=${color.toString(16).padStart(6, "0")}>`;
 }
 
-function alignWidgetSize(var0: ComponentType, var1: number, var2: number, _var3: boolean): void {
-  if (var0.type === 12) {
-    var0.tempWidth = var0.width;
-    var0.tempHeight = var0.height;
-    return;
-  }
-  if (var0.clientCode === 1337) {
-    var0.tempWidth = var0.width;
-    var0.tempHeight = var0.height;
-    return;
-  }
-
-  if (var0.widthMode === 0) {
-    var0.tempWidth = var0.width;
-  } else if (var0.widthMode === 1) {
-    var0.tempWidth = var1 - var0.width;
-  } else if (var0.widthMode === 2) {
-    var0.tempWidth = (var0.width * var1) >> 14;
-  } else {
-    var0.tempWidth = var0.width;
-  }
-
-  if (var0.heightMode === 0) {
-    var0.tempHeight = var0.height;
-  } else if (var0.heightMode === 1) {
-    var0.tempHeight = var2 - var0.height;
-  } else if (var0.heightMode === 2) {
-    var0.tempHeight = (var0.height * var2) >> 14;
-  } else {
-    var0.tempHeight = var0.height;
-  }
-
-  const field3677 = Math.max(1, var0.field3677 ?? 1);
-  const field3770 = Math.max(1, var0.field3770 ?? 1);
-  if (var0.widthMode === 4) {
-    var0.tempWidth = Math.trunc((field3770 * var0.tempHeight) / field3677);
-  }
-  if (var0.heightMode === 4) {
-    var0.tempHeight = Math.trunc((var0.tempWidth * field3677) / field3770);
-  }
-}
-
-function alignWidgetPosition(var0: ComponentType, var1: number, var2: number): void {
-  const width1 = var0.tempWidth;
-  const height1 = var0.tempHeight;
-
-  if (var0.xMode === 0) {
-    var0.x1 = var0.x;
-  } else if (var0.xMode === 1) {
-    var0.x1 = var0.x + ((var1 - width1) >> 1);
-  } else if (var0.xMode === 2) {
-    var0.x1 = var1 - width1 - var0.x;
-  } else if (var0.xMode === 3) {
-    var0.x1 = (var0.x * var1) >> 14;
-  } else if (var0.xMode === 4) {
-    var0.x1 = ((var1 - width1) >> 1) + ((var0.x * var1) >> 14);
-  } else {
-    var0.x1 = var1 - width1 - ((var0.x * var1) >> 14);
-  }
-
-  if (var0.yMode === 0) {
-    var0.y1 = var0.y;
-  } else if (var0.yMode === 1) {
-    var0.y1 = ((var2 - height1) >> 1) + var0.y;
-  } else if (var0.yMode === 2) {
-    var0.y1 = var2 - height1 - var0.y;
-  } else if (var0.yMode === 3) {
-    var0.y1 = (var2 * var0.y) >> 14;
-  } else if (var0.yMode === 4) {
-    var0.y1 = ((var2 - height1) >> 1) + ((var2 * var0.y) >> 14);
-  } else {
-    var0.y1 = var2 - height1 - ((var2 * var0.y) >> 14);
-  }
-}
-
-function alignWidget(var0: ComponentType, parentTempWidth: number, parentTempHeight: number): void {
-  alignWidgetSize(var0, parentTempWidth, parentTempHeight, false);
-  alignWidgetPosition(var0, parentTempWidth, parentTempHeight);
-}
-
 function resizeInterfaceScroll(var0: ComponentType): void {
   const scroll = getScroll(componentRuntimeId(var0));
   if (scroll.x > var0.scrollWidth - var0.tempWidth) scroll.x = var0.scrollWidth - var0.tempWidth;
@@ -376,8 +297,20 @@ function resizeInterfaceScroll(var0: ComponentType): void {
   if (scroll.y < 0) scroll.y = 0;
 }
 
+/** Draws item icons for widgets that show an item (`cc_setobject`); implemented by ItemIconRenderer. */
+export interface ItemIconProvider {
+  renderToCanvas(
+    itemId: number,
+    quantity: number,
+    options: { outline?: number; shadow?: number; quantityMode?: number },
+  ): HTMLCanvasElement | undefined;
+}
+
+type ItemWidgetFields = { itemId?: number; itemQuantity?: number; itemQuantityMode?: number };
+
 export class InterfaceManager {
   private rast: Rasterizer2D;
+  private itemIcons: ItemIconProvider | null = null;
 
   private readonly spritesById: ReadonlyMap<number, Sprite>;
   public readonly validRootWidgets = Array.from({ length: 100 }, () => false);
@@ -387,6 +320,30 @@ export class InterfaceManager {
   constructor(ctx: CanvasRenderingContext2D, spritesById: ReadonlyMap<number, Sprite> = new Map<number, Sprite>()) {
     this.rast = new Rasterizer2D(ctx);
     this.spritesById = spritesById;
+  }
+
+  setItemIcons(provider: ItemIconProvider | null): void {
+    this.itemIcons = provider;
+  }
+
+  /** Draws the item a graphic widget shows, scaled to the widget like the client does. Returns whether it drew one. */
+  private drawWidgetItem(widget: ComponentType, x: number, y: number): boolean {
+    const fields = widget as ComponentType & ItemWidgetFields;
+    const itemId = fields.itemId;
+    if (!this.itemIcons || typeof itemId !== "number" || itemId < 0) return false;
+    const icon = this.itemIcons.renderToCanvas(itemId, fields.itemQuantity ?? 1, {
+      outline: widget.outline,
+      shadow: widget.graphicShadow,
+      quantityMode: fields.itemQuantityMode ?? 2,
+    });
+    if (!icon) return true;
+    const ctx = this.rast.ctx;
+    ctx.imageSmoothingEnabled = false;
+    if (widget.trans1 !== 0) ctx.globalAlpha = (256 - (widget.trans1 & 255)) / 256;
+    if (icon.width === widget.tempWidth && icon.height === widget.tempHeight) ctx.drawImage(icon, x, y);
+    else ctx.drawImage(icon, x, y, widget.tempWidth, widget.tempHeight);
+    ctx.globalAlpha = 1;
+    return true;
   }
 
   drawInterfaceClipped(
@@ -848,6 +805,7 @@ export class InterfaceManager {
       }
 
       if (var10.type === 5) {
+        if (this.drawWidgetItem(var10, x, y)) continue;
         if (!var10.v3) {
           const spriteId = runCs1(var10) ? var10.secondaryGraphic : var10.graphic;
           if (spriteId < 0) continue;

@@ -64,6 +64,8 @@
     </div>
 {:else if tool === "object-selector"}
     <p class={hint}>Selection tool — hover and click objects in the 3D view.</p>
+{:else if tool === "object-place"}
+    <p class={hint}>Place tool — click to put the copied or catalog object down · R rotates · Esc finishes.</p>
 {:else if tool === "object-delete"}
     <p class={hint}>Delete tool — hold Delete and hover objects to remove them.</p>
 {:else if tool === "region-stamp"}

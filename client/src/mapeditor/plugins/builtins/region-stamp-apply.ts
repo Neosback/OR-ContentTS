@@ -23,6 +23,7 @@ import {
     type WallData,
     type WallDecorationData,
 } from "../../webgl/sceneLocData";
+import { refreshWallDecorationsForEntries } from "../../webgl/wall-decoration-sync";
 import { markObjectChunksForHeightEdit } from "../../webgl/scene-loc-height-sync";
 import { syncMapObjectPickIndex, worldTileToSceneTile } from "./object-transform-runtime";
 import type { WebGLMapEditorRenderer } from "../../webgl/WebGLMapEditorRenderer";
@@ -356,6 +357,7 @@ function applyRegionObjects(
                 for (const entry of newEntries) {
                     applySceneTileLocEntry(map.scene, entry);
                 }
+                refreshWallDecorationsForEntries(map.scene, [...before, ...newEntries], host.locTypeLoader);
                 const after = snapshotObjectEntriesForBounds(map, level, sceneBounds).map(cloneSceneTileLocEntry);
                 if (recordHistory && JSON.stringify(before) !== JSON.stringify(after)) {
                     host.recordEditMutation({

@@ -1,6 +1,7 @@
 import type { vec3 } from "gl-matrix";
 
 import type { Model } from "../rs/model/Model";
+import { faceDepthValues, getFaceDepthSource, type FaceDepthSource } from "../rs/model/face-depth-source";
 import { MeshPacker } from "./openrune-core/openrune_core";
 
 export { MeshPacker };
@@ -43,6 +44,7 @@ export function packModel(
     transparent: boolean,
     offset?: vec3,
     reuseVertices = true,
+    depthSource: FaceDepthSource = getFaceDepthSource(),
 ): number {
     return packer.add_model(
         model.faceCount,
@@ -58,7 +60,7 @@ export function packModel(
         model.faceColors3,
         model.faceTextures ?? EMPTY_I16,
         model.faceAlphas ?? EMPTY_I8,
-        model.faceRenderPriorities ?? EMPTY_I8,
+        faceDepthValues(model, depthSource) ?? EMPTY_I8,
         model.uvs ?? EMPTY_F32,
         offset !== undefined,
         offset?.[0] ?? 0,
@@ -94,7 +96,7 @@ export function packModelOffsets(
         model.faceColors3,
         model.faceTextures ?? EMPTY_I16,
         model.faceAlphas ?? EMPTY_I8,
-        model.faceRenderPriorities ?? EMPTY_I8,
+        faceDepthValues(model, depthSource) ?? EMPTY_I8,
         model.uvs ?? EMPTY_F32,
         offsets,
         transparent,

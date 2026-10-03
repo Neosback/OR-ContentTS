@@ -15,20 +15,24 @@
     import ObjectPropertiesWindow from "./panels/ObjectPropertiesWindow.svelte";
     import RegionStampCopyDialog from "./palettes/RegionStampCopyDialog.svelte";
     import StatusBar from "./StatusBar.svelte";
+    import EditorWorldMap from "./EditorWorldMap.svelte";
     import TitleBar from "./TitleBar.svelte";
     import { Workbench } from "./workbench-controller.svelte";
     import { isStatusBarVisible } from "../../mapeditor/status-bar-model";
     import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
     import type { ProjectSessionController } from "./project-session.svelte";
+    import type { LaunchController } from "./launch.svelte";
 
     let {
         host,
         projectSession,
         onCloseProject,
+        launch,
     }: {
         host: IEditorPluginHost;
         projectSession: ProjectSessionController;
         onCloseProject: (discardChanges: boolean) => void;
+        launch?: LaunchController;
     } = $props();
 
     const editor = new EditorState(host);
@@ -88,7 +92,8 @@
 </script>
 
 <div class="map-editor-container">
-    <TitleBar {projectSession} {onCloseProject} />
+    <TitleBar {projectSession} {onCloseProject} {launch} />
+    <EditorWorldMap {launch} />
     <div class="map-editor-workbench-body">
         <div bind:this={dockHost} class="map-editor-workbench-dockview h-full w-full min-h-0 min-w-0"></div>
     </div>

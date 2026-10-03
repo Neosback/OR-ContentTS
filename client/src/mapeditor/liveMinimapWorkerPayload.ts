@@ -1,6 +1,7 @@
 import { Transfer } from "threads/worker";
 
 import type { SceneData } from "./webgl/loader/EditorMapData";
+import type { SceneLocData } from "./webgl/sceneLocData";
 import { Scene } from "../rs/scene/Scene";
 
 /** Build a scene instance backed by transferred terrain snapshots (minimap-only). */
@@ -23,12 +24,15 @@ export type LiveMinimapWorkerRequest =
     | {
           mode: "full";
           scene: SceneData;
+          /** The placed objects, so the minimap can show walls, map scenes and map function icons. */
+          locs?: SceneLocData;
           selectedLevel: number;
           borderSize: number;
       }
     | {
           mode: "patch";
           scene: SceneData;
+          locs?: SceneLocData;
           selectedLevel: number;
           borderSize: number;
           pixels: Int32Array;

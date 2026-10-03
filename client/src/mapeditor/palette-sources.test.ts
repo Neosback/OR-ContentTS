@@ -12,6 +12,7 @@ const makeDeps = (): { deps: PaletteDeps; host: { goToWorldTile: ReturnType<type
         notifyWorkbenchStateChanged: vi.fn(),
         getEditorTool: () => "object-selector",
         isObjectSelectorToolActive: () => false,
+        isObjectPlaceToolActive: () => false,
         selectedObject: undefined,
         hideBelowViewPlane: false,
         showRoofs: true,
@@ -58,7 +59,7 @@ describe("palette items", () => {
         const items = buildPaletteItems(deps, "oak");
         expect(items[0]).toMatchObject({ group: "Objects", title: "Place Oak tree" });
         items[0].run();
-        expect(host.setEditorTool).toHaveBeenCalledWith("object-selector");
+        expect(host.setEditorTool).toHaveBeenCalledWith("object-place");
     });
 
     it("shows commands and toggles before object matches in the grouped list", () => {

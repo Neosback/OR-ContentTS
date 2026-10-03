@@ -12,11 +12,15 @@
     import { perfState } from "../../lib/perf.svelte";
     import { useEditorState } from "../editor-state.svelte";
     import { buildViewportMenuItems } from "./viewport-menu";
+    import { isViewportMinimapVisible } from "../../../mapeditor/viewport-minimap-model";
+    import EditorMinimap from "./EditorMinimap.svelte";
+    import QuickControlsMenu from "./QuickControlsMenu.svelte";
 
     const editor = useEditorState();
     const host = editor.host;
     const hud = editor.hud;
     const statusBarOn = $derived(editor.read(() => isStatusBarVisible(host)));
+    const minimapOn = $derived(editor.read(() => isViewportMinimapVisible(host)));
 
     onMount(() => host.setViewMode("editor"));
 
@@ -82,6 +86,15 @@
                 {/if}
             </div>
             <div class="renderer-canvas h-full w-full" tabindex="0" role="application" use:rendererCanvas={host.renderer}></div>
+        </div>
+        {#if minimapOn}
+            <div class="pointer-events-auto absolute right-2 top-2 z-20 drop-shadow-md">
+                <EditorMinimap />
+            </div>
+        {/if}
+        <!-- Quick controls: the pinned rendering switches, in the corner of the view they change. -->
+        <div class="pointer-events-auto absolute bottom-2 right-2 z-20 rounded-md border border-border bg-card/85 shadow-md backdrop-blur">
+            <QuickControlsMenu side="top" />
         </div>
     </div>
 </TooltipProvider>
