@@ -13,6 +13,8 @@ export type MockClientItemContainer = {
   /** Client item-container ids use definition ids directly (-1 = empty). */
   itemIds: number[];
   itemQuantities: number[];
+  /** Optional logical capacity when the populated slot arrays are sparse or truncated. */
+  capacity?: number;
 };
 
 export type MockClientSocialUser = {
@@ -222,6 +224,7 @@ export function setMockClientItemContainer(
   state.itemContainers[containerId] = {
     itemIds: [...container.itemIds],
     itemQuantities: [...container.itemQuantities],
+    capacity: container.capacity,
   };
   state.changes.inventories.add(containerId);
 }
@@ -251,7 +254,8 @@ export function getMockClientItemTotal(state: MockClientState, containerId: numb
 }
 
 export function getMockClientInventorySize(state: MockClientState, containerId: number): number {
-  const explicit = state.itemContainers[containerId]?.itemIds.length;
+  const container = state.itemContainers[containerId];
+  const explicit = container?.capacity ?? container?.itemIds.length;
   if (explicit !== undefined) return explicit;
 
   const commonCapacities: Readonly<Record<number, number>> = {
