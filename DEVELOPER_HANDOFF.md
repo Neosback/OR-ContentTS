@@ -310,6 +310,7 @@ These PRs establish the current baseline:
 | #73 | Added the shared Mock Client State harness, moved Varcs/social/client-state queries onto it, wired CS2 varp/varbit/varc mutations into one change journal, and replaced 3300-family client-state stubs with harness-backed inventory/stat/world/coordinate reads |
 | #74 | Added trigger-aware Interface widget event dispatch, initial/transmit/timer/pointer hooks, widget-relative mouse context, serialized 20 ms CS2 cycles, and shared IF3 mock-state simulation |
 | #76 | Tightened Interface event parity with root onLoad activation, true write-count transmit overflow semantics, and effective-hidden ancestor filtering |
+| #78 | Added explicit Interface Edit/Simulation modes, an isolated runtime interface graph, and a dockable State Debugger over the shared Mock Client State |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -691,9 +692,9 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, active retained runtime binding, Interface metadata projection, core rev-240 NPC/Obj/Param parity, selected-cache DBTable/DBRow/DBColumn decoding, Interface preview stabilization, and the shared Mock Client State foundation are in place. **For the current Interface-realism track, the next focused milestone should be explicit Edit vs Simulation modes plus a State Debugger over the PR #73 state and PR #74 event dispatcher**, not a second simulation state or a full game-server emulator.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, active retained runtime binding, Interface metadata projection, core rev-240 NPC/Obj/Param parity, selected-cache DBTable/DBRow/DBColumn decoding, Interface preview stabilization, the shared Mock Client State, event dispatch, and explicit Edit/Simulation runtime separation are in place. **After PR #78, continue Interface realism from real cache-script diagnostics and missing CS2 opcode families before considering a mock network layer.**
 
-For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, enum definitions, DB tables, and DB rows come from the selected cache; symbolic names/provenance come from the selected cache plus the retained OpenRune project metadata layer. Runtime state comes from the PR #73 Mock Client State and runtime hooks are dispatched by PR #74. The next Interface priority is making that machinery inspectable and controllable through explicit Edit/Simulation modes and a State Debugger, while continuing CS2 opcode coverage from real cache-script diagnostics. The remaining lossy/missing decoder audit remains the parallel cache-definition track and should stay separate from Interface event work.
+For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, enum definitions, DB tables, and DB rows come from the selected cache; symbolic names/provenance come from the selected cache plus the retained OpenRune project metadata layer. Runtime state comes from PR #73, hooks from PR #74/#76, and PR #78 separates authoring definitions from an inspectable Simulation graph with a State Debugger. The next Interface priority is broader CS2 coverage driven by actual unsupported-opcode/script diagnostics; the optional mock network layer should remain separate. The remaining lossy/missing decoder audit remains the parallel cache-definition track.
 
 ### Next-developer checklist and traps
 
