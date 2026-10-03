@@ -1,6 +1,7 @@
 import { vec3 } from "gl-matrix";
 
 import { Model, computeTextureCoords } from "../../../rs/model/Model";
+import { faceDepthValues, getFaceDepthSource, type FaceDepthSource } from "../../../rs/model/face-depth-source";
 import { Scene } from "../../../rs/scene/Scene";
 import { SceneTile } from "../../../rs/scene/SceneTile";
 import { TextureLoader } from "../../../rs/texture/TextureLoader";
@@ -88,6 +89,7 @@ export class SceneBuffer {
         readonly textureLoader: TextureLoader,
         readonly textureIdIndexMap: Map<number, number>,
         initVertexCount: number,
+        readonly faceDepth: FaceDepthSource = getFaceDepthSource(),
     ) {
         this.vertexBuf = new VertexBuffer(initVertexCount);
     }
