@@ -142,6 +142,52 @@ describe("Mock client state harness", () => {
     expect(packed & 0x3fff).toBe(3210);
   });
 
+  it("uses shared social state without requiring a separate runtime adapter", () => {
+    const state = createMockClientState();
+    setMockClientSocialState(state, {
+      localPlayerName: "Local",
+      friends: [{ name: "Friend", world: 302 }],
+      ignores: [],
+      friendsChat: {
+        displayName: "Studio",
+        ownerName: "Owner",
+        minKick: 0,
+        rank: 1,
+        members: [{ name: "Local", isSelf: true }],
+      },
+    });
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+
+    expect(handleSocialOpcode(ScriptOpcodes.FRIEND_COUNT)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(1);
+
+    Interpreter.Interpreter_intStackSize = 0;
+    expect(handleSocialOpcode(ScriptOpcodes.CLAN_GETCHATCOUNT)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(1);
+  });
+
+  it("uses deterministic client cycle and client-compatible MOVECOORD semantics", () => {
+    const state = createMockClientState();
+    state.clientCycle = 1234;
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+    const opcodeScript = new Script();
+
+    Interpreter.Interpreter_intStackSize = 0;
+    expect(method3416(ScriptOpcodes.CLIENTCLOCK, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(1234);
+
+    Interpreter.Interpreter_intStackSize = 4;
+    Interpreter.Interpreter_intStack[0] = 0;
+    Interpreter.Interpreter_intStack[1] = 3;
+    Interpreter.Interpreter_intStack[2] = 1;
+    Interpreter.Interpreter_intStack[3] = 4;
+    expect(method3416(ScriptOpcodes.MOVECOORD, opcodeScript, false)).toBe(1);
+    const packed = Interpreter.Interpreter_intStack[0]!;
+    expect((packed >> 28) & 0x3).toBe(1);
+    expect((packed >> 14) & 0x3fff).toBe(3);
+    expect(packed & 0x3fff).toBe(4);
+  });
+
   it("stores Varcs in the same state used by CS2", async () => {
     const state = createMockClientState();
     applyCs2RuntimeFromSim(state, "test", {}, null);
