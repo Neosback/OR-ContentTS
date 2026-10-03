@@ -1,12 +1,17 @@
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import { Varps, Varps_masks } from "../varps";
+import {
+  setMockClientVarbit,
+  setMockClientVarcInt,
+  setMockClientVarcString,
+  setMockClientVarp,
+} from "../mock-client-state";
 import { parseInterfaceParentsLookup, type ComponentType, type InterfaceEntry } from "../component-types";
 import { Interpreter } from "./Interpreter";
 import type { ScriptEvent } from "./script-event";
 import { Script } from "./Script";
 import { ScriptFrame } from "./script-frame";
 import { ScriptOpcodes } from "./ScriptOpcodes";
-import { Varcs } from "./varcs";
 import { getCs2RuntimeContext } from "./runtime-context";
 import { emitCs2RuntimeLog } from "./cs2-console-sink";
 import { handleObjectOpcode } from "./object-opcodes";
@@ -16,8 +21,6 @@ import { handleEnumOpcode } from "./enum-opcodes";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
-
-export const varcs = new Varcs();
 
 export function isWorldMapEvent(var0: number): boolean {
   return var0 === 10 || var0 === 11 || var0 === 12 || var0 === 13 || var0 === 14 || var0 === 15 || var0 === 16 || var0 === 17;
@@ -1692,7 +1695,7 @@ async function runScriptLogic(var0: ScriptEvent, var1: Script, var2: number, var
 
           Interpreter.field849 = var0.field1063;
 
-          const { varps, varbitLookup } = getCs2RuntimeContext();
+          const { clientState, varps, varcs, varbitLookup } = getCs2RuntimeContext();
           const Varps_main = varps.Varps_main;
 
           while (true) {
@@ -1734,7 +1737,11 @@ async function runScriptLogic(var0: ScriptEvent, var1: Script, var2: number, var
               Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = Varps_main[var13]!;
             } else if (var32 === ScriptOpcodes.SET_VARP) {
               var13 = activeScript.intOperands[var5]!;
-              Varps_main[var13] = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
+              setMockClientVarp(
+                clientState,
+                var13,
+                Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!,
+              );
             } else if (var32 === ScriptOpcodes.SCONST) {
               Interpreter.Interpreter_stringStack[++Interpreter.Interpreter_stringStackSize - 1] = activeScript.stringOperands[var5] ?? null;
             } else if (var32 === ScriptOpcodes.JUMP) {
@@ -1791,7 +1798,12 @@ async function runScriptLogic(var0: ScriptEvent, var1: Script, var2: number, var
               );
             } else if (var32 === ScriptOpcodes.SET_VARBIT) {
               var13 = activeScript.intOperands[var5]!;
-              method5910(var13, Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!, varbitLookup, Varps_main);
+              setMockClientVarbit(
+                clientState,
+                var13,
+                Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!,
+                varbitLookup,
+              );
             } else if (var32 === ScriptOpcodes.IF_ICMPLE) {
               Interpreter.Interpreter_intStackSize -= 2;
               if (
@@ -1852,7 +1864,8 @@ async function runScriptLogic(var0: ScriptEvent, var1: Script, var2: number, var
                     activeScript.intOperands[var5]!,
                   );
                 } else if (var32 === ScriptOpcodes.SET_VARC_INT) {
-                  varcs.setInt(
+                  setMockClientVarcInt(
+                    clientState,
                     activeScript.intOperands[var5]!,
                     Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!,
                   );
@@ -1894,7 +1907,8 @@ async function runScriptLogic(var0: ScriptEvent, var1: Script, var2: number, var
                     Interpreter.Interpreter_stringStack[++Interpreter.Interpreter_stringStackSize - 1] = var21;
                   } else if (var32 === ScriptOpcodes.SET_VARC_STRING_OLD || var32 === ScriptOpcodes.SET_VARC_STRING) {
                     const raw = Interpreter.Interpreter_stringStack[--Interpreter.Interpreter_stringStackSize];
-                    varcs.setString(
+                    setMockClientVarcString(
+                      clientState,
                       activeScript.intOperands[var5]!,
                       asCs2String(raw),
                     );
