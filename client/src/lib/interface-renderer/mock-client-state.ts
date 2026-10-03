@@ -4,6 +4,13 @@ import { Varps, Varps_masks } from "./varps";
 import { Varcs } from "./cs2/varcs";
 
 export type MockClientInventory = {
+  /** Widget inventory ids use the cache/widget wire encoding (definition id + 1, 0 = empty). */
+  itemIds: number[];
+  itemQuantities: number[];
+};
+
+export type MockClientItemContainer = {
+  /** Client item-container ids use definition ids directly (-1 = empty). */
   itemIds: number[];
   itemQuantities: number[];
 };
@@ -54,11 +61,19 @@ export type MockClientState = {
   isMembersWorld: boolean;
   membersOnlyItemIds?: ReadonlySet<number> | null;
   simulatedInventories: Record<number, MockClientInventory>;
+  itemContainers: Record<number, MockClientItemContainer>;
   varps: Varps;
   varcs: Varcs;
   social: MockClientSocialState;
   localTileX: number;
   localTileY: number;
+  localPlane: number;
+  clientCycle: number;
+  worldId: number;
+  staffModLevel: number;
+  rebootTimer: number;
+  playerMod: boolean;
+  worldFlags: number;
   changes: MockClientChangeJournal;
 };
 
@@ -102,6 +117,7 @@ export function createMockClientState(): MockClientState {
     isMembersWorld: true,
     membersOnlyItemIds: null,
     simulatedInventories: {},
+    itemContainers: {},
     varps: Varps.createDefault(),
     varcs: new Varcs(),
     social: {
@@ -111,6 +127,13 @@ export function createMockClientState(): MockClientState {
     },
     localTileX: DEFAULT_MOCK_TILE_X,
     localTileY: DEFAULT_MOCK_TILE_Y,
+    localPlane: 0,
+    clientCycle: 0,
+    worldId: 301,
+    staffModLevel: 0,
+    rebootTimer: 0,
+    playerMod: false,
+    worldFlags: 0,
     changes: emptyJournal(),
   };
 }
@@ -191,16 +214,44 @@ export function setMockClientVarcString(state: MockClientState, id: number, valu
   if (state.varcs.getString(id) !== before) state.changes.varcStrings.add(id);
 }
 
-export function setMockClientInventory(
+export function setMockClientItemContainer(
   state: MockClientState,
   containerId: number,
-  inventory: MockClientInventory,
+  container: MockClientItemContainer,
 ): void {
-  state.simulatedInventories[containerId] = {
-    itemIds: [...inventory.itemIds],
-    itemQuantities: [...inventory.itemQuantities],
+  state.itemContainers[containerId] = {
+    itemIds: [...container.itemIds],
+    itemQuantities: [...container.itemQuantities],
   };
   state.changes.inventories.add(containerId);
+}
+
+export function getMockClientItemId(state: MockClientState, containerId: number, slot: number): number {
+  const container = state.itemContainers[containerId];
+  if (!container || slot < 0 || slot >= container.itemIds.length) return -1;
+  return container.itemIds[slot] ?? -1;
+}
+
+export function getMockClientItemQuantity(state: MockClientState, containerId: number, slot: number): number {
+  const container = state.itemContainers[containerId];
+  if (!container || slot < 0 || slot >= container.itemQuantities.length) return 0;
+  return container.itemQuantities[slot] ?? 0;
+}
+
+export function getMockClientItemTotal(state: MockClientState, containerId: number, itemId: number): number {
+  if (itemId < 0) return 0;
+  const container = state.itemContainers[containerId];
+  if (!container) return 0;
+  const limit = Math.min(container.itemIds.length, container.itemQuantities.length);
+  let total = 0;
+  for (let slot = 0; slot < limit; slot++) {
+    if (container.itemIds[slot] === itemId) total += container.itemQuantities[slot] ?? 0;
+  }
+  return total;
+}
+
+export function getMockClientInventorySize(state: MockClientState, containerId: number): number {
+  return state.itemContainers[containerId]?.itemIds.length ?? 0;
 }
 
 export function setMockClientSkill(
@@ -257,16 +308,6 @@ export function mergeMockClientState(previous: MockClientState, next: MockClient
       || (previous.currentExp[id] ?? 0) !== (next.currentExp[id] ?? 0)
     ) {
       changes.skills.add(id);
-    }
-  }
-
-  const inventoryIds = new Set([
-    ...Object.keys(previous.simulatedInventories).map(Number),
-    ...Object.keys(next.simulatedInventories).map(Number),
-  ]);
-  for (const id of inventoryIds) {
-    if (previous.simulatedInventories[id] !== next.simulatedInventories[id]) {
-      changes.inventories.add(id);
     }
   }
 
