@@ -22,11 +22,22 @@ import type { PrioritySortValidation } from "./face-priority-validation";
  *   harness.setIndexSource("priority") // draw compute-sorted indices; "original" is the default
  *   harness.setMode("diff")      // compare the selected WebGPU stream against WebGL2
  *   await harness.validatePriorities() // GPU priority sort vs CPU RuneLite reference for visible maps
+ *   await harness.sampleTimings(120)    // median/p95 priority-compute and render GPU cost
  */
 export type HarnessMode = "off" | "overlay" | "only" | "diff";
 
 export interface PriorityValidationResult extends PrioritySortValidation {
     mapId: number;
+}
+
+export interface ObjectPassTimingSummary {
+    samples: number;
+    computeMedianMs: number;
+    computeP95Ms: number;
+    renderMedianMs: number;
+    renderP95Ms: number;
+    totalMedianMs: number;
+    totalP95Ms: number;
 }
 
 export interface ObjectPassHarness {
@@ -43,6 +54,8 @@ export interface ObjectPassHarness {
      * every visible map against the independent CPU RuneLite priority-order reference.
      */
     validatePriorities(): Promise<PriorityValidationResult[]>;
+    /** Samples timestamp-query results over real animation frames. Requires an adapter with timestamp-query support. */
+    sampleTimings(sampleCount?: number): Promise<ObjectPassTimingSummary>;
     stop(): void;
 }
 
@@ -197,6 +210,49 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         return results;
     };
 
+    const percentile = (values: number[], fraction: number): number => {
+        const sorted = [...values].sort((a, b) => a - b);
+        const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1);
+        return sorted[Math.max(index, 0)];
+    };
+
+    const sampleTimings = async (sampleCount = 120): Promise<ObjectPassTimingSummary> => {
+        if (!Number.isInteger(sampleCount) || sampleCount < 1) {
+            throw new RangeError("sampleCount must be a positive integer");
+        }
+
+        const compute: number[] = [];
+        const render: number[] = [];
+        const total: number[] = [];
+        let lastFrame = pass.stats.frames;
+
+        while (compute.length < sampleCount) {
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            if (pass.stats.frames === lastFrame) continue;
+            lastFrame = pass.stats.frames;
+
+            const computeMs = pass.stats.computeGpuMs;
+            const renderMs = pass.stats.renderGpuMs;
+            const totalMs = pass.stats.gpuMs;
+            if (computeMs === undefined || renderMs === undefined || totalMs === undefined) continue;
+            compute.push(computeMs);
+            render.push(renderMs);
+            total.push(totalMs);
+        }
+
+        const summary: ObjectPassTimingSummary = {
+            samples: compute.length,
+            computeMedianMs: percentile(compute, 0.5),
+            computeP95Ms: percentile(compute, 0.95),
+            renderMedianMs: percentile(render, 0.5),
+            renderP95Ms: percentile(render, 0.95),
+            totalMedianMs: percentile(total, 0.5),
+            totalP95Ms: percentile(total, 0.95),
+        };
+        console.table(summary);
+        return summary;
+    };
+
     const loop = (): void => {
         if (stopped) return;
         renderOnce();
@@ -222,6 +278,7 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         },
         renderOnce,
         validatePriorities,
+        sampleTimings,
         stop() {
             stopped = true;
             cancelAnimationFrame(raf);
