@@ -4,6 +4,19 @@ import { ParamsMap, Type } from "../Type";
 import { ObjStackability } from "./ObjStackability";
 import { ObjTypeLoader } from "./ObjTypeLoader";
 
+export type ObjConditionalOp = {
+    index: number;
+    varpId: number;
+    varbitId: number;
+    minValue: number;
+    maxValue: number;
+    text: string;
+};
+
+export type ObjConditionalSubOp = ObjConditionalOp & {
+    subId: number;
+};
+
 export class ObjType extends Type {
     model?: number;
 
@@ -83,6 +96,13 @@ export class ObjType extends Type {
     placeholder: number;
     placeholderTemplate: number;
 
+    subops?: Array<Array<string | null> | null>;
+    entitySubops: Array<{ index: number; subId: number; text: string }>;
+    conditionalActions: ObjConditionalOp[];
+    conditionalSubActions: ObjConditionalSubOp[];
+    keepOnlyDuringSeqs?: number[];
+    unlockable: boolean;
+
     params?: ParamsMap;
 
     constructor(id: number, cacheInfo: CacheInfo) {
@@ -129,6 +149,10 @@ export class ObjType extends Type {
         this.notedId = -1;
         this.placeholder = -1;
         this.placeholderTemplate = -1;
+        this.entitySubops = [];
+        this.conditionalActions = [];
+        this.conditionalSubActions = [];
+        this.unlockable = false;
 
         this.model = 0;
     }
@@ -222,6 +246,17 @@ export class ObjType extends Type {
             }
         } else if (opcode === 42) {
             this.shiftClickIndex = buffer.readByte();
+        } else if (opcode === 43) {
+            const opId = buffer.readUnsignedByte();
+            if (!this.subops) this.subops = [];
+            const subops = this.subops[opId] ?? [];
+            while (true) {
+                const encodedSubId = buffer.readUnsignedByte();
+                if (encodedSubId === 0) break;
+                const subId = encodedSubId - 1;
+                subops[subId] = buffer.readString();
+            }
+            this.subops[opId] = subops;
         } else if (opcode === 44) {
             if (this.cacheInfo.game === "oldschool" && this.cacheInfo.revision >= 237) {
                 this.model = buffer.readInt();
@@ -341,30 +376,48 @@ export class ObjType extends Type {
             this.placeholderTemplate = buffer.readUnsignedShort();
         } else if (opcode >= 150 && opcode < 155) {
             buffer.readUnsignedShort();
+        } else if (opcode === 160) {
+            this.stackability = ObjStackability.NEVER;
+        } else if (opcode === 161) {
+            const count = buffer.readUnsignedShort();
+            this.keepOnlyDuringSeqs = new Array<number>(count);
+            for (let i = 0; i < count; i++) {
+                this.keepOnlyDuringSeqs[i] = buffer.readUnsignedShort();
+            }
         } else if (opcode === 200) {
-            // subop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedByte();
-            buffer.readString();
+            const index = buffer.readUnsignedByte();
+            while (true) {
+                const encodedSubId = buffer.readUnsignedByte();
+                if (encodedSubId === 0) break;
+                this.entitySubops.push({
+                    index,
+                    subId: encodedSubId - 1,
+                    text: buffer.readString(),
+                });
+            }
         } else if (opcode === 201) {
-            // multiop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readInt();
-            buffer.readInt();
-            buffer.readNullString();
+            this.conditionalActions.push({
+                index: buffer.readUnsignedByte(),
+                varpId: buffer.readUnsignedShort(),
+                varbitId: buffer.readUnsignedShort(),
+                minValue: buffer.readInt(),
+                maxValue: buffer.readInt(),
+                text: buffer.readString(),
+            });
         } else if (opcode === 202) {
-            // multisubop
-            buffer.readUnsignedByte();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readUnsignedShort();
-            buffer.readInt();
-            buffer.readInt();
-            buffer.readNullString();
+            this.conditionalSubActions.push({
+                index: buffer.readUnsignedByte(),
+                subId: buffer.readUnsignedShort(),
+                varpId: buffer.readUnsignedShort(),
+                varbitId: buffer.readUnsignedShort(),
+                minValue: buffer.readInt(),
+                maxValue: buffer.readInt(),
+                text: buffer.readString(),
+            });
         } else if (opcode === 249) {
             this.params = Type.readParamsMap(buffer, this.params);
+        } else if (opcode === 251) {
+            this.unlockable = true;
         } else {
             throw new Error("ObjType: Opcode " + opcode + " not implemented.");
         }
