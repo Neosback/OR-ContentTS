@@ -61,8 +61,10 @@ export function transmitTriggersMatch(
   changedIds: readonly number[],
 ): boolean {
   if (changedIds.length === 0) return false;
-  if (triggers == null) return true;
-  if (triggers.length === 0) return false;
+  // The client only keeps a 32-entry circular change buffer. Once more than 32
+  // values changed since a widget last processed transmits, trigger filtering
+  // cannot be trusted and the listener fires unconditionally.
+  if (changedIds.length > 32 || triggers == null || triggers.length === 0) return true;
 
   const changed = new Set(changedIds);
   return triggers.some((id) => changed.has(id));
@@ -134,8 +136,23 @@ export class WidgetEventDispatcher {
     return this.enqueue(component, pointerArgs(component, kind), coordinates);
   }
 
+  dispatchInitialVarTransmit(entry: InterfaceEntry): Promise<void> {
+    for (const component of collectComponents(entry)) {
+      if (component.hide) continue;
+      if (
+        component.onVarTransmit
+        && component.onVarTransmitList != null
+        && component.onVarTransmitList.length > 0
+      ) {
+        void this.enqueue(component, component.onVarTransmit);
+      }
+    }
+    return this.tail;
+  }
+
   dispatchTimer(entry: InterfaceEntry): Promise<void> {
     for (const component of collectComponents(entry)) {
+      if (component.hide) continue;
       if (component.onTimer) void this.enqueue(component, component.onTimer);
     }
     return this.tail;
@@ -145,6 +162,8 @@ export class WidgetEventDispatcher {
     const changes = consumeMockClientChanges(state);
 
     for (const component of collectComponents(entry)) {
+      if (component.hide) continue;
+
       if (
         component.onVarTransmit
         && transmitTriggersMatch(component.onVarTransmitList, changes.varps)
