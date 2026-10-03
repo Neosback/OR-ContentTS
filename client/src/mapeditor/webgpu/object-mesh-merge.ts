@@ -17,6 +17,8 @@ export interface StaticObjectMesh {
     indices: Uint32Array;
     /** One original OSRS face render priority per triangle, opaque first then transparent. */
     faceRenderPriorities: Uint8Array;
+    /** Original model face index per triangle, aligned with faceRenderPriorities. */
+    faceOrdinals: Uint32Array;
     /** PRIORITY_GROUP_WORDS uint32 per model instance with explicit OSRS face priorities. */
     priorityGroups: Uint32Array;
     /** SLOT_INFO_STRIDE uint16 per slot. */
@@ -44,6 +46,7 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
     const words = new Uint32Array(vertexTotal * 4);
     const indices = new Uint32Array(opaqueTotal + alphaTotal);
     const faceRenderPriorities = new Uint8Array((opaqueTotal + alphaTotal) / 3).fill(0xff);
+    const faceOrdinals = new Uint32Array((opaqueTotal + alphaTotal) / 3);
     const priorityGroups = new Uint32Array(priorityGroupTotal * PRIORITY_GROUP_WORDS);
     const slotInfo = new Uint16Array(Math.max(slotTotal, 1) * SLOT_INFO_STRIDE);
 
@@ -86,6 +89,14 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
             chunk.faceRenderPriorities.subarray(opaqueTriangles, opaqueTriangles + alphaTriangles),
             alphaPriorityCursor,
         );
+        faceOrdinals.set(
+            chunk.faceOrdinals.subarray(0, opaqueTriangles),
+            opaquePriorityCursor,
+        );
+        faceOrdinals.set(
+            chunk.faceOrdinals.subarray(opaqueTriangles, opaqueTriangles + alphaTriangles),
+            alphaPriorityCursor,
+        );
 
         for (let group = 0; group < chunk.priorityGroups.length / PRIORITY_GROUP_WORDS; group++) {
             const sourceBase = group * PRIORITY_GROUP_WORDS;
@@ -117,6 +128,7 @@ export function mergeStaticObjectChunks(chunks: readonly (EditorMapObjectChunkDa
         words,
         indices,
         faceRenderPriorities,
+        faceOrdinals,
         priorityGroups,
         slotInfo,
         opaqueCount: opaqueTotal,
