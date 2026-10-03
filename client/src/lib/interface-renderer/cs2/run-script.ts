@@ -1,6 +1,10 @@
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import { Varps, Varps_masks } from "../varps";
 import {
+  getMockClientInventorySize,
+  getMockClientItemId,
+  getMockClientItemQuantity,
+  getMockClientItemTotal,
   setMockClientVarbit,
   setMockClientVarcInt,
   setMockClientVarcString,
@@ -1404,24 +1408,40 @@ function packCoord(plane: number, x: number, y: number): number {
 export function method3416(var0: number, var1: Script, var2: boolean): number {
   void var1;
   void var2;
+  const { clientState } = getCs2RuntimeContext();
 
   if (var0 === ScriptOpcodes.CLIENTCLOCK) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = Math.trunc(Date.now() / 20);
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.clientCycle | 0;
     return 1;
   } else if (var0 === ScriptOpcodes.INV_GETOBJ || var0 === ScriptOpcodes.INV_GETNUM || var0 === ScriptOpcodes.INV_TOTAL) {
     Interpreter.Interpreter_intStackSize -= 2;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var0 === ScriptOpcodes.INV_GETOBJ ? -1 : 0;
+    const containerId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize] ?? 0;
+    const slotOrItemId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1] ?? 0;
+    const value = var0 === ScriptOpcodes.INV_GETOBJ
+      ? getMockClientItemId(clientState, containerId, slotOrItemId)
+      : var0 === ScriptOpcodes.INV_GETNUM
+        ? getMockClientItemQuantity(clientState, containerId, slotOrItemId)
+        : getMockClientItemTotal(clientState, containerId, slotOrItemId);
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = value;
     return 1;
   } else if (var0 === ScriptOpcodes.INV_SIZE) {
-    --Interpreter.Interpreter_intStackSize;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = 0;
+    const containerId = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? 0;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
+      getMockClientInventorySize(clientState, containerId);
     return 1;
   } else if (var0 === ScriptOpcodes.STAT || var0 === ScriptOpcodes.STAT_BASE || var0 === ScriptOpcodes.STAT_XP) {
-    --Interpreter.Interpreter_intStackSize;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = 0;
+    const skillId = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize] ?? -1;
+    const values = var0 === ScriptOpcodes.STAT
+      ? clientState.currentLevels
+      : var0 === ScriptOpcodes.STAT_BASE
+        ? clientState.maximumLevels
+        : clientState.currentExp;
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
+      skillId >= 0 && skillId < values.length ? values[skillId]! : 0;
     return 1;
   } else if (var0 === ScriptOpcodes.COORD) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = packCoord(0, 0, 0);
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
+      packCoord(clientState.localPlane, clientState.localTileX, clientState.localTileY);
     return 1;
   } else if (var0 === ScriptOpcodes.COORDX) {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
@@ -1435,17 +1455,30 @@ export function method3416(var0: number, var1: Script, var2: boolean): number {
     const v = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
     Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = v & 0x3fff;
     return 1;
-  } else if (
-    var0 === ScriptOpcodes.MAP_MEMBERS
-    || var0 === ScriptOpcodes.STAFFMODLEVEL
-    || var0 === ScriptOpcodes.REBOOTTIMER
-    || var0 === ScriptOpcodes.MAP_WORLD
-    || var0 === ScriptOpcodes.RUNENERGY_VISIBLE
-    || var0 === ScriptOpcodes.RUNWEIGHT_VISIBLE
-    || var0 === ScriptOpcodes.PLAYERMOD
-    || var0 === ScriptOpcodes.WORLDFLAGS
-  ) {
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = 0;
+  } else if (var0 === ScriptOpcodes.MAP_MEMBERS) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.isMembersWorld ? 1 : 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.STAFFMODLEVEL) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] =
+      clientState.staffModLevel >= 2 ? clientState.staffModLevel : 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.REBOOTTIMER) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.rebootTimer | 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.MAP_WORLD) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.worldId | 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.RUNENERGY_VISIBLE) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.runEnergy | 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.RUNWEIGHT_VISIBLE) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.weight | 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.PLAYERMOD) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.playerMod ? 1 : 0;
+    return 1;
+  } else if (var0 === ScriptOpcodes.WORLDFLAGS) {
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = clientState.worldFlags | 0;
     return 1;
   } else if (
     var0 === ScriptOpcodes.INVOTHER_GETOBJ
@@ -1453,7 +1486,14 @@ export function method3416(var0: number, var1: Script, var2: boolean): number {
     || var0 === ScriptOpcodes.INVOTHER_TOTAL
   ) {
     Interpreter.Interpreter_intStackSize -= 2;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = var0 === ScriptOpcodes.INVOTHER_GETOBJ ? -1 : 0;
+    const containerId = (Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize] ?? 0) + 32768;
+    const slotOrItemId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1] ?? 0;
+    const value = var0 === ScriptOpcodes.INVOTHER_GETOBJ
+      ? getMockClientItemId(clientState, containerId, slotOrItemId)
+      : var0 === ScriptOpcodes.INVOTHER_GETNUM
+        ? getMockClientItemQuantity(clientState, containerId, slotOrItemId)
+        : getMockClientItemTotal(clientState, containerId, slotOrItemId);
+    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = value;
     return 1;
   } else if (var0 === ScriptOpcodes.MOVECOORD) {
     Interpreter.Interpreter_intStackSize -= 4;
