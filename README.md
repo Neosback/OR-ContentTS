@@ -80,7 +80,7 @@ The moved backend is validated independently for compile, protocol, API/security
 
 When OpenRune already provides an authoritative source form, Studio should update it and let OpenRune build the caches. LIVE is the full/base generated cache; SERVER is derived from LIVE and augmented with server-specific sources.
 
-Current implementation through PR #69 includes local Interface/CS2 cache access, project-aware Interface GameVal/RSCM metadata, and rev-240 core NPC/Obj/Param decoder parity. The next decoder milestone is DBTable/DBRow.
+Current implementation through PR #71 includes local Interface/CS2 cache access, project-aware Interface GameVal/RSCM metadata, rev-240 core NPC/Obj/Param parity, and selected-cache DBTable/DBRow/DBColumn decoding. The next decoder milestone is the remaining lossy/missing-type audit.
 
 See [docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md](docs/OPENRUNE_MAP_CACHE_ARCHITECTURE.md) for the map/cache/GameVal ownership model, [docs/STUDIO_BACKEND_INTEGRATION.md](docs/STUDIO_BACKEND_INTEGRATION.md) for the optional backend lifecycle/security plan, and [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) for the exact takeover checklist.
 
