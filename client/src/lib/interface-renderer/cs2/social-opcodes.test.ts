@@ -40,6 +40,8 @@ function pushInt(value: number): void {
 beforeEach(() => {
   Interpreter.Interpreter_intStackSize = 0;
   Interpreter.Interpreter_intStack.fill(0);
+  Interpreter.Interpreter_stringStackSize = 0;
+  Interpreter.Interpreter_stringStack.fill(null);
   applyCs2RuntimeFromSim(null, "test", {}, null);
 });
 
