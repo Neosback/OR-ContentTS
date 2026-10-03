@@ -638,7 +638,7 @@ export class WebGPUObjectPass {
         const priorityPass = encoder.beginComputePass({
             label: "object face priority sort",
             timestampWrites: this.timestamps
-                ? { querySet: this.timestamps.querySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 }
+                ? { querySet: this.timestamps.querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 }
                 : undefined,
         });
         priorityPass.setPipeline(this.priorityPipeline);
@@ -668,7 +668,7 @@ export class WebGPUObjectPass {
                 depthStoreOp: "store",
             },
             timestampWrites: this.timestamps
-                ? { querySet: this.timestamps.querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 }
+                ? { querySet: this.timestamps.querySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 }
                 : undefined,
         });
 
