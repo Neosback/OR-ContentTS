@@ -92,6 +92,7 @@
     let renderRaf = 0;
     let clientTickTimer = 0;
     let eventDispatcher: WidgetEventDispatcher | null = null;
+    let latestClientState: Cs1SimState | null = null;
 
     const viewportWidth = $derived(mode === "fixed" ? FIXED_VIEWPORT_WIDTH : containerWidth);
     const viewportHeight = $derived(mode === "fixed" ? FIXED_VIEWPORT_HEIGHT : containerHeight);
@@ -262,12 +263,13 @@
         data: InterfaceEntry,
         id: number,
     ): void {
+        latestClientState = clientState ?? cs1SimState;
         setCs1SimState(cs1SimState ?? null);
         setCs1InterfaceEntry(data);
         setCs1VarbitDefinitionLookup(cs1VarbitDefinitionLookup ?? null);
         const { socialRuntime } = getCs2RuntimeContext();
         applyCs2RuntimeFromSim(
-            clientState ?? cs1SimState,
+            latestClientState,
             revision,
             cacheHeaders,
             cs1VarbitDefinitionLookup ?? null,
@@ -380,66 +382,80 @@
 
     $effect(() => {
         const data = interfaceData;
-        const state = clientState ?? cs1SimState;
         const enabled = interactiveMode;
 
         eventDispatcher?.dispose();
         eventDispatcher = null;
         if (clientTickTimer !== 0) {
-            window.clearInterval(clientTickTimer);
+            window.clearTimeout(clientTickTimer);
             clientTickTimer = 0;
         }
 
-        if (!enabled || !data || !state) return;
+        if (!enabled || !data) return;
 
         const dispatcher = new WidgetEventDispatcher();
         eventDispatcher = dispatcher;
+        let cancelled = false;
 
         // The client invokes var-transmit listeners with trigger lists once when a
         // group becomes active, before ordinary changed-id processing begins.
         void dispatcher.dispatchInitialVarTransmit(data);
 
-        const tick = (): void => {
-            state.clientCycle = (state.clientCycle + 1) | 0;
+        const runTick = async (): Promise<void> => {
+            if (cancelled) return;
+            const startedAt = performance.now();
+            const state = latestClientState;
 
-            // Snapshot transmit changes first. Listener mutations are intentionally
-            // retained for the next 20 ms client tick instead of recursively firing.
-            void dispatcher.dispatchTransmits(data, state);
-            void dispatcher.dispatchTimer(data);
+            if (state) {
+                state.clientCycle = (state.clientCycle + 1) | 0;
 
-            // Re-hit-test every client cycle. Runtime scripts can move/show/hide widgets
-            // while the pointer is stationary, which can itself cause enter/leave events.
-            if (pointerInside) updateHoverEvents(data, pointerX, pointerY);
+                // Snapshot transmit changes first. Listener mutations are intentionally
+                // retained for the next 20 ms client tick instead of recursively firing.
+                void dispatcher.dispatchTransmits(data, state);
+                void dispatcher.dispatchTimer(data);
 
-            for (const hovered of hoveredEventComponents) {
-                const position = relativeEventPosition(hovered, pointerX, pointerY);
-                void dispatcher.dispatchPointer(hovered, "mouseRepeat", {
-                    mouseX: position.x,
-                    mouseY: position.y,
-                });
+                // Re-hit-test every client cycle. Runtime scripts can move/show/hide widgets
+                // while the pointer is stationary, which can itself cause enter/leave events.
+                if (pointerInside) updateHoverEvents(data, pointerX, pointerY);
+
+                for (const hovered of hoveredEventComponents) {
+                    const position = relativeEventPosition(hovered, pointerX, pointerY);
+                    void dispatcher.dispatchPointer(hovered, "mouseRepeat", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                }
+
+                const clicked = Interpreter.clickedWidget;
+                if (clicked) {
+                    const position = relativeEventPosition(clicked, pointerX, pointerY);
+                    void dispatcher.dispatchPointer(clicked, "hold", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                    void dispatcher.dispatchPointer(clicked, "clickRepeat", {
+                        mouseX: position.x,
+                        mouseY: position.y,
+                    });
+                }
             }
 
-            const clicked = Interpreter.clickedWidget;
-            if (clicked) {
-                const position = relativeEventPosition(clicked, pointerX, pointerY);
-                void dispatcher.dispatchPointer(clicked, "hold", {
-                    mouseX: position.x,
-                    mouseY: position.y,
-                });
-                void dispatcher.dispatchPointer(clicked, "clickRepeat", {
-                    mouseX: position.x,
-                    mouseY: position.y,
-                });
-            }
+            // Do not let a slow CS2 listener create overlapping client cycles. The
+            // next cycle starts after the shared VM queue drains, preserving ordering.
+            await dispatcher.flush();
+            if (cancelled) return;
+            const elapsed = performance.now() - startedAt;
+            clientTickTimer = window.setTimeout(() => void runTick(), Math.max(0, 20 - elapsed));
         };
 
-        clientTickTimer = window.setInterval(tick, 20);
+        clientTickTimer = window.setTimeout(() => void runTick(), 20);
 
         return () => {
+            cancelled = true;
             dispatcher.dispose();
             if (eventDispatcher === dispatcher) eventDispatcher = null;
             if (clientTickTimer !== 0) {
-                window.clearInterval(clientTickTimer);
+                window.clearTimeout(clientTickTimer);
                 clientTickTimer = 0;
             }
         };
@@ -535,7 +551,7 @@
 
     onDestroy(() => {
         cancelAnimationFrame(renderRaf);
-        if (clientTickTimer !== 0) window.clearInterval(clientTickTimer);
+        if (clientTickTimer !== 0) window.clearTimeout(clientTickTimer);
         clientTickTimer = 0;
         eventDispatcher?.dispose();
         eventDispatcher = null;
