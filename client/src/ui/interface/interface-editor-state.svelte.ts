@@ -364,6 +364,7 @@ export class InterfaceEditorState {
                 undefined,
                 undefined,
                 this.viewer.clientScriptIndex,
+                this.viewer.objTypeLoader,
             );
             await openInterface(1, selectedId, 1);
             if (controller.signal.aborted || selectedId !== this.selectedId) return;

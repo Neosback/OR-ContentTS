@@ -9,6 +9,7 @@ import { ScriptOpcodes } from "./ScriptOpcodes";
 import { Varcs } from "./varcs";
 import { getCs2RuntimeContext } from "./runtime-context";
 import { emitCs2RuntimeLog } from "./cs2-console-sink";
+import { handleObjectOpcode } from "./object-opcodes";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
@@ -1742,7 +1743,7 @@ export async function method3270(var0: number, var1: Script, var2: boolean): Pro
   } else if (var0 < 4200) {
     return method6884(var0, var1, var2);
   } else if (var0 < 4300) {
-    return logUnhandledScriptOpcode(var0, var1);
+    return handleObjectOpcode(var0);
   } else if (var0 < 5100) {
     return logUnhandledScriptOpcode(var0, var1);
   } else if (var0 < 5400) {

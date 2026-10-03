@@ -1,3 +1,4 @@
+import type { ObjTypeLoader } from "@/rs/config/objtype/ObjTypeLoader";
 import type { VarbitDefinitionLookup } from "@/rs/config/vartype/bit/VarBitTypeLoader";
 import type { Cs1SimState } from "../cs1-interpreter";
 import { Varps } from "../varps";
@@ -9,6 +10,8 @@ export type Cs2RuntimeContext = {
   cacheHeaders: HeadersInit;
   /** DAT2 client script index (`IndexType.DAT2.clientScript` = 12): archive id = script id, file 0. */
   clientScriptIndex: CacheIndex | null;
+  /** Object definitions from the exact cache being previewed; used by OC_* clientscript opcodes. */
+  objTypeLoader: ObjTypeLoader | null;
   varps: Varps;
   varbitLookup: VarbitDefinitionLookup | null;
   interfaceEntry: InterfaceEntry | null;
@@ -22,6 +25,7 @@ let ctx: Cs2RuntimeContext = {
   scriptRev: "latest",
   cacheHeaders: {},
   clientScriptIndex: null,
+  objTypeLoader: null,
   varps: defaultVarps,
   varbitLookup: null,
   interfaceEntry: null,
@@ -42,11 +46,13 @@ export function applyCs2RuntimeFromSim(
   canvasWidth: number | null | undefined = null,
   canvasHeight: number | null | undefined = null,
   clientScriptIndex: CacheIndex | null | undefined = null,
+  objTypeLoader: ObjTypeLoader | null | undefined = null,
 ): void {
   ctx = {
     scriptRev,
     cacheHeaders,
     clientScriptIndex: clientScriptIndex ?? null,
+    objTypeLoader: objTypeLoader ?? null,
     varps: sim?.varps ?? defaultVarps,
     varbitLookup: varbitLookup ?? null,
     interfaceEntry: interfaceEntry ?? null,
