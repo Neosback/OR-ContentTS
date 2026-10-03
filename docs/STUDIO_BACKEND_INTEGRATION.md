@@ -322,24 +322,32 @@ Backend availability should unlock capabilities, not make the entire application
 
 ## Near-term integration sequence
 
-The next integration work should reduce backend dependence while preserving OpenRune's existing source/build system.
+The portable project/source foundation is already implemented. Do not rebuild it in the backend.
 
-1. keep all existing local/offline behavior;
-2. implement `ProjectFileSystem` and a Tauri filesystem adapter;
-3. add pure TypeScript RSCM/GameVal registry and OpenRune project indexing;
-4. add source-aware OpenRune config/server/map TOML adapters;
-5. update OpenRune-owned source files rather than compiled caches when a source exists;
-6. add TypeScript terrain and static-loc encoders for portable/offline output;
-7. add region/raw map package export;
-8. narrow `StudioBackendClient` around explicit build/test/map-publish/verification operations;
-9. add a bounded `PackMaps + PackWorldMap` backend operation for terrain/static-loc publication into LIVE;
-10. use the existing `:or-cache:buildCache` operation when the user requests full OpenRune LIVE/SERVER output;
-11. add `HttpBackendTransport` only for explicitly paired web backend use;
-12. add lazy Tauri backend supervision only for backend-only actions;
-13. keep OpenRune Server unchanged;
-14. defer generic JS5/DAT2 writing until standalone workflows prove it is needed.
+Completed frontend/local foundation includes:
 
-Do not prioritize backend-backed `ProjectStore`, `CacheSource`, or `WorldSource` merely because the backend can expose files. Prefer direct local implementations when the platform already has the necessary capability.
+- `ProjectFileSystem` with Tauri and browser File System Access adapters;
+- `ProjectFileSystemCacheSource` for direct local cache access;
+- unified TypeScript GameVal DAT/TOML/RSCM registry;
+- OpenRune project/session/runtime discovery;
+- source-aware PackConfig, raw map, and server TOML adapters;
+- Interface metadata projection;
+- core rev-240 NPC/Obj/Param decoder parity.
+
+Continue in this order:
+
+1. finish DBTable/DBRow/DBColumn decoding and the remaining decoder parity audit in TypeScript;
+2. add TypeScript terrain/static-loc encoders and portable region/raw-map export;
+3. keep OpenRune-owned TOML/GameVal/pack source updates local through `ProjectFileSystem`;
+4. narrow `StudioBackendClient` to explicit bounded JVM operations;
+5. expose the existing allowlisted `:or-cache:buildCache` operation through an explicit user action, then reload LIVE;
+6. add one bounded `PackMaps + PackWorldMap` publication operation for terrain/static-loc changes;
+7. verify LIVE/SERVER outputs and surface capability/diagnostic results;
+8. add `HttpBackendTransport` only for explicitly paired web use and lazy Tauri supervision only for backend-only actions;
+9. keep OpenRune Server unchanged;
+10. defer generic JS5/DAT2 writing until a standalone workflow proves it is necessary.
+
+Do not prioritize backend-backed `ProjectStore`, `CacheSource`, `WorldSource`, GameVal parsing, or project-file access merely because the backend can expose files. Prefer the existing local implementations.
 
 ## Non-goals
 
