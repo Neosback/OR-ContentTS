@@ -10,6 +10,7 @@ import { Varcs } from "./varcs";
 import { getCs2RuntimeContext } from "./runtime-context";
 import { emitCs2RuntimeLog } from "./cs2-console-sink";
 import { handleObjectOpcode } from "./object-opcodes";
+import { handleSocialComparatorOpcode } from "./social-opcodes";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
@@ -1731,7 +1732,8 @@ export async function method3270(var0: number, var1: Script, var2: boolean): Pro
   } else if (var0 < 3600) {
     return logUnhandledScriptOpcode(var0, var1);
   } else if (var0 < 3700) {
-    return logUnhandledScriptOpcode(var0, var1);
+    const result = handleSocialComparatorOpcode(var0);
+    return result === 2 ? logUnhandledScriptOpcode(var0, var1) : result;
   } else if (var0 < 3800) {
     return logUnhandledScriptOpcode(var0, var1);
   } else if (var0 < 3900) {
