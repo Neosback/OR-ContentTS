@@ -6,6 +6,7 @@ import { CacheSystem } from "../rs/cache/CacheSystem";
 import { IndexType } from "../rs/cache/IndexType";
 import { Dat2CacheLoaderFactory } from "../rs/cache/loader/Dat2CacheLoaderFactory";
 import { ComponentDecoder } from "../rs/config/components/ComponentDecoder";
+import type { EnumTypeLoader } from "../rs/config/enumtype/EnumTypeLoader";
 import { InterfaceType } from "../rs/config/components/InterfaceType";
 import type { ObjTypeLoader } from "../rs/config/objtype/ObjTypeLoader";
 import {
@@ -58,6 +59,16 @@ function tryGetObjTypeLoader(cache: LoadedCache, cacheSystem: CacheSystem): ObjT
     }
 }
 
+function tryGetEnumTypeLoader(cache: LoadedCache, cacheSystem: CacheSystem): EnumTypeLoader | null {
+    if (cache.type !== "dat2") return null;
+    try {
+        return new Dat2CacheLoaderFactory(cache.info, cache.type, cacheSystem).getEnumTypeLoader();
+    } catch {
+        return null;
+    }
+}
+
+
 function tryPreloadVarbitDefinitions(
     cache: LoadedCache,
     cacheSystem: CacheSystem,
@@ -84,6 +95,7 @@ export class InterfaceViewer {
     spritesById!: ReadonlyMap<number, Sprite>;
     clientScriptIndex!: CacheIndex | null;
     objTypeLoader!: ObjTypeLoader | null;
+    enumTypeLoader!: EnumTypeLoader | null;
     varbitDefinitions!: ReadonlyMap<number, VarbitDefinition> | null;
 
     constructor(cache: LoadedCache) {
@@ -101,6 +113,7 @@ export class InterfaceViewer {
         this.varbitDefinitions = tryPreloadVarbitDefinitions(cache, this.cacheSystem);
         this.clientScriptIndex = tryGetDat2ClientScriptIndex(this.cacheSystem);
         this.objTypeLoader = tryGetObjTypeLoader(cache, this.cacheSystem);
+        this.enumTypeLoader = tryGetEnumTypeLoader(cache, this.cacheSystem);
     }
 
     load(): void {
