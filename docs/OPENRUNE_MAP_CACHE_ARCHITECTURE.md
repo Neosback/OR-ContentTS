@@ -1,6 +1,6 @@
 # OpenRune map/cache integration: source-first, TypeScript-first architecture
 
-> **Implementation checkpoint (through PR #69):** ProjectFileSystem/session/runtime, unified GameVal DAT/TOML/RSCM indexing, source-aware PackConfig/map/server TOML adapters, direct filesystem-backed cache access, Interface metadata, local CS2 object/enum data, and core rev-240 NPC/Obj/Param decoder parity are implemented. The immediate next cache-definition milestone is DBTable/DBRow/DBColumn. Terrain/static-loc encoders, Build Cache UI/client integration, and bounded PackMaps publication remain future work.
+> **Implementation checkpoint (through PR #71):** ProjectFileSystem/session/runtime, unified GameVal DAT/TOML/RSCM indexing, source-aware PackConfig/map/server TOML adapters, direct filesystem-backed cache access, Interface metadata, local CS2 object/enum data, core rev-240 NPC/Obj/Param parity, and selected-cache DBTable/DBRow/DBColumn decoding are implemented. The immediate next cache-definition milestone is the remaining lossy/missing-type audit. Terrain/static-loc encoders, Build Cache UI/client integration, and bounded PackMaps publication remain future work.
 
 ## Status and intent
 
