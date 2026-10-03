@@ -85,6 +85,24 @@ describe("WidgetEventDispatcher", () => {
     expect(transmitTriggersMatch([999], Array.from({ length: 33 }, (_, index) => index))).toBe(true);
   });
 
+  it("fires initial var-transmit listeners that declare trigger ids", async () => {
+    const state = createMockClientState();
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+
+    markerScript(90, 890, 1);
+    markerScript(91, 891, 1);
+    const data = entry(
+      component(1, { onVarTransmit: [90], onVarTransmitList: [12] }),
+      component(2, { onVarTransmit: [91], onVarTransmitList: null }),
+    );
+
+    const dispatcher = new WidgetEventDispatcher();
+    await dispatcher.dispatchInitialVarTransmit(data);
+
+    expect(state.varcs.getInt(890)).toBe(1);
+    expect(state.varcs.getInt(891)).toBe(-1);
+  });
+
   it("dispatches only transmit listeners whose trigger ids changed", async () => {
     const state = createMockClientState();
     applyCs2RuntimeFromSim(state, "test", {}, null);
