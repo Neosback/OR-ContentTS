@@ -142,6 +142,36 @@ describe("InterfaceMetadataSource", () => {
         ]);
     });
 
+
+    it("keeps project metadata visible but diagnoses when it differs from the selected cache", () => {
+        const packed = (548 << 16) | 12;
+        const gameVals = fakeGameVals([
+            new Interface("chatbox", 548, [
+                new InterfaceComponent("input", 12, 548),
+            ]),
+        ]);
+        const registry = buildGameValRegistry({
+            dat: emptyDat(),
+            toml: buildGameValTomlIndex([
+                parseGameValToml(
+                    "content/ui/gamevals.toml",
+                    `[gamevals.component]\nchatbox:send_button = ${packed}`,
+                ),
+            ]),
+            rscm: buildRscmIndex([]),
+        });
+
+        const metadata = createInterfaceMetadataSource(gameVals, registry)
+            .getComponent(548, 12);
+
+        expect(metadata.cacheName).toBe("input");
+        expect(metadata.projectSymbol).toBe("component.chatbox:send_button");
+        expect(metadata.displayName).toBe("chatbox:send_button");
+        expect(metadata.diagnostics).toEqual([
+            expect.stringContaining("Selected-cache name"),
+        ]);
+    });
+
     it("reflects a newly supplied project registry instead of retaining stale project names", () => {
         const packed = (548 << 16) | 12;
         const first = buildGameValRegistry({
