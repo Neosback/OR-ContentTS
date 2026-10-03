@@ -418,7 +418,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
     const modelGroupMap: Map<number, ModelMergeGroup> = new Map();
     for (const models of groupedModels.values()) {
         const model = models[0].model;
-        const faces = getModelFaces(model, workerState.faceDepth);
+        const faces = getModelFaces(model, sceneBuf.faceDepth);
         const opaqueFaces: ModelFace[] = [];
         const transparentFaces: ModelFace[] = [];
         for (const face of faces) {
