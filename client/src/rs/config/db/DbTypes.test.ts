@@ -83,7 +83,7 @@ describe("DBRow rev-240 decoding", () => {
             36,
             1,
             0xff, 0xff, 0xff, 0xf9,
-            0, 0, 0, 0, 0, 0, 0, 3,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             "r".charCodeAt(0), "o".charCodeAt(0), "w".charCodeAt(0), 0,
             0xff,
             4,
@@ -99,7 +99,7 @@ describe("DBRow rev-240 decoding", () => {
 
         const column = row.columns.get(2);
         expect(column?.types.map((type) => type.name)).toEqual(["INT", "LONG", "STRING"]);
-        expect(column?.values).toEqual([-7, 3n, "row"]);
+        expect(column?.values).toEqual([-7, -1n, "row"]);
 
         expect(buffer.offset).toBe(buffer.length);
     });
