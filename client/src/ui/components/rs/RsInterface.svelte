@@ -13,6 +13,7 @@
     import type { ComponentType, InterfaceEntry } from "../../../lib/interface-renderer/component-types";
     import type { Cs1SimState } from "../../../lib/interface-renderer/cs1-interpreter";
     import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "../../../lib/interface-renderer/cs2/runtime-context";
+    import { WidgetEventDispatcher } from "../../../lib/interface-renderer/widget-event-dispatcher";
     import type { CacheIndex } from "../../../rs/cache/CacheIndex";
     import type { EnumTypeLoader } from "../../../rs/config/enumtype/EnumTypeLoader";
     import type { ObjTypeLoader } from "../../../rs/config/objtype/ObjTypeLoader";
@@ -48,6 +49,7 @@
         selectedComponent = null,
         interactiveMode = false,
         cs1SimState = null,
+        clientState = null,
         cs1VarbitDefinitionLookup = null,
         cs2RedrawNonce = 0,
     }: {
@@ -70,6 +72,8 @@
         selectedComponent?: ComponentType | null;
         interactiveMode?: boolean;
         cs1SimState?: Cs1SimState | null;
+        /** Shared mock client state for CS2 simulation, including modern IF3 interfaces. */
+        clientState?: Cs1SimState | null;
         cs1VarbitDefinitionLookup?: VarbitDefinitionLookup | null;
         cs2RedrawNonce?: number;
     } = $props();
@@ -80,7 +84,12 @@
     let containerHeight = $state(0);
     let manager: InterfaceManager | null = null;
     let hoverPick: ComponentType | null = null;
+    let heldComponent: ComponentType | null = null;
+    let pointerX = 0;
+    let pointerY = 0;
     let renderRaf = 0;
+    let clientTickTimer = 0;
+    let eventDispatcher: WidgetEventDispatcher | null = null;
 
     const viewportWidth = $derived(mode === "fixed" ? FIXED_VIEWPORT_WIDTH : containerWidth);
     const viewportHeight = $derived(mode === "fixed" ? FIXED_VIEWPORT_HEIGHT : containerHeight);
@@ -174,7 +183,7 @@
         setCs1VarbitDefinitionLookup(cs1VarbitDefinitionLookup ?? null);
         const { socialRuntime } = getCs2RuntimeContext();
         applyCs2RuntimeFromSim(
-            cs1SimState,
+            clientState ?? cs1SimState,
             revision,
             cacheHeaders,
             cs1VarbitDefinitionLookup ?? null,
@@ -231,6 +240,7 @@
         const selectedId = selectedComponentId;
         const selected = selectedComponent;
         const simState = cs1SimState;
+        const runtimeState = clientState;
         const lookup = cs1VarbitDefinitionLookup;
         const rev = revision;
         const headers = cacheHeaders;
@@ -248,6 +258,7 @@
         void selectedId;
         void selected;
         void simState;
+        void runtimeState;
         void lookup;
         void rev;
         void headers;
@@ -284,26 +295,106 @@
     });
 
     $effect(() => {
+        const data = interfaceData;
+        const state = clientState ?? cs1SimState;
+        const enabled = interactiveMode;
+
+        eventDispatcher?.dispose();
+        eventDispatcher = null;
+        if (clientTickTimer !== 0) {
+            window.clearInterval(clientTickTimer);
+            clientTickTimer = 0;
+        }
+
+        if (!enabled || !data || !state) return;
+
+        const dispatcher = new WidgetEventDispatcher();
+        eventDispatcher = dispatcher;
+
+        const tick = (): void => {
+            state.clientCycle = (state.clientCycle + 1) | 0;
+
+            // Snapshot transmit changes first. Listener mutations are intentionally
+            // retained for the next 20 ms client tick instead of recursively firing.
+            void dispatcher.dispatchTransmits(data, state);
+            void dispatcher.dispatchTimer(data);
+
+            const hovered = hoverPick;
+            if (hovered) {
+                void dispatcher.dispatchPointer(hovered, "mouseRepeat", {
+                    mouseX: pointerX,
+                    mouseY: pointerY,
+                });
+            }
+
+            const clicked = Interpreter.clickedWidget;
+            if (clicked) {
+                void dispatcher.dispatchPointer(clicked, "hold", {
+                    mouseX: pointerX,
+                    mouseY: pointerY,
+                });
+                void dispatcher.dispatchPointer(clicked, "clickRepeat", {
+                    mouseX: pointerX,
+                    mouseY: pointerY,
+                });
+            }
+        };
+
+        clientTickTimer = window.setInterval(tick, 20);
+
+        return () => {
+            dispatcher.dispose();
+            if (eventDispatcher === dispatcher) eventDispatcher = null;
+            if (clientTickTimer !== 0) {
+                window.clearInterval(clientTickTimer);
+                clientTickTimer = 0;
+            }
+        };
+    });
+
+    $effect(() => {
         if (interactiveMode) return;
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;
         hoverPick = null;
+        heldComponent = null;
     });
 
     function onMouseMove(event: MouseEvent): void {
         const position = localPosition(event);
+        pointerX = position.x;
+        pointerY = position.y;
         setInterfaceMousePosition(position.x, position.y);
         if (!interactiveMode || !interfaceData) return;
+
+        const previous = hoverPick;
         const next = pickComponentAt(interfaceData, position.x, position.y);
-        if (next !== hoverPick) {
+        if (next !== previous) {
+            if (previous) {
+                void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
+                    mouseX: position.x,
+                    mouseY: position.y,
+                });
+            }
             hoverPick = next;
             Interpreter.mousedOverWidgetIf1 = next;
+            if (next) {
+                void eventDispatcher?.dispatchPointer(next, "mouseOver", {
+                    mouseX: position.x,
+                    mouseY: position.y,
+                });
+            }
         }
     }
 
     function onMouseLeave(): void {
         setInterfaceMousePosition(0, 0);
-        if (hoverPick !== null) {
+        const previous = hoverPick;
+        if (previous !== null) {
+            void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
+                mouseX: pointerX,
+                mouseY: pointerY,
+            });
             hoverPick = null;
             Interpreter.mousedOverWidgetIf1 = null;
         }
@@ -313,18 +404,53 @@
         if (!interactiveMode || !interfaceData) return;
         event.preventDefault();
         const position = localPosition(event);
+        pointerX = position.x;
+        pointerY = position.y;
+
+        const target = pickComponentAt(interfaceData, position.x, position.y);
+        if (target) {
+            void eventDispatcher?.dispatchPointer(target, "scrollWheel", {
+                mouseX: position.x,
+                mouseY: position.y,
+                field1063: Math.trunc(event.deltaY),
+            });
+        }
+
         const picked = pickScrollableAt(interfaceData, position.x, position.y);
         if (!picked) return;
         nudgeScrollY(picked.runtimeId, event.deltaY, picked.scrollHeight, picked.tempHeight);
     }
 
     function onMouseDown(event: MouseEvent): void {
-        if (!interactiveMode || !interfaceData) return;
+        if (!interactiveMode || !interfaceData || event.button !== 0) return;
         const position = localPosition(event);
-        Interpreter.clickedWidget = pickComponentAt(interfaceData, position.x, position.y);
+        pointerX = position.x;
+        pointerY = position.y;
+        const picked = pickComponentAt(interfaceData, position.x, position.y);
+        heldComponent = picked;
+        Interpreter.clickedWidget = picked;
+        if (picked) {
+            void eventDispatcher?.dispatchPointer(picked, "click", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
     }
 
-    function clearClicked(): void {
+    function clearClicked(event?: MouseEvent): void {
+        const released = heldComponent ?? Interpreter.clickedWidget;
+        if (event) {
+            const position = localPosition(event);
+            pointerX = position.x;
+            pointerY = position.y;
+        }
+        if (released) {
+            void eventDispatcher?.dispatchPointer(released, "release", {
+                mouseX: pointerX,
+                mouseY: pointerY,
+            });
+        }
+        heldComponent = null;
         Interpreter.clickedWidget = null;
     }
 
@@ -336,6 +462,10 @@
 
     onDestroy(() => {
         cancelAnimationFrame(renderRaf);
+        if (clientTickTimer !== 0) window.clearInterval(clientTickTimer);
+        clientTickTimer = 0;
+        eventDispatcher?.dispose();
+        eventDispatcher = null;
         manager = null;
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;
