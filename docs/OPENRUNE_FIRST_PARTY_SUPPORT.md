@@ -1,7 +1,7 @@
 # First-party OpenRune server support: audit and plan
 
 Findings from three read-only audits (TS decoders vs `OpenRune-FileStore-main`, the server's `or-cache` and content layout, and the
-`backend/` + client file layers). Nothing here is built yet; it is the basis for choosing the first milestone.
+`backend/` + client file layers). This started as an audit/plan; the desktop/source-first filesystem milestone, project indexing, Interface metadata, and core rev-240 NPC/Obj/Param decoder work are now implemented. Treat the status notes below as the current checkpoint.
 
 ## 1. Are the TypeScript decoders on par with the FileStore?
 
@@ -65,5 +65,5 @@ through the existing source-aware writers; detect external changes; trigger `bui
   Logic lives in `project/openrune-server-content.ts`.
 - **Verified:** `cargo test` (14, including a real watcher on a temp folder), vitest (writer races, session/runtime watch), and the screen driven in the browser
   pane against an in-memory project. Not yet driven in the native app against a real server checkout (needs the native folder dialog).
-- **Still open:** Build cache button (`StudioBackendClient` + `:or-cache:buildCache`), DBTable/DBRow plus the remaining decoder-lossiness audit, browser-only mtime polling.
+- **Still open:** DBTable/DBRow decoding first; then the remaining decoder-lossiness audit, TypeScript terrain/static-loc encoding, the explicit Build Cache bridge (`StudioBackendClient` + `:or-cache:buildCache`), bounded `PackMaps + PackWorldMap` publication, and browser-only mtime polling.
 
