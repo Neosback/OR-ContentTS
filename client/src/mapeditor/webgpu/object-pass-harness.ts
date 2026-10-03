@@ -4,6 +4,7 @@ import type { EditorMapSquare } from "../webgl/EditorMapSquare";
 import type { WebGLMapEditorRenderer } from "../webgl/WebGLMapEditorRenderer";
 import { mergeStaticObjectChunks } from "./object-mesh-merge";
 import { WebGPUObjectPass, type ObjectPassFrame, type ObjectPassTextures } from "./WebGPUObjectPass";
+import type { PrioritySortValidation } from "./face-priority-validation";
 
 /**
  * Dev-only A/B harness for the WebGPU object pass. It reads the data the WebGL2 editor already holds (object chunk
@@ -13,8 +14,13 @@ import { WebGPUObjectPass, type ObjectPassFrame, type ObjectPassTextures } from 
  *   await __webgpuHarness()      // from the console; returns the controller (also at window.__webgpuObjectPass)
  *   harness.setMode("diff")      // overlay | only | diff | off
  *   harness.stats                // frame cost, draw calls, GPU time when available
+ *   await harness.validatePriorities() // GPU priority sort vs CPU RuneLite reference for visible maps
  */
 export type HarnessMode = "off" | "overlay" | "only" | "diff";
+
+export interface PriorityValidationResult extends PrioritySortValidation {
+    mapId: number;
+}
 
 export interface ObjectPassHarness {
     readonly pass: WebGPUObjectPass;
@@ -23,6 +29,11 @@ export interface ObjectPassHarness {
     setMode(mode: HarnessMode): void;
     /** Draws one frame now (the harness also draws every animation frame while the page is visible). */
     renderOnce(): void;
+    /**
+     * Runs one real WebGPU frame, reads back the compute-sorted indices and GPU-computed face depths, then compares
+     * every visible map against the independent CPU RuneLite priority-order reference.
+     */
+    validatePriorities(): Promise<PriorityValidationResult[]>;
     stop(): void;
 }
 
@@ -147,6 +158,36 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         pass.render(frameFor(performance.now() * 0.001), visible);
     };
 
+    const validatePriorities = async (): Promise<PriorityValidationResult[]> => {
+        layout();
+        const visible = syncMaps();
+
+        // Queue a fresh frame immediately before readback so the comparison uses the current camera, map edits and
+        // contouring data. WebGPU queue ordering guarantees the following readback copies happen after this compute.
+        pass.render(frameFor(performance.now() * 0.001), visible);
+
+        const results: PriorityValidationResult[] = [];
+        for (const mapId of visible) {
+            const validation = await pass.validatePrioritySort(mapId);
+            if (validation) {
+                results.push({ mapId, ...validation });
+            }
+        }
+
+        const mismatches = results.filter((result) => !result.matches);
+        if (mismatches.length === 0) {
+            console.info(
+                `[webgpu harness] priority sort: GPU == RuneLite CPU reference for ${results.length} visible map(s)`,
+            );
+        } else {
+            console.error(
+                `[webgpu harness] priority sort mismatch in ${mismatches.length}/${results.length} visible map(s)`,
+                mismatches,
+            );
+        }
+        return results;
+    };
+
     const loop = (): void => {
         if (stopped) return;
         renderOnce();
@@ -164,6 +205,7 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
             applyMode();
         },
         renderOnce,
+        validatePriorities,
         stop() {
             stopped = true;
             cancelAnimationFrame(raf);
