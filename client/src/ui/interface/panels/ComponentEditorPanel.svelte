@@ -278,6 +278,11 @@
                 {isLegacy ? "CS1 hooks" : "CS2 hooks"}
             </Button>
         </div>
+        {#if editor.runtimeMode === "simulate"}
+            <div class="shrink-0 border-b border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-[10px] leading-snug text-amber-200">
+                Simulation mode: component edits affect the isolated runtime copy only. Switch to Edit for authoring changes.
+            </div>
+        {/if}
 
         {#if tab === "properties"}
             <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-2 py-1.5">
