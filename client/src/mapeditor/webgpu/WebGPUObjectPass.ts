@@ -345,7 +345,7 @@ export class WebGPUObjectPass {
         const vertexBuffer = device.createBuffer({
             label: `map ${id} vertices`,
             size: mesh.words.byteLength,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
         device.queue.writeBuffer(vertexBuffer, 0, mesh.words as Uint32Array<ArrayBuffer>);
         const indexBuffer = device.createBuffer({
@@ -548,12 +548,8 @@ export class WebGPUObjectPass {
         const priorityPass = encoder.beginComputePass({ label: "object face priority sort" });
         priorityPass.setPipeline(this.priorityPipeline);
         priorityPass.setBindGroup(0, this.sceneBindGroup);
-        for (const map of this.maps.values()) {
-            if (visibleIds && !visibleIds.has(
-                [...this.maps.entries()].find(([, candidate]) => candidate === map)?.[0] ?? -1
-            )) {
-                continue;
-            }
+        for (const [id, map] of this.maps) {
+            if (visibleIds && !visibleIds.has(id)) continue;
             if (map.priorityGroupCount === 0) continue;
             priorityPass.setBindGroup(1, map.bindGroup);
             priorityPass.setBindGroup(2, map.priorityBindGroup);
