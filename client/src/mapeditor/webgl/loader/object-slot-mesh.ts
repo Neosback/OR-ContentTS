@@ -156,6 +156,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
     // Phase 1: decide every emit job (and write the slot records). Nothing is copied yet.
     const jobs = new GrowableU32(256);
     const staticPrioritiesByJob: (Uint8Array | undefined)[] = [];
+    const staticOrdinalsByJob: (Uint32Array | undefined)[] = [];
     let jobCount = 0;
     const addJob = (firstElement: number, count: number, slot: number, target: number): number => {
         jobs.push(firstElement);
@@ -177,6 +178,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
                 }
                 const job = addJob(cmd.offset / 4, cmd.elements, slot, TARGET_STATIC);
                 staticPrioritiesByJob[job] = cmd.faceRenderPriorities;
+                staticOrdinalsByJob[job] = cmd.faceOrdinals;
             }
         }
     };
@@ -223,6 +225,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
     }
     const staticTriangleCount = (staticOpaqueCount + staticAlphaCount) / 3;
     const faceRenderPriorities = new Uint8Array(staticTriangleCount).fill(0xff);
+    const faceOrdinals = new Uint32Array(staticTriangleCount);
     const priorityRangeBySlot = new Uint32Array(Math.max(slotCount, 1) * 4);
     const prioritySlot = new Uint8Array(Math.max(slotCount, 1));
     let priorityCursor = 0;
@@ -233,13 +236,15 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
         }
         const triangleCount = elementCount / 3;
         const priorities = staticPrioritiesByJob[job];
-        if (priorities) {
-            if (priorities.length !== triangleCount) {
+        const ordinals = staticOrdinalsByJob[job];
+        if (priorities || ordinals) {
+            if (!priorities || !ordinals || priorities.length !== triangleCount || ordinals.length !== triangleCount) {
                 throw new Error(
-                    `slot mesh priority count mismatch for job ${job}: ${priorities.length} priorities for ${triangleCount} triangles`,
+                    `slot mesh face metadata mismatch for job ${job}: expected ${triangleCount} triangles`,
                 );
             }
             faceRenderPriorities.set(priorities, priorityCursor);
+            faceOrdinals.set(ordinals, priorityCursor);
             let explicitPriorities = priorities.length > 0;
             for (let i = 0; i < priorities.length; i++) {
                 if (priorities[i] > 11) {
@@ -306,6 +311,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
         staticOpaqueCount,
         staticAlphaCount,
         faceRenderPriorities,
+        faceOrdinals,
         priorityGroups,
         animIndices: new Int32Array(output.animIndices.buffer, output.animIndices.byteOffset, output.animIndices.length),
         slotInfo: slotInfo.slice(0, Math.max(slotCount, 1) * SLOT_INFO_STRIDE),
