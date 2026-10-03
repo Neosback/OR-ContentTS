@@ -7,6 +7,7 @@ import { IndexType } from "../rs/cache/IndexType";
 import { Dat2CacheLoaderFactory } from "../rs/cache/loader/Dat2CacheLoaderFactory";
 import { ComponentDecoder } from "../rs/config/components/ComponentDecoder";
 import { InterfaceType } from "../rs/config/components/InterfaceType";
+import type { ObjTypeLoader } from "../rs/config/objtype/ObjTypeLoader";
 import {
     preloadVarbitDefinitions,
     type VarbitDefinition,
@@ -48,6 +49,15 @@ function tryGetDat2ClientScriptIndex(cacheSystem: CacheSystem): CacheIndex | nul
     }
 }
 
+function tryGetObjTypeLoader(cache: LoadedCache, cacheSystem: CacheSystem): ObjTypeLoader | null {
+    if (cache.type !== "dat2") return null;
+    try {
+        return new Dat2CacheLoaderFactory(cache.info, cache.type, cacheSystem).getObjTypeLoader();
+    } catch {
+        return null;
+    }
+}
+
 function tryPreloadVarbitDefinitions(
     cache: LoadedCache,
     cacheSystem: CacheSystem,
@@ -73,6 +83,7 @@ export class InterfaceViewer {
 
     spritesById!: ReadonlyMap<number, Sprite>;
     clientScriptIndex!: CacheIndex | null;
+    objTypeLoader!: ObjTypeLoader | null;
     varbitDefinitions!: ReadonlyMap<number, VarbitDefinition> | null;
 
     constructor(cache: LoadedCache) {
@@ -89,6 +100,7 @@ export class InterfaceViewer {
         this.spritesById = spriteIndex ? preloadInterfaceSprites(spriteIndex) : new Map<number, Sprite>();
         this.varbitDefinitions = tryPreloadVarbitDefinitions(cache, this.cacheSystem);
         this.clientScriptIndex = tryGetDat2ClientScriptIndex(this.cacheSystem);
+        this.objTypeLoader = tryGetObjTypeLoader(cache, this.cacheSystem);
     }
 
     load(): void {
