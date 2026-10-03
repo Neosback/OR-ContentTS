@@ -24,6 +24,8 @@ export type InterfaceMetadata = {
     projectKey?: string;
     provenance?: InterfaceMetadataProvenance;
     declarations: readonly InterfaceMetadataProvenance[];
+    projectAlternates: readonly string[];
+    diagnostics: readonly string[];
     displayName: string;
 };
 
@@ -36,6 +38,8 @@ export type InterfaceComponentMetadata = {
     projectKey?: string;
     provenance?: InterfaceMetadataProvenance;
     declarations: readonly InterfaceMetadataProvenance[];
+    projectAlternates: readonly string[];
+    diagnostics: readonly string[];
     displayName?: string;
 };
 
@@ -62,16 +66,53 @@ function declarationProvenance(entry: GameValRegistryEntry): InterfaceMetadataPr
     }));
 }
 
-function firstProjectEntry(
+function projectEntries(
     registry: GameValRegistry | null,
     candidates: readonly [table: string, id: number][],
-): GameValRegistryEntry | undefined {
-    if (!registry) return undefined;
+): GameValRegistryEntry[] {
+    if (!registry) return [];
+    const out: GameValRegistryEntry[] = [];
+    const seen = new Set<string>();
     for (const [table, id] of candidates) {
         const found = findGameValId(registry, table, id);
-        if (found) return found;
+        if (!found || seen.has(found.symbol)) continue;
+        seen.add(found.symbol);
+        out.push(found);
     }
-    return undefined;
+    return out;
+}
+
+function registryDiagnostics(
+    registry: GameValRegistry | null,
+    tables: readonly string[],
+    id: number,
+    entries: readonly GameValRegistryEntry[],
+): string[] {
+    if (!registry) return [];
+
+    const messages = new Set<string>();
+    if (new Set(entries.map((entry) => entry.symbol)).size > 1) {
+        messages.add(
+            `Multiple OpenRune symbols map to id ${id}: ${entries.map((entry) => entry.symbol).join(", ")}.`,
+        );
+    }
+
+    for (const issue of registry.issues) {
+        if (issue.id === id && tables.includes(issue.table)) messages.add(issue.message);
+    }
+    for (const issue of registry.sourceIssues.toml) {
+        if (issue.id === id && issue.table && tables.includes(issue.table)) messages.add(issue.message);
+    }
+    for (const issue of registry.sourceIssues.rscm) {
+        if (issue.id === id && issue.namespace && tables.includes(issue.namespace)) messages.add(issue.message);
+        for (const related of issue.related ?? []) {
+            if (related.id === id && tables.some((table) => related.symbol.startsWith(`${table}.`))) {
+                messages.add(issue.message);
+            }
+        }
+    }
+
+    return [...messages];
 }
 
 function loadCacheInterfaces(gameVals: GameVals | null): void {
@@ -121,7 +162,8 @@ export function createInterfaceMetadataSource(
     return {
         getInterface(id: number): InterfaceMetadata {
             const cacheName = clean(cacheInterface(gameVals, id)?.name);
-            const project = firstProjectEntry(registry, [["interface", id]]);
+            const projects = projectEntries(registry, [["interface", id]]);
+            const project = projects[0];
             const projectKey = clean(project?.key);
             return {
                 id,
@@ -130,6 +172,8 @@ export function createInterfaceMetadataSource(
                 projectKey,
                 provenance: project ? provenance(project) : undefined,
                 declarations: project ? declarationProvenance(project) : [],
+                projectAlternates: projects.slice(1).map((entry) => entry.symbol),
+                diagnostics: registryDiagnostics(registry, ["interface"], id, projects),
                 displayName: projectKey ?? cacheName ?? `Interface ${id}`,
             };
         },
@@ -140,10 +184,9 @@ export function createInterfaceMetadataSource(
             packedId = ((interfaceId & 0xffff) << 16) | (componentId & 0xffff),
         ): InterfaceComponentMetadata {
             const cacheName = clean(cacheComponent(gameVals, interfaceId, componentId)?.name);
-            const project = firstProjectEntry(registry, [
-                ["component", packedId],
-                ["components", packedId],
-            ]);
+            const tables = ["component", "components"] as const;
+            const projects = projectEntries(registry, tables.map((table) => [table, packedId] as const));
+            const project = projects[0];
             const projectKey = clean(project?.key);
             return {
                 interfaceId,
@@ -154,6 +197,8 @@ export function createInterfaceMetadataSource(
                 projectKey,
                 provenance: project ? provenance(project) : undefined,
                 declarations: project ? declarationProvenance(project) : [],
+                projectAlternates: projects.slice(1).map((entry) => entry.symbol),
+                diagnostics: registryDiagnostics(registry, tables, packedId, projects),
                 displayName: projectKey ?? cacheName,
             };
         },
