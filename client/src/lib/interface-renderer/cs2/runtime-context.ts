@@ -12,7 +12,35 @@ export type Cs2SocialComparator =
   | { kind: "user"; index: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 }
   | { kind: "rank" };
 
+export type Cs2SocialUser = {
+  name: string;
+  previousName?: string;
+  world?: number;
+  rank?: number;
+  isOnline?: boolean;
+  isFriend?: boolean;
+  isIgnored?: boolean;
+  isSelf?: boolean;
+};
+
+export type Cs2FriendsChatState = {
+  displayName: string;
+  ownerName: string;
+  minKick: number;
+  rank: number;
+  members: readonly Cs2SocialUser[];
+};
+
+export type Cs2SocialState = {
+  friends: readonly Cs2SocialUser[];
+  ignores: readonly Cs2SocialUser[];
+  friendsChat: Cs2FriendsChatState | null;
+  localPlayerName?: string;
+};
+
 export type Cs2SocialRuntime = {
+  /** Optional mock/live client state for FRIEND_*, IGNORE_* and legacy Friends Chat queries. */
+  state?: Cs2SocialState;
   removeComparator(list: Cs2SocialListKind): void;
   addComparator(list: Cs2SocialListKind, comparator: Cs2SocialComparator, reversed: boolean): void;
   sort(list: Cs2SocialListKind): void;
@@ -27,7 +55,7 @@ export type Cs2RuntimeContext = {
   objTypeLoader: ObjTypeLoader | null;
   /** Enum definitions from the exact cache being previewed; used by ENUM_* clientscript opcodes. */
   enumTypeLoader: EnumTypeLoader | null;
-  /** Optional live/simulated social-list state for stateful 3628-3657 opcodes. */
+  /** Optional live/simulated social-list state and comparator runtime for 3600-3657 opcodes. */
   socialRuntime: Cs2SocialRuntime | null;
   varps: Varps;
   varbitLookup: VarbitDefinitionLookup | null;
