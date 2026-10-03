@@ -4,7 +4,7 @@ This directory contains framework-neutral project/persistence contracts used by 
 
 ## Current implementation checkpoint
 
-As of PR #69, the portable project layer includes the unified GameVal registry, guarded OpenRune source adapters, retained `OpenRuneProjectSession`, active runtime binding, Interface metadata projection, and filesystem-backed cache access. The immediate next cache-definition work is DBTable/DBRow/DBColumn decoding; see the takeover checklist in `../../../DEVELOPER_HANDOFF.md`.
+As of PR #71, the portable project layer includes the unified GameVal registry, guarded OpenRune source adapters, retained `OpenRuneProjectSession`, active runtime binding, Interface metadata projection, filesystem-backed cache access, and selected-cache DBTable/DBRow/DBColumn decoding. The immediate next cache-definition work is the remaining lossy/missing-type audit; see `../../../DEVELOPER_HANDOFF.md`.
 
 ## Edit Format v1
 
