@@ -7,14 +7,14 @@ import { Cs1Interpreter } from "./cs1-interpreter";
 import {
   clearMockClientChanges,
   createMockClientState,
-  setMockClientInventory,
+  setMockClientItemContainer,
   setMockClientSocialState,
   setMockClientVarbit,
   snapshotMockClientChanges,
 } from "./mock-client-state";
 import { Interpreter } from "./cs2/Interpreter";
 import { applyCs2RuntimeFromSim, getCs2RuntimeContext } from "./cs2/runtime-context";
-import { runScript } from "./cs2/run-script";
+import { method3416, runScript } from "./cs2/run-script";
 import { Script } from "./cs2/Script";
 import { ScriptEvent } from "./cs2/script-event";
 import { ScriptOpcodes } from "./cs2/ScriptOpcodes";
@@ -84,6 +84,58 @@ describe("Mock client state harness", () => {
     });
   });
 
+  it("backs core CS2 inventory, skill and world queries with the same state", () => {
+    const state = createMockClientState();
+    state.currentLevels[0] = 87;
+    state.maximumLevels[0] = 99;
+    state.currentExp[0] = 12_345_678;
+    state.localPlane = 2;
+    state.localTileX = 3200;
+    state.localTileY = 3210;
+    state.runEnergy = 64;
+    state.weight = -7;
+    state.worldId = 444;
+    setMockClientItemContainer(state, 93, {
+      itemIds: [4151, 995, -1],
+      itemQuantities: [1, 25_000, 0],
+    });
+    applyCs2RuntimeFromSim(state, "test", {}, null);
+
+    const opcodeScript = new Script();
+
+    Interpreter.Interpreter_intStackSize = 2;
+    Interpreter.Interpreter_intStack[0] = 93;
+    Interpreter.Interpreter_intStack[1] = 1;
+    expect(method3416(ScriptOpcodes.INV_GETOBJ, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(995);
+
+    Interpreter.Interpreter_intStackSize = 2;
+    Interpreter.Interpreter_intStack[0] = 93;
+    Interpreter.Interpreter_intStack[1] = 995;
+    expect(method3416(ScriptOpcodes.INV_TOTAL, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(25_000);
+
+    Interpreter.Interpreter_intStackSize = 1;
+    Interpreter.Interpreter_intStack[0] = 0;
+    expect(method3416(ScriptOpcodes.STAT, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(87);
+
+    Interpreter.Interpreter_intStackSize = 0;
+    expect(method3416(ScriptOpcodes.MAP_WORLD, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(444);
+
+    Interpreter.Interpreter_intStackSize = 0;
+    expect(method3416(ScriptOpcodes.RUNENERGY_VISIBLE, opcodeScript, false)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(64);
+
+    Interpreter.Interpreter_intStackSize = 0;
+    expect(method3416(ScriptOpcodes.COORD, opcodeScript, false)).toBe(1);
+    const packed = Interpreter.Interpreter_intStack[0]!;
+    expect((packed >> 28) & 0x3).toBe(2);
+    expect((packed >> 14) & 0x3fff).toBe(3200);
+    expect(packed & 0x3fff).toBe(3210);
+  });
+
   it("stores Varcs in the same state used by CS2", async () => {
     const state = createMockClientState();
     applyCs2RuntimeFromSim(state, "test", {}, null);
@@ -104,8 +156,8 @@ describe("Mock client state harness", () => {
   it("tracks inventory and social mutations for future transmit dispatch", () => {
     const state = createMockClientState();
 
-    setMockClientInventory(state, 93, {
-      itemIds: [4162, 0],
+    setMockClientItemContainer(state, 93, {
+      itemIds: [4161, -1],
       itemQuantities: [1, 0],
     });
     setMockClientSocialState(state, {
@@ -115,8 +167,8 @@ describe("Mock client state harness", () => {
       friendsChat: null,
     });
 
-    expect(state.simulatedInventories[93]).toEqual({
-      itemIds: [4162, 0],
+    expect(state.itemContainers[93]).toEqual({
+      itemIds: [4161, -1],
       itemQuantities: [1, 0],
     });
     expect(state.social.friends[0]?.name).toBe("Friend");
