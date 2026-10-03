@@ -64,7 +64,8 @@ Recent parity work includes:
 - PR #69: rev-240 core NPC/Obj/Param decoder parity;
 - PR #72: stabilized the Svelte preview/render boundary, preserved selected-cache enum/object loaders during redraw, added deterministic mock social queries for 3600-3627, and virtualized the interface list;
 - PR #73: introduced one shared Mock Client State for CS1/CS2, including Varps/Varbits, Varcs, skills, item containers, social/world/client fields, a change journal, and harness-backed 3300-family client-state opcodes;
-- PR #74: added serialized widget event dispatch with initial/changed var transmits, inventory/stat transmits, timers, hover/repeat, click/hold/release, scroll-wheel listeners, trigger filtering, and widget-relative pointer context.
+- PR #74: added serialized widget event dispatch with initial/changed var transmits, inventory/stat transmits, timers, hover/repeat, click/hold/release, scroll-wheel listeners, trigger filtering, and widget-relative pointer context;
+- PR #76: tightened that dispatcher with root onLoad activation, write-count-based 32-event overflow handling, and effective-hidden ancestor filtering.
 
 Do not reintroduce network/cache-proxy reads for data already available from the selected `CacheSystem`.
 
