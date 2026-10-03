@@ -8,6 +8,10 @@ import prioritySortShaderSource from "./face-priority-sort.wgsl?raw";
 import type { StaticObjectMesh } from "./object-mesh-merge";
 import shaderSource from "./object-pass.wgsl?raw";
 import { generateLayerMips, mipLevelCount } from "./texture-mips";
+import {
+    shouldUsePriorityIndices,
+    type ObjectIndexSource,
+} from "./object-index-source";
 
 /**
  * Phase 0 of the WebGPU renderer (docs/WGPU_RENDERER_PLAN.md): the editor's object slot-mesh pass, drawing exactly the
@@ -59,7 +63,7 @@ export interface ObjectPassFrame {
     hideRoofs: boolean;
 }
 
-export type ObjectIndexSource = "original" | "priority";
+export type { ObjectIndexSource } from "./object-index-source";
 
 export interface ObjectPassStats {
     frames: number;
@@ -71,6 +75,8 @@ export interface ObjectPassStats {
     computeGpuMs?: number;
     /** GPU time spent in the object render pass, ms. */
     renderGpuMs?: number;
+    /** Increments only when a fresh timestamp-query result has been resolved. */
+    gpuSamples: number;
     drawCalls: number;
     indices: number;
 }
@@ -105,7 +111,7 @@ const ALPHA_BLEND: GPUBlendState = {
 };
 
 export class WebGPUObjectPass {
-    readonly stats: ObjectPassStats = { frames: 0, cpuMs: 0, drawCalls: 0, indices: 0 };
+    readonly stats: ObjectPassStats = { frames: 0, cpuMs: 0, gpuSamples: 0, drawCalls: 0, indices: 0 };
 
     private readonly maps = new Map<number, GpuMap>();
     private readonly sceneBuffer: GPUBuffer;
@@ -686,7 +692,9 @@ export class WebGPUObjectPass {
             pass.setBindGroup(1, map.bindGroup);
             pass.setVertexBuffer(0, map.vertexBuffer);
             pass.setIndexBuffer(
-                this.indexSource === "priority" ? map.sortedIndexBuffer : map.indexBuffer,
+                shouldUsePriorityIndices(this.indexSource, map.priorityGroupCount)
+                    ? map.sortedIndexBuffer
+                    : map.indexBuffer,
                 "uint32",
             );
             pass.drawIndexed(map.data.mesh.opaqueCount, 1, 0, 0, 0);
@@ -701,7 +709,9 @@ export class WebGPUObjectPass {
             pass.setBindGroup(1, map.bindGroup);
             pass.setVertexBuffer(0, map.vertexBuffer);
             pass.setIndexBuffer(
-                this.indexSource === "priority" ? map.sortedIndexBuffer : map.indexBuffer,
+                shouldUsePriorityIndices(this.indexSource, map.priorityGroupCount)
+                    ? map.sortedIndexBuffer
+                    : map.indexBuffer,
                 "uint32",
             );
             pass.drawIndexed(map.data.mesh.alphaCount, 1, map.data.mesh.opaqueCount, 0, 0);
@@ -729,6 +739,7 @@ export class WebGPUObjectPass {
                     this.stats.computeGpuMs = Number(times[1] - times[0]) / 1e6;
                     this.stats.renderGpuMs = Number(times[3] - times[2]) / 1e6;
                     this.stats.gpuMs = Number(times[3] - times[0]) / 1e6;
+                    this.stats.gpuSamples++;
                 })
                 .catch(() => undefined)
                 .finally(() => {
