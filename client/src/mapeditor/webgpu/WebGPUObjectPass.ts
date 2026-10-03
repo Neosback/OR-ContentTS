@@ -1,4 +1,6 @@
 import { getFaceDepthSource, type FaceDepthSource } from "../../rs/model/face-depth-source";
+import { buildPrioritySortGpuData, GPU_PRIORITY_GROUP_WORDS } from "./face-priority-gpu";
+import prioritySortShaderSource from "./face-priority-sort.wgsl?raw";
 import type { StaticObjectMesh } from "./object-mesh-merge";
 import shaderSource from "./object-pass.wgsl?raw";
 import { generateLayerMips, mipLevelCount } from "./texture-mips";
@@ -67,6 +69,12 @@ interface GpuMap {
     data: ObjectPassMap;
     vertexBuffer: GPUBuffer;
     indexBuffer: GPUBuffer;
+    sortedIndexBuffer: GPUBuffer;
+    priorityBuffer: GPUBuffer;
+    priorityGroupBuffer: GPUBuffer;
+    priorityScratchBuffer: GPUBuffer;
+    priorityGroupCount: number;
+    priorityBindGroup: GPUBindGroup;
     slotBuffer: GPUBuffer;
     heightTexture: GPUTexture;
     flagsTexture: GPUTexture;
@@ -111,6 +119,8 @@ export class WebGPUObjectPass {
         private readonly format: GPUTextureFormat,
         private readonly sceneLayout: GPUBindGroupLayout,
         private readonly mapLayout: GPUBindGroupLayout,
+        private readonly priorityLayout: GPUBindGroupLayout,
+        private readonly priorityPipeline: GPUComputePipeline,
         private readonly opaquePipeline: GPURenderPipeline,
         private readonly alphaPipeline: GPURenderPipeline,
         hasTimestamps: boolean,
@@ -174,19 +184,31 @@ export class WebGPUObjectPass {
         context.configure({ device, format, alphaMode });
 
         const module = device.createShaderModule({ label: "object pass", code: shaderSource });
-        const info = await module.getCompilationInfo();
-        for (const message of info.messages) {
-            const text = `[wgsl ${message.type}] ${message.lineNum}:${message.linePos} ${message.message}`;
-            if (message.type === "error") console.error(text);
-            else console.warn(text);
-        }
-        if (info.messages.some((message) => message.type === "error")) {
-            throw new Error("object-pass.wgsl failed to compile");
-        }
+        const priorityModule = device.createShaderModule({
+            label: "object face priority sort",
+            code: prioritySortShaderSource,
+        });
+        const reportCompilation = async (shader: GPUShaderModule, name: string): Promise<void> => {
+            const info = await shader.getCompilationInfo();
+            for (const message of info.messages) {
+                const text = `[${name} ${message.type}] ${message.lineNum}:${message.linePos} ${message.message}`;
+                if (message.type === "error") console.error(text);
+                else console.warn(text);
+            }
+            if (info.messages.some((message) => message.type === "error")) {
+                throw new Error(`${name} failed to compile`);
+            }
+        };
+        await reportCompilation(module, "object-pass.wgsl");
+        await reportCompilation(priorityModule, "face-priority-sort.wgsl");
 
         const sceneLayout = device.createBindGroupLayout({
             entries: [
-                { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE,
+                    buffer: { type: "uniform" },
+                },
                 { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float", viewDimension: "2d-array" } },
                 { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } },
                 { binding: 3, visibility: GPUShaderStage.VERTEX, texture: { sampleType: "sint", viewDimension: "2d" } },
@@ -194,13 +216,42 @@ export class WebGPUObjectPass {
         });
         const mapLayout = device.createBindGroupLayout({
             entries: [
-                { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: "uniform" } },
-                { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: "read-only-storage" } },
-                { binding: 2, visibility: GPUShaderStage.VERTEX, texture: { sampleType: "sint", viewDimension: "2d-array" } },
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+                    buffer: { type: "uniform" },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+                    buffer: { type: "read-only-storage" },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.VERTEX | GPUShaderStage.COMPUTE,
+                    texture: { sampleType: "sint", viewDimension: "2d-array" },
+                },
                 { binding: 3, visibility: GPUShaderStage.VERTEX, texture: { sampleType: "uint", viewDimension: "2d-array" } },
             ],
         });
+        const priorityLayout = device.createBindGroupLayout({
+            entries: [
+                { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+                { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+                { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+                { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+                { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+                { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+            ],
+        });
         const layout = device.createPipelineLayout({ bindGroupLayouts: [sceneLayout, mapLayout] });
+        const priorityPipeline = device.createComputePipeline({
+            label: "object face priority sort",
+            layout: device.createPipelineLayout({
+                bindGroupLayouts: [sceneLayout, mapLayout, priorityLayout],
+            }),
+            compute: { module: priorityModule, entryPoint: "sortPriorityGroup" },
+        });
 
         const createPipeline = (fragmentEntry: string): GPURenderPipeline =>
             device.createRenderPipeline({
@@ -226,6 +277,8 @@ export class WebGPUObjectPass {
             format,
             sceneLayout,
             mapLayout,
+            priorityLayout,
+            priorityPipeline,
             createPipeline("fs_opaque"),
             createPipeline("fs_alpha"),
             hasTimestamps,
@@ -298,9 +351,42 @@ export class WebGPUObjectPass {
         const indexBuffer = device.createBuffer({
             label: `map ${id} indices`,
             size: mesh.indices.byteLength,
-            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         });
         device.queue.writeBuffer(indexBuffer, 0, mesh.indices as Uint32Array<ArrayBuffer>);
+
+        const priorityData = buildPrioritySortGpuData(mesh);
+        const sortedIndexBuffer = device.createBuffer({
+            label: `map ${id} priority-sorted indices`,
+            size: mesh.indices.byteLength,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        // The compute pass only rewrites explicit-priority model ranges. Everything else stays byte-for-byte
+        // identical to the reference index stream.
+        device.queue.writeBuffer(sortedIndexBuffer, 0, mesh.indices as Uint32Array<ArrayBuffer>);
+
+        const priorityBuffer = device.createBuffer({
+            label: `map ${id} face priorities`,
+            size: Math.max(priorityData.priorities.byteLength, 4),
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        if (priorityData.priorities.byteLength > 0) {
+            device.queue.writeBuffer(priorityBuffer, 0, priorityData.priorities as Uint32Array<ArrayBuffer>);
+        }
+        const priorityGroupBuffer = device.createBuffer({
+            label: `map ${id} face priority groups`,
+            size: Math.max(priorityData.groups.byteLength, 4),
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        if (priorityData.groups.byteLength > 0) {
+            device.queue.writeBuffer(priorityGroupBuffer, 0, priorityData.groups as Uint32Array<ArrayBuffer>);
+        }
+        const priorityScratchBuffer = device.createBuffer({
+            label: `map ${id} face priority scratch`,
+            // ScratchFace is { triangle: u32, depth: i32 } = 8 bytes.
+            size: Math.max(priorityData.scratchFaces * 8, 8),
+            usage: GPUBufferUsage.STORAGE,
+        });
         const slotBuffer = device.createBuffer({
             label: `map ${id} slots`,
             size: Math.max(mesh.slotInfo.byteLength, 16),
@@ -352,10 +438,27 @@ export class WebGPUObjectPass {
                 { binding: 3, resource: flagsTexture.createView({ dimension: "2d-array" }) },
             ],
         });
+        const priorityBindGroup = device.createBindGroup({
+            layout: this.priorityLayout,
+            entries: [
+                { binding: 0, resource: { buffer: indexBuffer } },
+                { binding: 1, resource: { buffer: sortedIndexBuffer } },
+                { binding: 2, resource: { buffer: priorityBuffer } },
+                { binding: 3, resource: { buffer: priorityGroupBuffer } },
+                { binding: 4, resource: { buffer: vertexBuffer } },
+                { binding: 5, resource: { buffer: priorityScratchBuffer } },
+            ],
+        });
         this.maps.set(id, {
             data,
             vertexBuffer,
             indexBuffer,
+            sortedIndexBuffer,
+            priorityBuffer,
+            priorityGroupBuffer,
+            priorityScratchBuffer,
+            priorityGroupCount: priorityData.groups.length / GPU_PRIORITY_GROUP_WORDS,
+            priorityBindGroup,
             slotBuffer,
             heightTexture,
             flagsTexture,
@@ -370,6 +473,10 @@ export class WebGPUObjectPass {
         if (!map) return;
         map.vertexBuffer.destroy();
         map.indexBuffer.destroy();
+        map.sortedIndexBuffer.destroy();
+        map.priorityBuffer.destroy();
+        map.priorityGroupBuffer.destroy();
+        map.priorityScratchBuffer.destroy();
         map.slotBuffer.destroy();
         map.heightTexture.destroy();
         map.flagsTexture.destroy();
@@ -435,6 +542,25 @@ export class WebGPUObjectPass {
         }
 
         const encoder = device.createCommandEncoder();
+
+        // Validation stage: execute the priority sorter every frame, but keep the render pass on indexBuffer until
+        // the computed stream is compared against the CPU reference and representative WebGL2 captures.
+        const priorityPass = encoder.beginComputePass({ label: "object face priority sort" });
+        priorityPass.setPipeline(this.priorityPipeline);
+        priorityPass.setBindGroup(0, this.sceneBindGroup);
+        for (const map of this.maps.values()) {
+            if (visibleIds && !visibleIds.has(
+                [...this.maps.entries()].find(([, candidate]) => candidate === map)?.[0] ?? -1
+            )) {
+                continue;
+            }
+            if (map.priorityGroupCount === 0) continue;
+            priorityPass.setBindGroup(1, map.bindGroup);
+            priorityPass.setBindGroup(2, map.priorityBindGroup);
+            priorityPass.dispatchWorkgroups(map.priorityGroupCount);
+        }
+        priorityPass.end();
+
         const pass = encoder.beginRenderPass({
             colorAttachments: [
                 {
