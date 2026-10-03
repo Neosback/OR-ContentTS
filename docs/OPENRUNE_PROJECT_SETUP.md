@@ -25,4 +25,8 @@ After a project is accepted, setup opens a full `OpenRuneProjectSession` (projec
 - automatically after a new OpenRune setup is added,
 - from the **Project overview** button on every OpenRune setup card.
 
-Each capability is marked **In use** (a Studio editor reads it today: the map editor and interface editor, through the LIVE cache) or **Loaded** (indexed and queryable, but no editor uses it yet), and **Ready / Partly there / Not available** with what to do about it (for example "generate LIVE with OpenRune bootstrap").
+Each capability is marked **In use** or **Loaded**, plus **Ready / Partly there / Not available** with an actionable explanation. The Interface Editor now uses both LIVE/cache data and the retained project's GameVal/RSCM metadata projection; map editing remains cache/runtime driven while OpenRune NPC/ground-Obj/Area TOML sources are indexed for source-aware workflows.
+
+## Handoff note
+
+Setup is no longer the next architectural blocker. Preserve its single-root authority and retained-session behavior while adding new editors. A Basic Cache must clear active OpenRune project metadata, and switching OpenRune roots must never expose stale metadata from the previous project.
