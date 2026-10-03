@@ -150,6 +150,10 @@ export interface IEditorPluginHost extends EditorRsConfigServices, EditorRuntime
     isHistoryApplying(): boolean;
     undoHistory(): void;
     redoHistory(): void;
+    /** Jumps to a history entry (-1 = the state before the first edit). */
+    jumpHistory(index: number): void;
+    /** Centres the camera on a world tile, loading its map square if needed; `plane` also sets the view plane. */
+    goToWorldTile(worldX: number, worldY: number, plane?: number): void;
     clearHistory(): void;
 
     saveDockPanelRestore(panelId: string, options: AddPanelOptions): void;
@@ -534,6 +538,12 @@ export class EditorPluginHost implements IEditorPluginHost {
     };
     undoHistory = (): void => {
         this._e.undoHistory();
+    };
+    goToWorldTile(worldX: number, worldY: number, plane?: number): void {
+        this._e.goToWorldTile(worldX, worldY, plane);
+    }
+    jumpHistory = (index: number): void => {
+        this._e.jumpHistory(index);
     };
     redoHistory = (): void => {
         this._e.redoHistory();

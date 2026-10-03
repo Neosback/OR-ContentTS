@@ -1,4 +1,4 @@
-import type { AddPanelOptions, DockviewApi, SerializedDockview } from "dockview-core";
+import type { AddPanelOptions, DockviewApi, DockviewGroupPanel, SerializedDockview } from "dockview-core";
 
 import { addMapEditorDockPanelRestoredOrDefault, extractDockPanelRestoreOptions } from "../../mapeditor/map-editor-dock-panel-restore";
 import { getMapEditorFloatableDockPanelDefaults } from "../../mapeditor/map-editor-floatable-dock-defaults";
@@ -77,12 +77,14 @@ export class Workbench {
         readonly host: IEditorPluginHost,
         panels: readonly StudioPanel[],
         onTabMenu: (panelId: string, event: MouseEvent) => void,
+        headerActions?: (group: DockviewGroupPanel) => { element: HTMLElement; dispose(): void } | undefined,
     ) {
         const dock = createStudioDock(container, {
             panels,
             storageKey: LAYOUT_STORAGE_KEY,
             isRestoredLayoutValid: (api) => api.getPanel(SCENE_PANEL_ID) !== undefined,
             onTabContextMenu: onTabMenu,
+            headerActions,
             defaultLayout: (d) => {
                 this.dock = d;
                 this.buildDefaultLayout();

@@ -40,24 +40,41 @@
             {#if history.entries.length === 0}
                 <p class="p-3 text-xs text-muted-foreground">Terrain and paint edits appear here as you work.</p>
             {:else}
-                <ul class="divide-y divide-border/60 p-1">
+                <ul class="divide-y divide-border/60 p-1" aria-label="Edit history">
                     {#each entries as entry, displayIdx (entry.id)}
                         {@const index = history.entries.length - 1 - displayIdx}
-                        <li
-                            class="flex items-start gap-2 rounded px-2 py-1.5 text-xs {index === history.currentIndex ? 'bg-primary/10 ring-1 ring-primary/30' : ''} {index > history.currentIndex ? 'opacity-50' : ''}"
-                        >
-                            <span class="w-5 shrink-0 font-mono text-[10px] text-muted-foreground">{index + 1}.</span>
-                            <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{formatTime(entry.timestamp)}</span>
-                            <span class="min-w-0 flex-1">
-                                <span class="block truncate font-medium">{entry.label}</span>
-                                <span class="block truncate text-[10px] text-muted-foreground">
-                                    {entry.tileCount} tile{entry.tileCount === 1 ? "" : "s"}{entry.mapIds.length > 0
-                                        ? ` · ${entry.mapIds.map((id) => formatMapSquareLabel(id)).join(", ")}`
-                                        : ""}
+                        <li>
+                            <button
+                                type="button"
+                                aria-current={index === history.currentIndex}
+                                title={index === history.currentIndex ? "The editor is at this step" : "Jump to this step"}
+                                class="flex w-full cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/50 {index === history.currentIndex ? 'bg-primary/10 ring-1 ring-primary/30' : ''} {index > history.currentIndex ? 'opacity-50' : ''}"
+                                onclick={() => host.jumpHistory(index)}
+                            >
+                                <span class="w-5 shrink-0 font-mono text-[10px] text-muted-foreground">{index + 1}.</span>
+                                <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{formatTime(entry.timestamp)}</span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-medium">{entry.label}</span>
+                                    <span class="block truncate text-[10px] text-muted-foreground">
+                                        {entry.tileCount} tile{entry.tileCount === 1 ? "" : "s"}{entry.mapIds.length > 0
+                                            ? ` · ${entry.mapIds.map((id) => formatMapSquareLabel(id)).join(", ")}`
+                                            : ""}
+                                    </span>
                                 </span>
-                            </span>
+                            </button>
                         </li>
                     {/each}
+                    <li>
+                        <button
+                            type="button"
+                            aria-current={history.currentIndex === -1}
+                            class="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/50 {history.currentIndex === -1 ? 'bg-primary/10 ring-1 ring-primary/30' : ''}"
+                            onclick={() => host.jumpHistory(-1)}
+                        >
+                            <span class="w-5 shrink-0"></span>
+                            Original map
+                        </button>
+                    </li>
                 </ul>
             {/if}
         </div>

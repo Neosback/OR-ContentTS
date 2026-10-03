@@ -20,3 +20,30 @@ export const TOOL_RAIL_ORDER: readonly MapEditorTool[] = TOOL_RAIL_GROUPS.flat()
 export function visibleRailGroups(isAvailable: (tool: MapEditorTool) => boolean): MapEditorTool[][] {
     return TOOL_RAIL_GROUPS.map((group) => group.filter(isAvailable)).filter((group) => group.length > 0);
 }
+
+/**
+ * The rail's groups for a chosen list of tools (in the user's order): consecutive tools that belong to different
+ * built-in groups are separated by a divider, tools the rail does not know sit in their own trailing group.
+ */
+export function railGroupsFor(chosen: readonly string[], isAvailable: (tool: MapEditorTool) => boolean): MapEditorTool[][] {
+    const groupOf = (tool: string): number => {
+        const index = TOOL_RAIL_GROUPS.findIndex((group) => (group as readonly string[]).includes(tool));
+        return index < 0 ? TOOL_RAIL_GROUPS.length : index;
+    };
+    const groups: MapEditorTool[][] = [];
+    let current: MapEditorTool[] = [];
+    let currentGroup = -1;
+    for (const id of chosen) {
+        const tool = id as MapEditorTool;
+        if (!isAvailable(tool)) continue;
+        const group = groupOf(id);
+        if (current.length > 0 && group !== currentGroup) {
+            groups.push(current);
+            current = [];
+        }
+        currentGroup = group;
+        current.push(tool);
+    }
+    if (current.length > 0) groups.push(current);
+    return groups;
+}

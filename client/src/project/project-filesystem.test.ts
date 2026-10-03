@@ -49,7 +49,7 @@ describe("InMemoryProjectFileSystem", () => {
         expect(await fs.list("")).toEqual([
             { name: ".data", path: ".data", kind: "directory" },
             { name: "content", path: "content", kind: "directory" },
-            { name: "game.yml", path: "game.yml", kind: "file", size: 13 },
+            { name: "game.yml", path: "game.yml", kind: "file", size: 13, modifiedAt: expect.any(Number) },
         ]);
 
         expect(await fs.stat("content/woodcutting/gamevals.toml")).toEqual({
@@ -57,6 +57,7 @@ describe("InMemoryProjectFileSystem", () => {
             path: "content/woodcutting/gamevals.toml",
             kind: "file",
             size: 27,
+            modifiedAt: expect.any(Number),
         });
         expect(await fs.stat("missing")).toBeUndefined();
         expect(await fs.exists(".data/cache/LIVE")).toBe(true);
@@ -114,7 +115,7 @@ describe("InMemoryProjectFileSystem", () => {
     it("supports read-only capability gating", async () => {
         const fs = new InMemoryProjectFileSystem(seed, { writable: false });
 
-        expect(fs.capabilities).toEqual({ read: true, write: false, watch: false });
+        expect(fs.capabilities).toEqual({ read: true, write: false, watch: true });
         expect(await fs.readText("game.yml")).toBe("revision: 240");
         await expect(fs.writeText("game.yml", "revision: 241")).rejects.toMatchObject({
             code: "WRITE_UNAVAILABLE",

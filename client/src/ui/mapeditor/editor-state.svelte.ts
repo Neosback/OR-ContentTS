@@ -3,6 +3,8 @@ import { getContext, setContext } from "svelte";
 import type { MapEditorBrushType, MapEditorTool } from "../../mapeditor/map-editor-kinds";
 import type { MapEditorHistorySnapshot } from "../../mapeditor/map-editor-history";
 import { getActivePaintModifiers } from "../../mapeditor/editor-tool-input";
+import { drawStats, glMemory } from "../../perf/gl-memory";
+import { tileTelemetry, type StatusSegment } from "../../mapeditor/status-format";
 import { OVERLAY_SAME_ID_FLOOD_BRUSH_HUD } from "../../mapeditor/overlay-flood-fill";
 import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
 import { fromExternal } from "../lib/external.svelte";
@@ -26,7 +28,17 @@ export class Hud {
     /** World tile under the cursor (undefined off the map); only reassigned when it changes. */
     hoverTile = $state.raw<{ worldX: number; worldY: number } | undefined>();
 
+    /** Cursor telemetry for the status bar (region, local/world tile, plane and the hovered tile's contents). */
+    tileSegments = $state.raw<StatusSegment[]>([]);
+    /** Render stats for the status bar, refreshed a few times a second. */
+    frameMs = $state("");
+    drawCalls = $state(0);
+    triangles = $state(0);
+    gpuBytes = $state(0);
+
     private frame = 0;
+    private lastTileKey = "";
+    private lastStatsAt = 0;
     private lastFpsAt = 0;
     private lastSampleAt = 0;
 
@@ -65,6 +77,21 @@ export class Hud {
         const hover = host.getHoveredTile();
         if (hover?.worldX !== this.hoverTile?.worldX || hover?.worldY !== this.hoverTile?.worldY) {
             this.hoverTile = hover;
+        }
+        const level = host.getTilePickLevel();
+        const tileKey = hover ? `${hover.worldX},${hover.worldY},${level}` : "";
+        // The tile's contents change while painting, so the same tile is re-read about four times a second.
+        const resample = tileKey !== this.lastTileKey || time - this.lastStatsAt >= 250;
+        if (resample) {
+            this.lastTileKey = tileKey;
+            this.tileSegments = hover ? tileTelemetry(hover, level, host.getTileInfo(level, hover.worldX, hover.worldY)) : [];
+        }
+        if (time - this.lastStatsAt >= 250) {
+            this.lastStatsAt = time;
+            this.frameMs = host.renderer.stats.frameTime.toFixed(1);
+            this.drawCalls = drawStats.lastCalls;
+            this.triangles = drawStats.lastTriangles;
+            this.gpuBytes = glMemory.bytes;
         }
         this.debugText = host.debugText ?? "";
         this.cameraYaw = host.camera.getYaw();

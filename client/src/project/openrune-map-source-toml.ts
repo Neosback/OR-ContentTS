@@ -1015,9 +1015,14 @@ export async function indexProjectOpenRuneMapSources(
 
     for (const [symbol, declarations] of areasBySymbolMutable) {
         if (declarations.length < 2) continue;
+        // One area id may cover many polygons (area.multiway does) and MapAreaPacker merges them. It only keeps the last
+        // declaration's includes/excludes, so differing lists are the case where something is silently dropped.
+        const listsOf = (area: OpenRuneAreaSource): string =>
+            JSON.stringify([[...area.includes].sort(), [...area.excludes].sort()]);
+        if (declarations.every((area) => listsOf(area) === listsOf(declarations[0]!))) continue;
         issues.push({
             code: "DUPLICATE_AREA_ID",
-            message: `OpenRune area "${symbol}" is declared multiple times.`,
+            message: `OpenRune area "${symbol}" is declared multiple times with different includes/excludes; the packer keeps only the last declaration's lists.`,
             sourcePath: declarations[0]!.sourcePath,
             line: declarations[0]!.line,
             kind: "area",

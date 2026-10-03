@@ -46,7 +46,7 @@ function locTypeNotInteractive(locType: LocType): boolean {
     return locType.isInteractive === 0;
 }
 
-function newTagForTile(
+export function newTagForTile(
     sceneTileX: number,
     sceneTileY: number,
     locTypeId: number,
@@ -61,7 +61,7 @@ function newTagForTile(
     ).toString();
 }
 
-function markChunks(
+export function markChunks(
     map: EditorMapSquare,
     mapId: number,
     renderer: WebGLMapEditorRenderer,

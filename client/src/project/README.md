@@ -317,3 +317,11 @@ When a user applies changes into an OpenRune project:
 - treat LIVE/SERVER caches as generated outputs.
 
 Terrain/static-loc placement has no current OpenRune TOML source. Those mutations remain represented by Studio semantic state and can be encoded into raw map payloads for portable export or explicit OpenRune-FileStore publication.
+
+## Writing and watching project files
+
+`ProjectFileSystem.writeText/writeBytes` accept `{ expectedModifiedAt, backup }`. Pass the `modifiedAt` seen when the file was read (`readTextStamped` in `project-filesystem.ts`
+does stat-then-read) and the write fails with `CONFLICT` if the file moved on; `null` means "must not exist". Use `writeTextGuarded` to map that to a domain error (the TOML
+writers map it to `STALE_SOURCE`). Adapters that cannot honour a guard or a backup ignore it. `watch()` (when `capabilities.watch`) reports changes made outside this app;
+`OpenRuneProjectSession.watch()` turns them into debounced re-indexes. See `docs/OPENRUNE_FIRST_PARTY_SUPPORT.md`.
+

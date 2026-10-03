@@ -1,3 +1,4 @@
+import { sameDefinitionText } from "./definition-text";
 import {
     findGameValSymbol,
     type GameValRegistry,
@@ -7,7 +8,10 @@ import type {
     OpenRuneProjectIndex,
 } from "./openrune-project-index";
 import {
+    ProjectFileSystemError,
+    readTextStamped,
     walkProjectDirectory,
+    writeTextGuarded,
     type ProjectFileSystem,
 } from "./project-filesystem";
 
@@ -94,6 +98,7 @@ export type OpenRuneServerTomlIssueCode =
     | "UNRESOLVED_ID"
     | "UNRESOLVED_INHERIT"
     | "DUPLICATE_TARGET"
+    | "IDENTICAL_DUPLICATE"
     | "INVALID_STOCK"
     | "UNRESOLVED_STOCK_OBJ"
     | "TOO_MANY_STOCK_ENTRIES";
@@ -179,6 +184,10 @@ export type OpenRuneServerWriteErrorCode =
     | "INVALID_PATH"
     | "SOURCE_MISSING"
     | "SOURCE_EXISTS";
+
+function staleSourceError(sourcePath: string, message: string): OpenRuneServerWriteError {
+    return new OpenRuneServerWriteError("STALE_SOURCE", message, sourcePath);
+}
 
 export class OpenRuneServerWriteError extends Error {
     constructor(
@@ -555,15 +564,15 @@ function parseInventoryStock(
             typeof count?.value !== "number" ||
             !Number.isSafeInteger(count.value) ||
             count.value < 0 ||
-            count.value > 0xffff ||
+            count.value > MAX_SHORT ||
             typeof restockCycles?.value !== "number" ||
             !Number.isSafeInteger(restockCycles.value) ||
-            restockCycles.value < 0 ||
-            restockCycles.value > 0xffff
+            restockCycles.value < MIN_SHORT ||
+            restockCycles.value > MAX_SHORT
         ) {
             issues.push({
                 code: "INVALID_STOCK",
-                message: `OpenRune inventory stock at ${block.sourcePath}:${line} requires obj plus integer count/restockCycles values in 0..65535.`,
+                message: `OpenRune inventory stock at ${block.sourcePath}:${line} requires obj plus an integer count in 0..32767 and restockCycles in -32768..32767 (-1 means it never restocks).`,
                 sourcePath: block.sourcePath,
                 line,
                 table: "inventory",
@@ -834,9 +843,13 @@ export async function indexProjectOpenRuneServerToml(
     for (const declarations of byTargetMutable.values()) {
         if (declarations.length < 2) continue;
         const first = declarations[0]!;
+        // Copies with the same text say the same thing wherever they sit, so which one is read changes nothing.
+        const identical = declarations.every((block) => sameDefinitionText(block.rawText, first.rawText));
         issues.push({
-            code: "DUPLICATE_TARGET",
-            message: `OpenRune server target "${first.table}" id ${first.resolvedId} is declared by multiple source blocks. PackServerConfig consumes all matching TOML sources, so Studio should not silently choose one.`,
+            code: identical ? "IDENTICAL_DUPLICATE" : "DUPLICATE_TARGET",
+            message: identical
+                ? `OpenRune server target "${first.table}" id ${first.resolvedId} has ${declarations.length} identical copies; harmless, but one can be deleted.`
+                : `OpenRune server target "${first.table}" id ${first.resolvedId} is declared by multiple source blocks with different content. PackServerConfig consumes all matching TOML sources, so Studio should not silently choose one.`,
             sourcePath: first.sourcePath,
             line: first.startLine,
             table: first.table,
@@ -970,7 +983,7 @@ export async function updateOpenRuneServerField(
         );
     }
 
-    const text = await fileSystem.readText(expected.sourcePath);
+    const { text, modifiedAt } = await readTextStamped(fileSystem, expected.sourcePath);
     const current = locateCurrentBlock(expected.sourcePath, text, expected);
     const lineEnding = text.includes("\r\n") ? "\r\n" : "\n";
     const lines = text.split(/\r?\n/);
@@ -1005,12 +1018,18 @@ export async function updateOpenRuneServerField(
         );
     }
 
-    await fileSystem.writeText(expected.sourcePath, lines.join(lineEnding));
+    await writeTextGuarded(fileSystem, expected.sourcePath, lines.join(lineEnding), modifiedAt, (error) =>
+        staleSourceError(expected.sourcePath, `OpenRune server block ${expected.table}#${expected.ordinal} changed on disk while it was being edited (${error.message}). Re-index before writing.`),
+    );
 }
 
-function requireUnsignedShort(value: number, label: string): void {
-    if (!Number.isSafeInteger(value) || value < 0 || value > 0xffff) {
-        throw new Error(`${label} must be an integer in 0..65535.`);
+/** The server's InventoryServerCodec writes stock count and restockCycles as signed shorts. */
+const MIN_SHORT = -0x8000;
+const MAX_SHORT = 0x7fff;
+
+function requireShort(value: number, label: string, min: number): void {
+    if (!Number.isSafeInteger(value) || value < min || value > MAX_SHORT) {
+        throw new Error(`${label} must be an integer in ${min}..${MAX_SHORT}.`);
     }
 }
 
@@ -1060,10 +1079,11 @@ export function serializeOpenRuneInventoryToml(
             );
         }
         for (const entry of stock) {
-            requireUnsignedShort(entry.count, "OpenRune inventory stock count");
-            requireUnsignedShort(
+            requireShort(entry.count, "OpenRune inventory stock count", 0);
+            requireShort(
                 entry.restockCycles,
                 "OpenRune inventory stock restockCycles",
+                MIN_SHORT,
             );
             lines.push(
                 "",
@@ -1110,14 +1130,27 @@ export async function replaceOpenRuneServerSourceFile(
                 sourcePath,
             );
         }
-        if ((await fileSystem.readText(sourcePath)) !== expectedText) {
+        const { text, modifiedAt } = await readTextStamped(fileSystem, sourcePath);
+        if (text !== expectedText) {
             throw new OpenRuneServerWriteError(
                 "STALE_SOURCE",
                 `OpenRune server source "${sourcePath}" changed on disk. Re-index before writing.`,
                 sourcePath,
             );
         }
+        await writeTextGuarded(fileSystem, sourcePath, nextText, modifiedAt, (error) =>
+            staleSourceError(sourcePath, `OpenRune server source "${sourcePath}" changed on disk while it was being replaced (${error.message}). Re-index before writing.`),
+        );
+        return;
     }
 
-    await fileSystem.writeText(sourcePath, nextText);
+    // A new file: refuse to overwrite one that appeared since the check above.
+    try {
+        await fileSystem.writeText(sourcePath, nextText, { expectedModifiedAt: null });
+    } catch (error) {
+        if (error instanceof ProjectFileSystemError && error.code === "CONFLICT") {
+            throw new OpenRuneServerWriteError("SOURCE_EXISTS", `OpenRune server source "${sourcePath}" already exists.`, sourcePath);
+        }
+        throw error;
+    }
 }

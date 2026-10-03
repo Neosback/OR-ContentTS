@@ -30,6 +30,7 @@ import { ObjectPickIndex, type EditorObjectKind, type EditorObjectRef } from "..
 import type { WebGLMapEditorRenderer } from "../../webgl/WebGLMapEditorRenderer";
 import {
     recordEditObjectMutation,
+    snapshotObjectEntriesForBounds,
     snapshotObjectEntriesForRef,
 } from "../../map-editor-object-history";
 
@@ -678,21 +679,52 @@ export function moveSelectedObjectToAnchor(
     );
 }
 
+/** Moves the selected object by whole tiles as one undo step (the old and the new footprint are snapshotted together). */
 export function moveSelectedObjectByTiles(
     host: IEditorPluginHost,
     renderer: WebGLMapEditorRenderer,
     deltaStartX: number,
     deltaStartY: number,
 ): boolean {
-    if (deltaStartX === 0 && deltaStartY === 0) {
-        return false;
-    }
-
     const ref = host.selectedObject;
-    if (!ref || !host.isObjectSelectorToolActive() || !isMovableObjectKind(ref.kind)) {
+    if ((deltaStartX === 0 && deltaStartY === 0) || !ref || !host.isObjectSelectorToolActive() || !isMovableObjectKind(ref.kind)) {
         return false;
     }
+    const map = renderer.mapManager.getMapById(ref.mapId) as EditorMapSquare | undefined;
+    if (!map) {
+        return false;
+    }
+    const loc = ref.kind === "loc" ? findLocForRef(map, ref) : undefined;
+    const from = loc
+        ? { minX: loc.startX, minY: loc.startY, maxX: loc.endX, maxY: loc.endY }
+        : { minX: ref.anchorTileX, minY: ref.anchorTileY, maxX: ref.anchorTileX, maxY: ref.anchorTileY };
+    const covered = {
+        minX: Math.min(from.minX, from.minX + deltaStartX),
+        minY: Math.min(from.minY, from.minY + deltaStartY),
+        maxX: Math.max(from.maxX, from.maxX + deltaStartX),
+        maxY: Math.max(from.maxY, from.maxY + deltaStartY),
+    };
+    return recordEditObjectMutation(
+        host,
+        map,
+        ref.level,
+        "Move object",
+        () => snapshotObjectEntriesForBounds(map, ref.level, covered),
+        () => moveSelectedObjectByTilesCore(host, renderer, deltaStartX, deltaStartY),
+        () => snapshotObjectEntriesForBounds(map, ref.level, covered),
+    );
+}
 
+function moveSelectedObjectByTilesCore(
+    host: IEditorPluginHost,
+    renderer: WebGLMapEditorRenderer,
+    deltaStartX: number,
+    deltaStartY: number,
+): boolean {
+    const ref = host.selectedObject;
+    if (!ref) {
+        return false;
+    }
     const map = renderer.mapManager.getMapById(ref.mapId) as EditorMapSquare | undefined;
     if (!map) {
         return false;

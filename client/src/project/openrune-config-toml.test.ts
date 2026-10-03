@@ -331,3 +331,24 @@ describe("updateOpenRuneConfigField", () => {
         });
     });
 });
+
+
+describe("updateOpenRuneConfigField write races", () => {
+    const sourcePath = "content/example/pack/src/main/resources/pack/configs/item.toml";
+    const original = '[[item]]\nid = "obj.poh_tablet_shootingstar"\nname = "Old"\n';
+
+    class TouchAfterReadFileSystem extends InMemoryProjectFileSystem {
+        override async readText(path: string): Promise<string> {
+            const text = await super.readText(path);
+            this.simulateExternalWrite(path, text);
+            return text;
+        }
+    }
+
+    it("raises STALE_SOURCE when the file is touched between read and write", async () => {
+        const fs = new TouchAfterReadFileSystem({ [sourcePath]: original });
+        const block = parseOpenRuneConfigToml(sourcePath, original, { gameVals: gameVals() }).blocks[0]!;
+        await expect(updateOpenRuneConfigField(fs, block, "name", "New")).rejects.toMatchObject({ code: "STALE_SOURCE" });
+        expect(await fs.readText(sourcePath)).toBe(original);
+    });
+});

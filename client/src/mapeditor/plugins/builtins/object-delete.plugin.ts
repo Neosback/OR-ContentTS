@@ -4,11 +4,11 @@ import type { EditorToolPlugin } from "./builtin-plugin-types";
 export const objectDeleteEditorTool: EditorToolPlugin = {
     id: "object-delete",
     name: "Object Delete",
-    description: "Hold Delete and hover objects to remove them from the map.",
+    description: "Click an object (or sweep the brush area) to remove it; everything is previewed in red and undoable.",
     icon: "trash-2",
     workspaces: [{ panelId: "editor-object-delete", activateTab: true }],
     actions: [{ kind: "select-tool", tool: "object-delete" }],
-    usesBrushControls: false,
+    usesBrushControls: true,
     keyBindings: [
         editorCommandKeyBinding("tool.select-object-delete", {
             id: "select-tool",

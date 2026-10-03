@@ -216,3 +216,27 @@ describe("MapEditHistory transactions", () => {
         expect(snapshot.currentIndex).toBe(1);
     });
 });
+
+describe("MapEditHistory.jumpToIndex", () => {
+    const record = (history: MapEditHistory, label: string): void => {
+        history.beginTransaction("underlay", label);
+        history.recordMutation({ kind: "map.tile", mapId: 1, level: 0, localTileId: 1, before: { u: 1 }, after: { u: 2 } });
+        history.commitTransaction();
+    };
+
+    it("returns the steps to undo (newest first) or redo (oldest first) and clamps the target", () => {
+        const history = new MapEditHistory();
+        record(history, "a");
+        record(history, "b");
+        record(history, "c");
+        expect(history.getSnapshot().currentIndex).toBe(2);
+
+        expect(history.jumpToIndex(0).map((entry) => entry.label)).toEqual(["c", "b"]);
+        expect(history.getSnapshot().currentIndex).toBe(0);
+        expect(history.jumpToIndex(2).map((entry) => entry.label)).toEqual(["b", "c"]);
+        expect(history.jumpToIndex(-5).map((entry) => entry.label)).toEqual(["c", "b", "a"]);
+        expect(history.getSnapshot().currentIndex).toBe(-1);
+        expect(history.jumpToIndex(-1)).toEqual([]);
+        expect(history.jumpToIndex(99).length).toBe(3);
+    });
+});

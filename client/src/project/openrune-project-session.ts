@@ -128,6 +128,28 @@ function diagnosticsFor(
  * UI/runtime integrations should retain one session per active OpenRune setup
  * instead of independently rescanning the repository for each editor.
  */
+export type OpenRuneProjectSessionChange = {
+    /** Project-relative paths that changed outside this app. */
+    paths: string[];
+    /** True when generated cache output (`.data/cache/**`) was among them: a build finished or was started. */
+    cacheChanged: boolean;
+    /** The re-indexed snapshot, when the refresh succeeded. */
+    snapshot?: OpenRuneProjectSessionSnapshot;
+    /** Why the refresh failed; the previous snapshot stays active. */
+    error?: unknown;
+};
+
+/** Files whose change can alter what the indexes say (TOML sources, rscm / gameval data, the project's game.yml). */
+export function isProjectSourcePath(path: string): boolean {
+    if (path.startsWith(".data/cache/")) return false;
+    return (
+        /\.(toml|rscm|yml|yaml|csv|kts)$/i.test(path) ||
+        path.startsWith(".data/gamevals") ||
+        // a changed folder (a directory was added, removed or renamed) may hold any of the above
+        !/\.[A-Za-z0-9]+$/.test(path)
+    );
+}
+
 export class OpenRuneProjectSession {
     private current?: OpenRuneProjectSessionSnapshot;
     private refreshInFlight?: Promise<OpenRuneProjectSessionSnapshot>;
@@ -136,6 +158,52 @@ export class OpenRuneProjectSession {
 
     get snapshot(): OpenRuneProjectSessionSnapshot | undefined {
         return this.current;
+    }
+
+    /**
+     * Follows changes made outside this app: after the file system reports changed source files and things settle for
+     * `debounceMs`, the project is re-indexed and `listener` gets the new snapshot. A failed refresh reports the error
+     * and keeps the previous snapshot. Does nothing (and returns a no-op stop function) when the file system cannot watch.
+     */
+    watch(listener: (change: OpenRuneProjectSessionChange) => void, options: { debounceMs?: number } = {}): () => void {
+        const watch = this.fileSystem.watch?.bind(this.fileSystem);
+        if (!watch) return () => undefined;
+        const debounceMs = options.debounceMs ?? 400;
+        let pending = new Set<string>();
+        let cacheChanged = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let stopped = false;
+
+        const flush = async (): Promise<void> => {
+            timer = undefined;
+            const paths = [...pending].sort();
+            const cache = cacheChanged;
+            pending = new Set();
+            cacheChanged = false;
+            if (stopped || (paths.length === 0 && !cache)) return;
+            try {
+                const snapshot = await this.refresh();
+                if (!stopped) listener({ paths, cacheChanged: cache, snapshot });
+            } catch (error) {
+                if (!stopped) listener({ paths, cacheChanged: cache, error });
+            }
+        };
+
+        const stopWatching = watch((change) => {
+            for (const path of change.paths) {
+                if (path.startsWith(".data/cache/")) cacheChanged = true;
+                else if (isProjectSourcePath(path)) pending.add(path);
+            }
+            if (pending.size === 0 && !cacheChanged) return;
+            if (timer !== undefined) clearTimeout(timer);
+            timer = setTimeout(() => void flush(), debounceMs);
+        });
+
+        return () => {
+            stopped = true;
+            if (timer !== undefined) clearTimeout(timer);
+            stopWatching();
+        };
     }
 
     async refresh(): Promise<OpenRuneProjectSessionSnapshot> {

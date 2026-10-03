@@ -5,10 +5,12 @@
     import Save from "@lucide/svelte/icons/save";
     import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
     import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+    import Search from "@lucide/svelte/icons/search";
     import Settings from "@lucide/svelte/icons/settings";
     import Upload from "@lucide/svelte/icons/upload";
 
     import { groupProviders } from "../../mapeditor/plugins/builtins/import-export-providers";
+    import { openCommandPalette } from "../../mapeditor/command-palette-signal";
     import { executeEditorCommand } from "../../mapeditor/commands/editor-command-registry";
     import { Badge } from "../components/ui/badge";
     import { Button } from "../components/ui/button";
@@ -27,6 +29,7 @@
     import { errorMessage, notifyError, notifyMessage, notifySuccess } from "../lib/notify";
     import { useEditorState } from "./editor-state.svelte";
     import type { ProjectSessionController } from "./project-session.svelte";
+    import CommandPalette from "./CommandPalette.svelte";
     import PluginHub from "./PluginHub.svelte";
     import SettingsDialog from "./settings/SettingsDialog.svelte";
     import { listLayouts, saveLayout, uniqueLayoutName, type SavedLayout } from "./workspace-layouts";
@@ -87,6 +90,15 @@
     }
     function resetLayout(): void {
         executeEditorCommand("workbench.reset-layout", commandContext());
+    }
+
+    /** Ctrl/Cmd+K or Ctrl/Cmd+P opens the command palette from anywhere in the editor. */
+    function onPaletteKey(event: KeyboardEvent): void {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+        if (event.code !== "KeyK" && event.code !== "KeyP") return;
+        event.preventDefault();
+        event.stopPropagation();
+        openCommandPalette();
     }
 
     async function saveProject(): Promise<void> {
@@ -176,6 +188,8 @@
         {/each}
     {/if}
 {/snippet}
+
+<svelte:window onkeydowncapture={onPaletteKey} />
 
 <TooltipProvider delayDuration={300}>
     <header data-map-editor-title-bar class="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
@@ -278,6 +292,10 @@
             </DropdownMenuContent>
         </DropdownMenu>
 
+        <Button variant="ghost" size="sm" class="gap-1.5 px-2" onclick={() => openCommandPalette()} title="Command palette (Ctrl/Cmd+K)" aria-label="Command palette">
+            <Search class="size-4" />
+            <span class="hidden sm:inline">Search</span>
+        </Button>
         <Button variant="ghost" size="sm" class="gap-1.5 px-2" onclick={() => openSettings()}>
             <Settings class="size-4" />
             <span class="hidden sm:inline">Settings</span>
@@ -287,5 +305,6 @@
         <div class="flex-1"></div>
 
         <SettingsDialog bind:open={settingsOpen} bind:tab={settingsTab} />
+        <CommandPalette onOpenSettings={openSettings} />
     </header>
 </TooltipProvider>

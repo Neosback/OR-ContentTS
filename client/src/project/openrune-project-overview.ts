@@ -278,9 +278,13 @@ export function describeOpenRuneProject(snapshot: OpenRuneProjectSessionSnapshot
 
     const issues = [
         issueGroup("GameVals", [...gameVals.issues, ...gameVals.sourceIssues.dat, ...gameVals.sourceIssues.toml, ...gameVals.sourceIssues.rscm]),
-        issueGroup("Config sources", configToml.issues),
+        issueGroup("Config sources", configToml.issues.filter((issue) => issue.code !== "IDENTICAL_DUPLICATE")),
         issueGroup("Map sources", mapSources.issues),
-        issueGroup("Server sources", serverToml.issues),
+        issueGroup("Server sources", serverToml.issues.filter((issue) => issue.code !== "IDENTICAL_DUPLICATE")),
+        issueGroup("Identical copies (harmless)", [
+            ...configToml.issues.filter((issue) => issue.code === "IDENTICAL_DUPLICATE"),
+            ...serverToml.issues.filter((issue) => issue.code === "IDENTICAL_DUPLICATE"),
+        ]),
     ].filter((group): group is OverviewIssueGroup => group !== undefined);
 
     const ready = features.filter((feature) => feature.status === "ready").length;

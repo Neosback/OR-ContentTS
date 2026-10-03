@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InMemoryProjectFileSystem } from "../project/in-memory-project-filesystem";
 import type {
@@ -14,6 +14,7 @@ import {
     getActiveOpenRuneProjectSnapshot,
     refreshActiveOpenRuneProjectRuntime,
     subscribeActiveOpenRuneProjectRuntime,
+    subscribeOpenRuneProjectExternalChanges,
     syncActiveOpenRuneProjectRuntime,
 } from "./active-openrune-project-runtime";
 
@@ -226,5 +227,39 @@ describe("active OpenRune project runtime", () => {
         unsubscribe();
 
         expect(seen).toEqual([null, "one:1", "one:2", null]);
+    });
+});
+
+describe("active OpenRune project runtime watching", () => {
+    afterEach(() => {
+        clearActiveOpenRuneProjectRuntime();
+        vi.useRealTimers();
+    });
+
+    it("publishes a fresh snapshot after the project changes on disk, and stops when cleared", async () => {
+        vi.useFakeTimers();
+        const fileSystem = new InMemoryProjectFileSystem(seed("one"));
+        const candidate = profile("one", "/projects/one");
+        await syncActiveOpenRuneProjectRuntime(candidate, { createFileSystem: () => fileSystem });
+
+        const generations: number[] = [];
+        subscribeActiveOpenRuneProjectRuntime((state) => {
+            if (state) generations.push(state.snapshot.generation);
+        });
+        const external: string[][] = [];
+        subscribeOpenRuneProjectExternalChanges((change) => external.push(change.paths));
+
+        fileSystem.simulateExternalWrite(".data/gamevals/npc.rscm", "imp=100\nrat=102");
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(getActiveOpenRuneProjectSnapshot()?.generation).toBe(2);
+        expect(getActiveOpenRuneProjectSnapshot()?.gameVals.bySymbol.get("npc.rat")?.id).toBe(102);
+        expect(generations.at(-1)).toBe(2);
+        expect(external).toEqual([[".data/gamevals/npc.rscm"]]);
+
+        clearActiveOpenRuneProjectRuntime();
+        fileSystem.simulateExternalWrite(".data/gamevals/npc.rscm", "imp=100");
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(external).toHaveLength(1);
     });
 });

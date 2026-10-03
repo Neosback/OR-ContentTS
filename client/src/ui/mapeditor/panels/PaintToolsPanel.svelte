@@ -8,7 +8,10 @@
     import { cn } from "../../lib/utils";
     import { useEditorState } from "../editor-state.svelte";
     import { TOOL_ICONS } from "../icons";
-    import { visibleRailGroups } from "../tool-rail";
+    import { TOOL_RAIL } from "../../../mapeditor/bar-kinds";
+    import { getBarModel } from "../../../mapeditor/bar-model";
+    import { railGroupsFor } from "../tool-rail";
+    import { openCustomizeBar } from "../customize-bar.svelte";
     import { PAINT_TOOLS_PANEL_ID } from "../workbench-controller.svelte";
 
     const editor = useEditorState();
@@ -16,9 +19,10 @@
     const workbench = $derived(editor.layout);
     const docked = $derived(workbench?.locations[PAINT_TOOLS_PANEL_ID] === "grid");
     const activeTool = $derived(editor.tool.current);
+    // The tools you chose for the strip, in your order, with a divider wherever the built-in groups change.
     const groups = $derived(
         editor.read(() =>
-            visibleRailGroups((id) => host.isEditorToolPluginEnabled(id)).map((group) =>
+            railGroupsFor(getBarModel(host, TOOL_RAIL).visibleIds, (id) => host.isEditorToolPluginEnabled(id)).map((group) =>
                 group.map((id) => BUILTIN_EDITOR_TOOL_PLUGINS.find((plugin) => plugin.id === id)).filter((plugin) => plugin !== undefined),
             ),
         ),
@@ -30,7 +34,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="flex h-full min-h-0 flex-col items-center gap-1 overflow-hidden bg-card p-[5px]"
-    oncontextmenu={(event) => contextMenu.open(event, "Paint tools", workbench?.menuFor(PAINT_TOOLS_PANEL_ID) ?? [])}
+    oncontextmenu={(event) =>
+        contextMenu.open(event, "Paint tools", [...(workbench?.menuFor(PAINT_TOOLS_PANEL_ID) ?? []), { id: "customize", label: "Customize tools…", onSelect: () => openCustomizeBar("tools") }])}
 >
     {#if docked}
         <Tooltip>

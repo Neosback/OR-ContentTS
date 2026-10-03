@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { isStatusBarVisible } from "../../../mapeditor/status-bar-model";
     import { onMount } from "svelte";
+    import { getObjectActionModel, LOC_DRAG_TYPE } from "../../../mapeditor/plugins/builtins/object-action-model";
 
     import "../../../mapeditor/MapEditorContainer.css";
     import { contextMenu } from "../../components/context-menu/context-menu.svelte";
@@ -9,20 +11,36 @@
     import { rendererCanvas } from "../../lib/actions";
     import { perfState } from "../../lib/perf.svelte";
     import { useEditorState } from "../editor-state.svelte";
-    import { BRUSH_PANEL_ID } from "../workbench-controller.svelte";
-    import QuickControlsMenu from "./QuickControlsMenu.svelte";
     import { buildViewportMenuItems } from "./viewport-menu";
 
     const editor = useEditorState();
     const host = editor.host;
     const hud = editor.hud;
+    const statusBarOn = $derived(editor.read(() => isStatusBarVisible(host)));
 
     onMount(() => host.setViewMode("editor"));
 
-    // Quick controls live in the viewport when the brush bar is docked (or its plugin is off); otherwise in the brush window.
-    const stickyNav = $derived(
-        editor.read(() => !host.isWorkbenchUiPluginEnabled("brush_workspace")) || editor.layout?.locations[BRUSH_PANEL_ID] === "grid",
-    );
+    const isLocDrag = (event: DragEvent): boolean => event.dataTransfer?.types.includes(LOC_DRAG_TYPE) === true;
+
+    /** While an object row is dragged over the view, the pointer drives the same hover the mouse does, so the ghost follows it. */
+    function onDragOver(event: DragEvent): void {
+        if (!isLocDrag(event)) return;
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        host.renderer.canvas.dispatchEvent(new MouseEvent("mousemove", { clientX: event.clientX, clientY: event.clientY }));
+    }
+
+    function onDrop(event: DragEvent): void {
+        if (!isLocDrag(event)) return;
+        event.preventDefault();
+        const locTypeId = Number(event.dataTransfer?.getData(LOC_DRAG_TYPE));
+        const tile = host.getHoveredTile();
+        const actions = getObjectActionModel(host);
+        if (Number.isFinite(locTypeId) && tile) {
+            actions.request({ type: "place-at", locTypeId, rotation: actions.placeRotation, worldX: tile.worldX, worldY: tile.worldY, level: host.getTilePickLevel() });
+        }
+        actions.cancel();
+    }
 
     function onContextMenu(event: MouseEvent): void {
         event.preventDefault();
@@ -30,7 +48,7 @@
         // Capture the hovered tile now so the copied data matches what was under the cursor when the menu opened.
         const snapshot = host.inspectHoveredTile();
         host.contextMenuObject = snapshot?.hoveredObject;
-        contextMenu.open(event, "Inspect", buildViewportMenuItems(snapshot), () => {
+        contextMenu.open(event, "Tile and object", buildViewportMenuItems(snapshot, host), () => {
             host.contextMenuObject = undefined;
         });
     }
@@ -55,18 +73,13 @@
 <TooltipProvider delayDuration={250}>
     <div class="map-editor-viewport-panel relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-background">
         {@render guardBanner()}
-        {#if stickyNav}
-            <div class="pointer-events-none absolute right-2 top-2 z-20">
-                <div class="pointer-events-auto flex items-center gap-1 rounded-md border border-border/70 bg-card p-0.5">
-                    <QuickControlsMenu />
-                </div>
-            </div>
-        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="map-editor-viewport-canvas-host relative h-full min-h-0 overflow-hidden" oncontextmenu={onContextMenu}>
+        <div class="map-editor-viewport-canvas-host relative h-full min-h-0 overflow-hidden" oncontextmenu={onContextMenu} ondragover={onDragOver} ondrop={onDrop}>
             <div class="map-editor-hud">
                 <div class="fps-counter content-text">{hud.fps}</div>
-                <div class="fps-counter content-text">{hud.debugText}</div>
+                {#if !statusBarOn}
+                    <div class="fps-counter content-text">{hud.debugText}</div>
+                {/if}
             </div>
             <div class="renderer-canvas h-full w-full" tabindex="0" role="application" use:rendererCanvas={host.renderer}></div>
         </div>

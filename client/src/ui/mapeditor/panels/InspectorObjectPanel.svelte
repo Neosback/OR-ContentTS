@@ -3,12 +3,14 @@
     import { untrack } from "svelte";
 
     import { executeEditorCommand } from "../../../mapeditor/commands/editor-command-registry";
+    import { getObjectActionModel } from "../../../mapeditor/plugins/builtins/object-action-model";
     import { locModelTypeName } from "../../../mapeditor/object-properties";
     import { isCopyableObjectKind } from "../../../mapeditor/plugins/builtins/object-copy-placement";
     import { notifyMessage } from "../../lib/notify";
     import { objectProperties, openObjectProperties } from "../object-properties-window.svelte";
     import { useEditorState } from "../editor-state.svelte";
     import ObjectPreview from "../inspector/ObjectPreview.svelte";
+    import ObjectCatalogPicker from "./ObjectCatalogPicker.svelte";
     import PanelFrame from "./PanelFrame.svelte";
 
     let { api }: { api: DockviewPanelApi } = $props();
@@ -18,6 +20,12 @@
 
     const selectedObject = $derived(editor.read(() => host.selectedObject));
     const hoveredObject = $derived(editor.read(() => host.hoveredObject));
+    const action = $derived(
+        editor.read(() => {
+            const model = getObjectActionModel(host);
+            return { mode: model.mode, candidate: model.candidate, rotation: model.placeRotation };
+        }),
+    );
     const copyActive = $derived(editor.read(() => host.isObjectCopyPlacementActive() && !!host.getObjectCopyTemplate()));
 
     // What this panel describes: the selection, or whatever the cursor is over when nothing is selected.
@@ -68,17 +76,28 @@
 
     const row = "grid grid-cols-[5.5rem_1fr] items-baseline gap-x-2 gap-y-0.5";
     const link = "text-xs text-sky-400 underline-offset-2 hover:underline";
+    const btn = "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input px-2 hover:bg-muted";
+    const kbd = "rounded border border-border px-1 font-mono text-[10px] text-muted-foreground";
 </script>
 
 <PanelFrame>
-    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2.5 py-2.5 text-xs">
+    <div class="map-editor-panel flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2.5 py-2.5 text-xs [&>*]:shrink-0">
         {#if copyActive}
             <div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100/90">
                 Copy placement active — click the map to place · <span class="font-medium">Esc</span> to cancel
             </div>
         {/if}
+        {#if action.mode === "move"}
+            <div class="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100/90">
+                Moving — click a tile to put it down · <span class="font-medium">Esc</span> to cancel
+            </div>
+        {:else if action.mode === "place"}
+            <div class="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100/90">
+                Placing #{action.candidate} (turn {action.rotation * 90}°) — click to place · <span class="font-medium">R</span> turns · <span class="font-medium">Esc</span> ends
+            </div>
+        {/if}
         <ObjectPreview {host} object={objectTarget} />
-        <div class="flex min-h-[16rem] flex-col gap-2">
+        <div class="flex min-h-[8rem] flex-col gap-2">
             {#if objectTarget}
                 <p class="text-muted-foreground">
                     {objectIsSelection ? "Selected" : "Hovered"} object ·
@@ -120,20 +139,33 @@
                     <button type="button" class={link} onclick={() => void copyText(`${worldTile?.x}, ${worldTile?.y}, ${objectTarget.level}`, "the world position")}>Copy position</button>
                 </div>
                 {#if objectIsSelection}
-                    <div class="flex flex-wrap gap-x-3 gap-y-1">
+                    <div class="grid gap-1.5" role="group" aria-label="Selected object actions">
+                        <div class="flex flex-wrap gap-1.5">
+                            {#if isCopyableObjectKind(objectTarget.kind)}
+                                <button type="button" class={btn} title="Pick it up and put it down on another tile" onclick={() => executeEditorCommand("object-selector.move-object", { host })}>Move <kbd class={kbd}>G</kbd></button>
+                                <button type="button" class={btn} title="Turn it a quarter" onclick={() => executeEditorCommand("object-selector.rotate-selected", { host })}>Rotate <kbd class={kbd}>R</kbd></button>
+                                <button type="button" class={btn} title="Stamp copies onto clicked tiles" onclick={() => executeEditorCommand("object-selector.copy-object", { host })}>Copy <kbd class={kbd}>C</kbd></button>
+                            {/if}
+                            <button type="button" class="{btn} text-red-400" title="Remove it (Ctrl+Z restores it)" onclick={() => executeEditorCommand("object-selector.delete-selected", { host })}>Delete <kbd class={kbd}>Del</kbd></button>
+                        </div>
                         {#if isCopyableObjectKind(objectTarget.kind)}
-                            <button type="button" class={link} onclick={() => executeEditorCommand("object-selector.rotate-selected", { host })}>Rotate (R)</button>
-                            <button type="button" class={link} onclick={() => executeEditorCommand("object-selector.copy-object", { host })}>Copy (C)</button>
+                            <div class="flex items-center gap-1" role="group" aria-label="Nudge one tile">
+                                <span class="mr-1 text-muted-foreground">Nudge</span>
+                                {#each [["←", -1, 0, "west"], ["↑", 0, 1, "north"], ["↓", 0, -1, "south"], ["→", 1, 0, "east"]] as [glyph, dx, dy, label] (label)}
+                                    <button type="button" class="grid size-7 cursor-pointer place-items-center rounded-md border border-input hover:bg-muted" aria-label={`Nudge one tile ${label}`} title={`One tile ${label}`} onclick={() => getObjectActionModel(host).request({ type: "nudge", dx: dx as number, dy: dy as number })}>{glyph}</button>
+                                {/each}
+                            </div>
                         {/if}
-                        <button type="button" class={link} onclick={clearSelection}>Clear selection</button>
+                        <button type="button" class={link + " justify-self-start"} onclick={clearSelection}>Clear selection</button>
                     </div>
                 {/if}
             {:else}
                 <p class="text-muted-foreground">Hover or click an object in the 3D view.</p>
             {/if}
         </div>
+        <ObjectCatalogPicker />
         <p class="mt-auto pt-2 text-[11px] leading-snug text-muted-foreground">
-            Click an object to select it, or bare ground to select a tile. <span class="font-medium">R</span> rotates, <span class="font-medium">C</span> copies, <span class="font-medium">Esc</span> cancels.
+            Click an object to select it, or bare ground to select a tile. <span class="font-medium">R</span> rotates, <span class="font-medium">G</span> moves, <span class="font-medium">C</span> copies, <span class="font-medium">Delete</span> removes, <span class="font-medium">Esc</span> cancels.
         </p>
     </div>
 </PanelFrame>

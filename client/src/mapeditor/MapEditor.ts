@@ -53,6 +53,11 @@ import {
     bootstrapEditorBottomBarModel,
     getEditorBottomBarWorkbenchSnapshot,
 } from "./plugins/builtins/editor-bottom-bar-model";
+import { TOOL_RAIL, VIEWPORT_BAR } from "./bar-kinds";
+import { barSnapshot } from "./bar-model";
+import { getStatusBarWorkbenchSnapshot } from "./status-bar-model";
+import { getObjectActionModel, getObjectActionWorkbenchSnapshot } from "./plugins/builtins/object-action-model";
+import { getObjectDeleteWorkbenchSnapshot } from "./plugins/builtins/object-delete-model";
 import { getMapEditorPanelDisplaySnapshot } from "./map-editor-panel-display";
 import { getQuickControlsWorkbenchSnapshot } from "./quick-controls-model";
 import {
@@ -98,6 +103,7 @@ import {
 } from "./map-editor-history";
 import {
     applyHistoryRedo,
+    applyHistoryJump,
     applyHistoryUndo,
 } from "./map-editor-history-apply";
 import { recordHistoryTileMutation } from "./map-editor-history-record";
@@ -932,6 +938,25 @@ export class MapEditor {
         this.notifyHistoryChanged();
     };
 
+    /** Moves the edit history to `targetIndex` (-1 = before the first edit), applying every step in between. */
+    jumpHistory = (targetIndex: number): void => {
+        if (!(this.renderer instanceof WebGLMapEditorRenderer)) {
+            return;
+        }
+        const from = this.mapEditHistory.getSnapshot().currentIndex;
+        const steps = this.mapEditHistory.jumpToIndex(targetIndex);
+        if (steps.length === 0) {
+            return;
+        }
+        this.mapEditHistory.applying = true;
+        try {
+            applyHistoryJump(this.renderer, steps, targetIndex < from ? "undo" : "redo");
+        } finally {
+            this.mapEditHistory.applying = false;
+        }
+        this.notifyHistoryChanged();
+    };
+
     clearHistory = (): void => {
         this.mapEditHistory.clear();
         this.notifyHistoryChanged();
@@ -958,6 +983,9 @@ export class MapEditor {
         const panelDisplayWorkbench = getMapEditorPanelDisplaySnapshot(this.pluginHost);
         const tileFlagsWorkbench = getTileFlagsToolWorkbenchSnapshot(this.pluginHost);
         const tileBrushWorkbench = `${getTileBrushWorkbenchSnapshot(this.pluginHost)}#${this.brushSize}:${this.brushType}#${this.selectedUnderlayId}:${this.selectedOverlayId}`;
+        const gridFlags = this.renderer as unknown as { drawGrid?: boolean; drawChunkGrid?: boolean; drawTileGrid?: boolean };
+        const grids = `${gridFlags.drawGrid ? 1 : 0}${gridFlags.drawChunkGrid ? 1 : 0}${gridFlags.drawTileGrid ? 1 : 0}`;
+        const objectDeleteWorkbench = `${getObjectDeleteWorkbenchSnapshot(this.pluginHost)}#${getObjectActionWorkbenchSnapshot(this.pluginHost)}#${getStatusBarWorkbenchSnapshot(this.pluginHost)}#${grids}#${barSnapshot(VIEWPORT_BAR)}#${barSnapshot(TOOL_RAIL)}`;
         const underlayWorkbench = getUnderlayGradientWorkbenchSnapshot(this.pluginHost);
         const overlayWorkbench = getOverlayGradientWorkbenchSnapshot(this.pluginHost);
         const objectVisibility = this.objectsVisible ? "1" : "0";
@@ -985,7 +1013,7 @@ export class MapEditor {
             copyOptions: this.regionStampCopyOptions,
             clipboard: this.regionStampClipboard ? `${this.regionStampClipboard.width}x${this.regionStampClipboard.height}` : null,
         });
-        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${tileBrushWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${quickControls}|${sandbox}|${objectSelector}|${regionStamp}`;
+        return `${tools}|${ui}|${brush}|${keybinds}|${viewer}|${heightStep}|${heightWorkbench}|${paintToolsStripWorkbench}|${bottomBarWorkbench}|${panelDisplayWorkbench}|${tileFlagsWorkbench}|${tileBrushWorkbench}|${underlayWorkbench}|${overlayWorkbench}|${objectVisibility}|${planeView}|${terrainSmoothing}|${quickControls}|${objectDeleteWorkbench}|${sandbox}|${objectSelector}|${regionStamp}`;
     };
 
     saveDockPanelRestore(panelId: string, options: AddPanelOptions): void {
@@ -1253,6 +1281,8 @@ export class MapEditor {
     }
 
     cancelObjectCopyPlacement(): void {
+        // Leaving the tool (or starting another placement) also ends a Move/Place in progress.
+        getObjectActionModel(this.pluginHost).cancel();
         if (!this.objectCopyPlacementActive && !this.objectCopyTemplate) {
             return;
         }
@@ -1279,19 +1309,12 @@ export class MapEditor {
         return input.isKeyDown("Delete") || input.isKeyDown("Backspace");
     }
 
+    /** Deletes what the Delete tool is previewing (the hovered object, or everything under the brush). */
     deleteHoveredObject(): boolean {
-        const ref = this.hoveredObject;
-        if (!ref || !this.isObjectDeleteModeActive()) {
+        if (!this.isObjectDeleteToolActive() || !(this.renderer instanceof WebGLMapEditorRenderer)) {
             return false;
         }
-        if (!(this.renderer instanceof WebGLMapEditorRenderer)) {
-            return false;
-        }
-        const ok = deleteObjectRefRuntime(this.pluginHost, this.renderer, ref);
-        if (ok) {
-            this.notifyWorkbenchStateChanged();
-        }
-        return ok;
+        return this.renderer.deleteObjectDeleteTargets();
     }
 
     private persistWorkbenchPluginState(): void {
@@ -1508,6 +1531,29 @@ export class MapEditor {
         this.camera.pos[2] = centerMapY * 64 + 32;
         this.camera.updated = true;
         this.camera.updatedPosition = true;
+    }
+
+    /**
+     * Moves the camera over a world tile (and optionally switches the view plane). When the tile lies outside the
+     * map squares currently loaded, the loaded area is re-centred there with the same radius.
+     */
+    goToWorldTile(worldX: number, worldY: number, plane?: number): void {
+        const mapX = Math.max(0, Math.min(MapManager.MAX_MAP_X - 1, worldX >> 6));
+        const mapY = Math.max(0, Math.min(MapManager.MAX_MAP_Y - 1, worldY >> 6));
+        const manager = this.renderer.mapManager;
+        const bounds = manager.getAllowedBounds();
+        if (bounds && (mapX < bounds.minX || mapX > bounds.maxX || mapY < bounds.minY || mapY > bounds.maxY)) {
+            const radius = Math.max(0, Math.floor(Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2));
+            this.configureRegionFocus(mapX, mapY, radius);
+        }
+        this.camera.pos[0] = worldX + 0.5;
+        this.camera.pos[2] = worldY + 0.5;
+        this.camera.updated = true;
+        this.camera.updatedPosition = true;
+        if (plane !== undefined) {
+            this.viewPlaneMax = Math.max(0, Math.min(Scene.MAX_LEVELS - 1, plane | 0));
+        }
+        this.notifyWorkbenchStateChanged();
     }
 
     applyFlatUnderlayInBounds(

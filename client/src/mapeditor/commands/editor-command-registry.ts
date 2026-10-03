@@ -11,6 +11,8 @@ import type {
     EditorToolKeybindTrigger,
 } from "../plugins/builtins/builtin-plugin-types";
 
+import { openCommandPalette } from "../command-palette-signal";
+import { getObjectActionModel } from "../plugins/builtins/object-action-model";
 import { getTileBrushModel } from "../plugins/builtins/tile-brush-model";
 export type EditorCommandId =
     | "workbench.brush-size-up"
@@ -23,6 +25,7 @@ export type EditorCommandId =
     | "workbench.open-panel"
     | "workbench.restore-panels"
     | "workbench.reset-layout"
+    | "workbench.command-palette"
     | "tool.select-underlay"
     | "tool.select-overlay"
     | "tool.select-height"
@@ -49,6 +52,8 @@ export type EditorCommandId =
     | "object-selector.clear-selection"
     | "object-selector.rotate-selected"
     | "object-selector.copy-object"
+    | "object-selector.move-object"
+    | "object-selector.delete-selected"
     | "region-stamp.copy"
     | "region-stamp.rotate"
     | "region-stamp.delete"
@@ -187,6 +192,12 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         },
     },
     {
+        id: "workbench.command-palette",
+        name: "Command palette",
+        description: "Search commands, panels, layouts and objects, or jump to a region or coordinates (Ctrl/Cmd+K).",
+        execute: () => openCommandPalette(),
+    },
+    {
         id: "workbench.reset-layout",
         name: "Reset workspace layout",
         description: "Reset the map-editor workspace to its default layout.",
@@ -263,9 +274,10 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
         description: "Cancel copy placement, or clear the current object selection.",
         isEnabled: ({ host }) =>
             host.isObjectSelectorToolActive() &&
-            (host.isObjectCopyPlacementActive() || host.selectedObject != null),
+            (getObjectActionModel(host).mode !== undefined || host.isObjectCopyPlacementActive() || host.selectedObject != null),
         execute: ({ host }) => {
-            if (host.isObjectCopyPlacementActive()) host.cancelObjectCopyPlacement();
+            if (getObjectActionModel(host).mode !== undefined) getObjectActionModel(host).cancel();
+            else if (host.isObjectCopyPlacementActive()) host.cancelObjectCopyPlacement();
             else host.clearSelectedObject();
             host.notifyWorkbenchStateChanged();
         },
@@ -304,11 +316,32 @@ const BASE_COMMANDS: readonly EditorCommand[] = [
             return (
                 host.isObjectSelectorToolActive() &&
                 !host.isObjectCopyPlacementActive() &&
-                ref != null &&
-                isCopyableObjectKind(ref.kind)
+                (getObjectActionModel(host).mode === "place" || (ref != null && isCopyableObjectKind(ref.kind)))
             );
         },
-        execute: ({ host }) => void host.rotateSelectedObject(),
+        // While placing a new object, R turns the ghost; otherwise it turns the selected object.
+        execute: ({ host }) => {
+            const actions = getObjectActionModel(host);
+            if (actions.mode === "place") actions.rotatePlacement();
+            else void host.rotateSelectedObject();
+        },
+    },
+    {
+        id: "object-selector.move-object",
+        name: "Move object",
+        description: "Pick the selected object up; click a tile to put it down (Esc cancels).",
+        isEnabled: ({ host }) => {
+            const ref = host.selectedObject;
+            return host.isObjectSelectorToolActive() && ref != null && isCopyableObjectKind(ref.kind) && !host.isObjectCopyPlacementActive();
+        },
+        execute: ({ host }) => getObjectActionModel(host).startMove(),
+    },
+    {
+        id: "object-selector.delete-selected",
+        name: "Delete selected object",
+        description: "Remove the selected object from the map (Ctrl+Z restores it).",
+        isEnabled: ({ host }) => host.isObjectSelectorToolActive() && host.selectedObject != null,
+        execute: ({ host }) => getObjectActionModel(host).request({ type: "delete-selected" }),
     },
     {
         id: "object-selector.copy-object",

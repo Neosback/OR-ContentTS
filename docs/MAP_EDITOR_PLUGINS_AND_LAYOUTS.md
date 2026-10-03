@@ -3,33 +3,31 @@
 ## Layouts and settings
 
 - **Saved layouts** (`client/src/ui/mapeditor/workspace-layouts.ts`, key `map-editor-layouts-v1`): a named snapshot of the
-  dock (`DockviewApi.toJSON()`, popouts left out), the Tile painter's side and folded state, which panels are HUDs, and
+  dock (`DockviewApi.toJSON()`, popouts left out), the Tile painter's side and folded state, and
   the pinned Quick controls. `Workbench.captureLayout` / `applyLayout`. A layout that cannot be loaded falls back to the
   default layout instead of leaving an empty workspace. Layouts export to / import from a `.layout.json` file.
-- **Starting points** (`Workbench.applyPreset`): *Default*, *Minimal* (3D view, tools, painter, brush bar) and
-  *HUD workspace* (info panels floated as HUDs).
+- **Starting points** (`Workbench.applyPreset`): *Default* and *Minimal* (3D view, tools, painter, brush bar).
 - **Settings bundle** (`workspace-settings.ts`): every `map-editor-*` localStorage key in one JSON file (keybinds, plugin
   switches, brush, display, gizmo colours, pins, layouts). Importing replaces them and reloads. Cache profiles and projects
   are never included.
 - All of it is in **View → Layouts** and **Settings → Workspace & layouts**.
 
-## HUD panels
+## Floating panels and menus
 
-A floating panel can lose its title bar: panel tab menu → **Hide title bar (HUD)**. The bar is still there, it fades in
-while the pointer is over the panel and is the drag handle (`.studio-hud` in `ui/styles/studio-dock.css`,
-`Workbench.setHud`, remembered in `map-editor-hud-panels-v1`). A group with several tabs keeps its bar.
-
-Floating groups start at z-index 10 (`dockview.css`; dockview adds 2 each time a group is raised) so menus and dialogs
-(50) always cover them; floating windows such as Object properties sit at 45.
+Floating dock groups start at z-index 10 (`dockview.css`; dockview adds 2 each time a group is raised) so menus and dialogs
+(50) always cover them; floating windows such as Object properties sit at 45. A title-bar-less "HUD" mode was tried and
+removed; overlay/HUD support will come back in a different form.
 
 ## Brush ghost
 
 With the Tile painter active, the tiles under the cursor are drawn as they would look after a stroke
 (`WebGLMapEditorRenderer.renderBrushGhost`, rules in `mapeditor/brush-ghost.ts`): the tile's own vertex lighting
 (`scene.tileLights`) applied to the underlay/overlay HSL, the overlay's texture from the terrain texture array, the real
-shape and rotation, and a stamped height. It is depth-tested (walls, roofs and objects cover it) and limited to
-`GHOST_MAX_TILES` tiles per frame. Not modelled: underlay smoothing against neighbours (a new underlay shows its flat
-colour). Switch it off with *Brush ghost* in the Rendering panel.
+shape and rotation, and a stamped height per corner. It is opaque, drawn without the cursor tint (the cursor is outline
+only while the ghost shows), depth-tested with a small lift so walls, roofs and objects cover it like they cover the
+ground, and limited to `GHOST_MAX_TILES` tiles per frame. A tile only gets a ghost if the stroke would change it. Not
+modelled: underlay smoothing against neighbours (a new underlay shows its flat colour). Objects lying on the ground (floor
+models) also cover it, as they would the painted result. Switch it off with *Brush ghost* in the Rendering panel.
 
 ## Plugin seams today
 

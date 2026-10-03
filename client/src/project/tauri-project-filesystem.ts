@@ -1,4 +1,4 @@
-import { desktopFileOps, isAccessDenied, pickAndGrantFolder } from "../lib/tauri/desktop-access";
+import { desktopFileOps, isAccessDenied, isConflict, pickAndGrantFolder } from "../lib/tauri/desktop-access";
 import {
     normalizeProjectPath,
     projectParentPath,
@@ -6,7 +6,9 @@ import {
     ProjectFileSystemError,
     type ProjectFileEntry,
     type ProjectFileSystem,
+    type ProjectFileChange,
     type ProjectFileSystemCapabilities,
+    type ProjectWriteOptions,
 } from "./project-filesystem";
 
 export type TauriProjectDirEntry = {
@@ -24,6 +26,9 @@ export type TauriProjectFileInfo = {
     mtime: Date | null;
 };
 
+/** Guards for a write, in the units the desktop commands use. */
+export type TauriWriteGuards = { expectedMtimeMs?: number; mustNotExist?: boolean; backup?: boolean };
+
 export interface TauriProjectFileSystemOps {
     join(...paths: string[]): Promise<string>;
     exists(path: string): Promise<boolean>;
@@ -31,8 +36,20 @@ export interface TauriProjectFileSystemOps {
     stat(path: string): Promise<TauriProjectFileInfo>;
     readFile(path: string): Promise<Uint8Array>;
     readTextFile(path: string): Promise<string>;
-    writeFile(path: string, data: Uint8Array): Promise<void>;
-    writeTextFile(path: string, data: string): Promise<void>;
+    writeFile(path: string, data: Uint8Array, guards?: TauriWriteGuards): Promise<void>;
+    writeTextFile(path: string, data: string, guards?: TauriWriteGuards): Promise<void>;
+    /** Optional so older fakes keep working; the desktop ops provide them. */
+    makeDirectory?(path: string): Promise<void>;
+    watch?(root: string, listener: (change: { root: string; paths: string[] }) => void): Promise<() => void>;
+}
+
+function guardsFor(options: ProjectWriteOptions | undefined): TauriWriteGuards | undefined {
+    if (!options) return undefined;
+    const guards: TauriWriteGuards = {};
+    if (options.expectedModifiedAt === null) guards.mustNotExist = true;
+    else if (options.expectedModifiedAt !== undefined) guards.expectedMtimeMs = options.expectedModifiedAt;
+    if (options.backup !== undefined) guards.backup = options.backup;
+    return guards;
 }
 
 
@@ -73,16 +90,16 @@ export async function selectTauriProjectDirectory(
  * filesystem confinement required by ProjectFileSystem.
  */
 export class TauriProjectFileSystem implements ProjectFileSystem {
-    readonly capabilities: ProjectFileSystemCapabilities = {
-        read: true,
-        write: true,
-        watch: false,
-    };
+    readonly capabilities: ProjectFileSystemCapabilities;
+
+    /** Own writes that the watcher must not report back as external changes: path -> time of the write. */
+    private readonly recentWrites = new Map<string, number>();
 
     constructor(
         readonly rootPath: string,
         private readonly ops: TauriProjectFileSystemOps = desktopFileOps,
     ) {
+        this.capabilities = { read: true, write: true, watch: typeof ops.watch === "function" };
         if (!rootPath) {
             throw new ProjectFileSystemError(
                 "INVALID_PATH",
@@ -153,16 +170,66 @@ export class TauriProjectFileSystem implements ProjectFileSystem {
         return data.slice();
     }
 
-    async writeText(path: string, text: string): Promise<void> {
+    async writeText(path: string, text: string, options?: ProjectWriteOptions): Promise<void> {
         const normalized = await this.prepareWrite(path);
         const resolved = await this.resolve(normalized);
-        await this.withIo(normalized, () => this.ops.writeTextFile(resolved, text));
+        this.noteOwnWrite(normalized);
+        await this.withIo(normalized, () => this.ops.writeTextFile(resolved, text, guardsFor(options)));
     }
 
-    async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    async writeBytes(path: string, data: Uint8Array, options?: ProjectWriteOptions): Promise<void> {
         const normalized = await this.prepareWrite(path);
         const resolved = await this.resolve(normalized);
-        await this.withIo(normalized, () => this.ops.writeFile(resolved, data.slice()));
+        this.noteOwnWrite(normalized);
+        await this.withIo(normalized, () => this.ops.writeFile(resolved, data.slice(), guardsFor(options)));
+    }
+
+    /** Creates a folder (and parents) inside the project; used before writing a new file into a new place. */
+    async makeDirectory(path: string): Promise<void> {
+        const normalized = normalizeProjectPath(path);
+        const make = this.ops.makeDirectory;
+        if (!make) {
+            throw new ProjectFileSystemError("WRITE_UNAVAILABLE", "This build cannot create folders.", normalized);
+        }
+        const resolved = await this.resolve(normalized);
+        await this.withIo(normalized, () => make(resolved));
+    }
+
+    /**
+     * Calls `listener` for changes made outside this app. A change to a path this instance wrote in the last couple of
+     * seconds is our own write coming back from the watcher and is dropped.
+     */
+    watch(listener: (change: ProjectFileChange) => void): () => void {
+        const start = this.ops.watch;
+        if (!start) return () => undefined;
+        let stopped = false;
+        let stop: (() => void) | undefined;
+        const prefix = this.rootPath.replace(/[\\/]+$/, "");
+        void start(this.rootPath, (change) => {
+            const now = Date.now();
+            const paths: string[] = [];
+            for (const absolute of change.paths) {
+                if (!absolute.startsWith(prefix)) continue;
+                const relative = absolute.slice(prefix.length).replaceAll("\\", "/").replace(/^\/+/, "");
+                const wroteAt = this.recentWrites.get(relative);
+                if (wroteAt !== undefined && now - wroteAt < 2000) continue;
+                paths.push(relative);
+            }
+            if (paths.length > 0) listener({ paths });
+        }).then((unlisten) => {
+            if (stopped) unlisten();
+            else stop = unlisten;
+        });
+        return () => {
+            stopped = true;
+            stop?.();
+        };
+    }
+
+    private noteOwnWrite(path: string): void {
+        const now = Date.now();
+        this.recentWrites.set(path, now);
+        for (const [key, at] of this.recentWrites) if (now - at > 5000) this.recentWrites.delete(key);
     }
 
     private async prepareWrite(path: string): Promise<string> {
@@ -271,6 +338,9 @@ export class TauriProjectFileSystem implements ProjectFileSystem {
             return await operation();
         } catch (error) {
             if (error instanceof ProjectFileSystemError) throw error;
+            if (isConflict(error)) {
+                throw new ProjectFileSystemError("CONFLICT", describeIoCause(error), path, { cause: error });
+            }
             if (isAccessDenied(error)) {
                 throw new ProjectFileSystemError("ACCESS_DENIED", describeIoCause(error), path, { cause: error });
             }

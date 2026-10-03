@@ -167,3 +167,42 @@ Actions, Transforms, Sound, Params, Other fields), searchable and copyable. It f
 the editor has no config encoder or project-level override for object types yet, so editing them needs that layer first.
 
 Layouts, HUD panels and the brush ghost are described in [MAP_EDITOR_PLUGINS_AND_LAYOUTS.md](MAP_EDITOR_PLUGINS_AND_LAYOUTS.md).
+
+## Object tools: Delete, Move, Place, Replace
+
+**Delete tool** (`object-delete-model.ts`, palette `ObjectDeletePalette.svelte`): *One object* removes the object under the
+cursor, *Brush area* removes everything standing under the brush footprint (size and shape from the brush bar). Kind filters
+(objects, walls, wall decor, floor decor) limit what counts. Whatever the next click would remove is previewed as red
+wireframes (plus a red footprint in area mode) and counted in the palette. **Click** removes the preview, **holding the right
+button** sweeps (like painting), **Delete/Backspace** removes it too. An area delete is one undo step per map square
+(`deleteObjectRefs`).
+
+**Select tool**: with an object selected the Object tab offers **Move** (G), **Rotate** (R), **Copy** (C), **Delete**
+(Delete/Backspace) and one-tile nudge arrows. Move shows the real model's outline and footprint at the cursor (green; the
+original in red) and a click puts it down (within the same map square); Esc cancels.
+
+**Place or replace** (`ObjectCatalogPicker.svelte`, `object-catalog.ts`): search object types by name or id (names are read
+in the background the first time). *Place* shows the object under the cursor (R turns it, a click places one, Esc ends);
+*Replace selected* swaps the selected object for the picked type on the same start tile with the same rotation, previewed in
+place while the button is hovered. Both are one undo step (`object-edit-runtime.ts`). Limits: normal objects only (wall, roof
+and model-less morphing types are listed as unplaceable), and Replace works on placed objects, not walls or decorations.
+
+## Editor shell: status bar, command palette, history, catalog
+
+- **Status bar** (`StatusBar.svelte`, formatting in `mapeditor/status-format.ts`, toggle "Status bar" in the Rendering panel): cursor
+  region id and square, local and world tile, plane, stored height, underlay, overlay (shape and rotation), flags; the active
+  tool's hint; fps, frame ms, draw calls, triangles and estimated GPU memory. Draw calls and triangles are counted by wrapping the GL
+  draw entry points, including the instanced `WEBGL_multi_draw` calls (`drawStats` in `perf/gl-memory.ts`).
+- **Command palette** (`CommandPalette.svelte`, Ctrl/Cmd+K or Ctrl/Cmd+P, the Search button, or the rebindable command
+  `workbench.command-palette`): enabled editor commands, panels, layouts, rendering toggles, **Go to** (`go-to-parser.ts`: `12342`,
+  `48,54`, `3100, 3512`, `3100,3512,1`, with optional labels; `host.goToWorldTile` re-centres the loaded area if the tile is outside
+  it) and object search (choosing one starts Place). Ranking is in `fuzzy.ts` (whole-text matches beat scattered letters), items in
+  `palette-sources.ts`.
+- **History**: click any row to jump there (the Original map row is the state before the first edit). `host.jumpHistory` applies the
+  steps in between.
+- **Viewport context menu**: over an object, Select / Move / Rotate / Copy / Delete; over a tile, pick it into the Tile painter and
+  place the catalog's object there, ahead of the existing copy items.
+- **Catalog**: `VirtualList` renders only the visible rows (a search returns every match), each with a lazily drawn thumbnail
+  (`inspector/object-thumbnails.ts`, `thumbnail-queue.ts`: newest request first, a few ms per slice, LRU 400). Rows can be dragged
+  onto the 3D view: the placement ghost follows the pointer (the drag feeds the renderer's hover) and dropping places one object.
+- **Grids**: "Map square grid" and "Chunk grid" are Rendering / Quick controls (saved in `map-editor-grids-v1`); they had no UI before.

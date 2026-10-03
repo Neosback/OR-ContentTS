@@ -1,5 +1,5 @@
 import { PerfGovernor } from "../../perf/perf-governor";
-import { glMemory, perfLog } from "../../perf/gl-memory";
+import { drawStats, glMemory, perfLog } from "../../perf/gl-memory";
 import { perf } from "../../perf/perf-profile";
 import { pixelRatio } from "../../util/DeviceUtil";
 import { RenderStats } from "./RenderStats";
@@ -215,5 +215,6 @@ export abstract class Renderer {
 
     onFrameEnd() {
         this.stats.onFrameEnd();
+        drawStats.endFrame();
     }
 }

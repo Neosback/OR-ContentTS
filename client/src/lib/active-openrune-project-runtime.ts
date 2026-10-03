@@ -8,6 +8,7 @@ import {
 } from "./openrune-profile-project-filesystem";
 import {
     OpenRuneProjectSession,
+    type OpenRuneProjectSessionChange,
     type OpenRuneProjectSessionSnapshot,
 } from "../project/openrune-project-session";
 import type { ProjectFileSystem } from "../project/project-filesystem";
@@ -30,6 +31,8 @@ export type ActiveOpenRuneProjectRuntimeOptions = {
 };
 
 let activeState: ActiveOpenRuneProjectRuntimeState | null = null;
+let stopWatching: (() => void) | undefined;
+const externalChangeListeners = new Set<ExternalChangeListener>();
 let activationSerial = 0;
 let inFlight:
     | {
@@ -40,8 +43,45 @@ let inFlight:
     | undefined;
 const listeners = new Set<ActiveOpenRuneProjectRuntimeListener>();
 
+export type ExternalChangeListener = (
+    change: OpenRuneProjectSessionChange,
+    state: ActiveOpenRuneProjectRuntimeState,
+) => void;
+
+/** Called after files of the active project changed outside this app and the project was re-indexed (or failed to). */
+export function subscribeOpenRuneProjectExternalChanges(
+    listener: ExternalChangeListener,
+): () => void {
+    externalChangeListeners.add(listener);
+    return () => externalChangeListeners.delete(listener);
+}
+
+/** Follows external edits of the retained session's files; one watch per session, replaced when the session changes. */
+function watchSession(state: ActiveOpenRuneProjectRuntimeState): void {
+    stopWatching?.();
+    stopWatching = state.session.watch((change) => {
+        const current = activeState;
+        if (!current || current.session !== state.session) return;
+        const next = change.snapshot
+            ? { ...current, snapshot: change.snapshot }
+            : current;
+        if (next !== current) {
+            ++activationSerial;
+            publish(next);
+        }
+        for (const listener of externalChangeListeners) listener(change, next);
+    });
+}
+
 function publish(state: ActiveOpenRuneProjectRuntimeState | null): void {
+    const previousSession = activeState?.session;
     activeState = state;
+    if (!state) {
+        stopWatching?.();
+        stopWatching = undefined;
+    } else if (state.session !== previousSession) {
+        watchSession(state);
+    }
     for (const listener of listeners) listener(state);
 }
 

@@ -179,6 +179,39 @@ class GlMemoryMeter {
 
 export const glMemory = new GlMemoryMeter();
 
+/** Triangles a draw of `count` vertices produces for a GL primitive mode (lines and points count as none). */
+export function trianglesForDraw(mode: number, count: number): number {
+    if (count < 3) return 0;
+    if (mode === 0x0004) return Math.floor(count / 3); // TRIANGLES
+    if (mode === 0x0005 || mode === 0x0006) return count - 2; // TRIANGLE_STRIP / TRIANGLE_FAN
+    return 0;
+}
+
+/**
+ * Draw calls and triangles per frame, counted by wrapping the draw entry points (including WEBGL_multi_draw, which
+ * the terrain and object passes use). `last*` is the finished frame; call `endFrame()` once per frame.
+ */
+class DrawStatsMeter {
+    calls = 0;
+    triangles = 0;
+    lastCalls = 0;
+    lastTriangles = 0;
+
+    record(mode: number, count: number, instances = 1): void {
+        this.calls++;
+        this.triangles += trianglesForDraw(mode, count) * Math.max(1, instances);
+    }
+
+    endFrame(): void {
+        this.lastCalls = this.calls;
+        this.lastTriangles = this.triangles;
+        this.calls = 0;
+        this.triangles = 0;
+    }
+}
+
+export const drawStats = new DrawStatsMeter();
+
 type Fn = (...args: any[]) => any;
 
 function wrap<K extends keyof WebGL2RenderingContext>(
@@ -293,6 +326,77 @@ export function installGlMemoryMeter(): void {
     });
 }
 
+/** Counts draw calls and triangles (see `drawStats`). */
+function installDrawCounters(): void {
+    if (typeof WebGL2RenderingContext === "undefined") return;
+    const proto = WebGL2RenderingContext.prototype;
+    wrap(proto, "drawArrays", (gl, args, original) => {
+        drawStats.record(args[0], args[2]);
+        return original.apply(gl, args);
+    });
+    wrap(proto, "drawElements", (gl, args, original) => {
+        drawStats.record(args[0], args[1]);
+        return original.apply(gl, args);
+    });
+    wrap(proto, "drawArraysInstanced", (gl, args, original) => {
+        drawStats.record(args[0], args[2], args[3]);
+        return original.apply(gl, args);
+    });
+    wrap(proto, "drawElementsInstanced", (gl, args, original) => {
+        drawStats.record(args[0], args[1], args[4]);
+        return original.apply(gl, args);
+    });
+    // WEBGL_multi_draw lives on an extension object: patch it the first time a context hands it out.
+    const patched = new WeakSet<object>();
+    wrap(proto, "getExtension", (gl, args, original) => {
+        const extension = original.apply(gl, args);
+        if (extension && args[0] === "WEBGL_multi_draw" && !patched.has(extension)) {
+            patched.add(extension);
+            const ext = extension as Record<string, Fn>;
+            const sum = (list: ArrayLike<number> | undefined, offset: number, drawCount: number): number => {
+                let total = 0;
+                for (let i = 0; i < drawCount; i++) total += list?.[offset + i] ?? 0;
+                return total;
+            };
+            const arrays = ext.multiDrawArraysWEBGL;
+            if (arrays) {
+                ext.multiDrawArraysWEBGL = function (this: unknown, ...a: any[]) {
+                    drawStats.record(a[0], sum(a[3], a[4], a[5]));
+                    return arrays.apply(this, a);
+                };
+            }
+            // picogl submits geometry through the instanced variants (one instance per range).
+            const weighted = (counts: ArrayLike<number> | undefined, countsOffset: number, instances: ArrayLike<number> | undefined, instancesOffset: number, drawCount: number): number => {
+                let total = 0;
+                for (let i = 0; i < drawCount; i++) total += (counts?.[countsOffset + i] ?? 0) * Math.max(1, instances?.[instancesOffset + i] ?? 1);
+                return total;
+            };
+            const arraysInstanced = ext.multiDrawArraysInstancedWEBGL;
+            if (arraysInstanced) {
+                ext.multiDrawArraysInstancedWEBGL = function (this: unknown, ...a: any[]) {
+                    drawStats.record(a[0], weighted(a[3], a[4], a[5], a[6], a[7]));
+                    return arraysInstanced.apply(this, a);
+                };
+            }
+            const elementsInstanced = ext.multiDrawElementsInstancedWEBGL;
+            if (elementsInstanced) {
+                ext.multiDrawElementsInstancedWEBGL = function (this: unknown, ...a: any[]) {
+                    drawStats.record(a[0], weighted(a[1], a[2], a[6], a[7], a[8]));
+                    return elementsInstanced.apply(this, a);
+                };
+            }
+            const elements = ext.multiDrawElementsWEBGL;
+            if (elements) {
+                ext.multiDrawElementsWEBGL = function (this: unknown, ...a: any[]) {
+                    drawStats.record(a[0], sum(a[1], a[2], a[6]));
+                    return elements.apply(this, a);
+                };
+            }
+        }
+        return extension;
+    });
+}
+
 /** Logs creation of large canvases (a 2D/WebGL canvas is GPU memory too, and is not covered by the GL wrappers). */
 function installCanvasMeter(): void {
     if (typeof HTMLCanvasElement === "undefined") return;
@@ -328,8 +432,10 @@ try {
 }
 installCanvasMeter();
 installGlMemoryMeter();
+installDrawCounters();
 
 // Dev-only console handle: `__glMemory.describe()`.
 if (import.meta.env.DEV && typeof window !== "undefined") {
     (window as unknown as { __glMemory?: GlMemoryMeter }).__glMemory = glMemory;
+    (window as unknown as { __drawStats?: DrawStatsMeter }).__drawStats = drawStats;
 }

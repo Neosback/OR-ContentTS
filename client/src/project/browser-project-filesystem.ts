@@ -1,4 +1,5 @@
 import {
+    checkWriteGuard,
     normalizeProjectPath,
     projectParentPath,
     projectPathName,
@@ -6,6 +7,7 @@ import {
     type ProjectFileEntry,
     type ProjectFileSystem,
     type ProjectFileSystemCapabilities,
+    type ProjectWriteOptions,
 } from "./project-filesystem";
 
 export type BrowserProjectAccessMode = "filesystem" | "import-download";
@@ -47,7 +49,15 @@ export type BrowserDirectoryPicker = (options?: {
 
 export type BrowserProjectFileSystemEnvironment = {
     showDirectoryPicker?: BrowserDirectoryPicker;
+    /** Milliseconds clock; replaceable so tests need not wait. */
+    now?: () => number;
 };
+
+/**
+ * A person needs longer than this to dismiss a real folder picker. An `AbortError` sooner than that means the
+ * embedding (an in-app browser pane, for example) cannot show the picker at all and refused it on the spot.
+ */
+const INSTANT_ABORT_MS = 250;
 
 export type SelectBrowserProjectDirectoryOptions = {
     id?: string;
@@ -102,6 +112,8 @@ export async function selectBrowserProjectDirectory(
         );
     }
 
+    const now = environment.now ?? (() => Date.now());
+    const startedAt = now();
     try {
         const root = await environment.showDirectoryPicker({
             id: options.id ?? "openrune-project",
@@ -109,11 +121,21 @@ export async function selectBrowserProjectDirectory(
         });
         return new BrowserProjectFileSystem(root);
     } catch (error) {
-        if (isAbortError(error)) return undefined;
+        if (isAbortError(error)) {
+            if (now() - startedAt < INSTANT_ABORT_MS) {
+                throw new ProjectFileSystemError(
+                    "READ_UNAVAILABLE",
+                    "This browser window closed the folder picker immediately, so it cannot open project folders. Use the OpenRune desktop app, or open Studio in Chrome or Edge.",
+                    undefined,
+                    { cause: error },
+                );
+            }
+            return undefined;
+        }
         if (errorName(error) === "SecurityError" || errorName(error) === "NotAllowedError") {
             throw new ProjectFileSystemError(
                 "READ_UNAVAILABLE",
-                "Browser project directory access was not granted.",
+                "Browser project directory access was not granted. If this window cannot show a folder picker (an in-app browser pane, for example), use the OpenRune desktop app or open Studio in Chrome or Edge.",
                 undefined,
                 { cause: error },
             );
@@ -224,15 +246,15 @@ export class BrowserProjectFileSystem implements ProjectFileSystem {
         return new Uint8Array(data).slice();
     }
 
-    async writeText(path: string, text: string): Promise<void> {
-        await this.write(path, text);
+    async writeText(path: string, text: string, options?: ProjectWriteOptions): Promise<void> {
+        await this.write(path, text, options);
     }
 
-    async writeBytes(path: string, data: Uint8Array): Promise<void> {
-        await this.write(path, data.slice());
+    async writeBytes(path: string, data: Uint8Array, options?: ProjectWriteOptions): Promise<void> {
+        await this.write(path, data.slice(), options);
     }
 
-    private async write(path: string, data: string | Uint8Array): Promise<void> {
+    private async write(path: string, data: string | Uint8Array, options?: ProjectWriteOptions): Promise<void> {
         const normalized = normalizeProjectPath(path);
         if (!normalized) {
             throw new ProjectFileSystemError(
@@ -245,6 +267,17 @@ export class BrowserProjectFileSystem implements ProjectFileSystem {
         const parent = projectParentPath(normalized);
         const directory = await this.resolveDirectory(parent);
         const name = projectPathName(normalized);
+
+        if (options?.expectedModifiedAt !== undefined) {
+            // The browser has no atomic compare-and-swap: this narrows the window, it does not close it.
+            let current: number | undefined;
+            try {
+                current = (await (await directory.getFileHandle(name)).getFile()).lastModified;
+            } catch {
+                current = undefined;
+            }
+            checkWriteGuard(normalized, current, options);
+        }
 
         let handle: BrowserFileHandle;
         try {

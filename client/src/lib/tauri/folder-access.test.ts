@@ -24,7 +24,7 @@ describe("folder access", () => {
 
     it("summarizes read, write and delete as allowed and the rest as unavailable", () => {
         const rows = Object.fromEntries(describePermissions().map((row) => [row.id, row.allowed]));
-        expect(rows).toEqual({ read: true, write: true, delete: true, other: false });
+        expect(rows).toEqual({ read: true, write: true, mkdir: true, delete: true, other: false });
         expect(describePermissions([]).every((row) => !row.allowed)).toBe(true);
     });
 

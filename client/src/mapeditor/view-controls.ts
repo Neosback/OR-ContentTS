@@ -1,6 +1,8 @@
 import { TILE_RENDER_FLAG_DESCRIPTORS } from "../rs/map/TileRenderFlags";
 import { executeEditorCommand } from "./commands/editor-command-registry";
 import type { IEditorPluginHost } from "./plugins/editor-plugin-host";
+import { storeGrid, type GridKind } from "./grid-settings";
+import { isStatusBarVisible, setStatusBarVisible } from "./status-bar-model";
 import { getTileBrushModel } from "./plugins/builtins/tile-brush-model";
 import { getTileFlagsToolModel } from "./plugins/builtins/tile-flags-tool-model";
 
@@ -39,6 +41,23 @@ export const FLAG_MEANING: Record<string, string> = {
     "Render Z-1": "Drawn on the plane below",
     "No map draw": "Left off the minimap",
 };
+
+/** The renderer owns the grid flags (`drawGrid`, `drawChunkGrid`, `drawTileGrid`); the choice is also saved for the next session. */
+function gridControl(kind: GridKind, label: string, description: string): ViewControl {
+    const flag = kind === "square" ? "drawGrid" : kind === "chunk" ? "drawChunkGrid" : "drawTileGrid";
+    return {
+        id: `grid-${kind}`,
+        group: "scene",
+        label,
+        description,
+        get: (host) => (host.renderer as unknown as Record<string, boolean>)[flag] === true,
+        set: (host, value) => {
+            (host.renderer as unknown as Record<string, boolean>)[flag] = value;
+            storeGrid(kind, value);
+            host.notifyWorkbenchStateChanged();
+        },
+    };
+}
 
 const baseControls: readonly ViewControl[] = [
     {
@@ -87,6 +106,17 @@ const baseControls: readonly ViewControl[] = [
         set: (host, value) => {
             if (host.terrainSmoothingEnabled !== value) executeEditorCommand("workbench.toggle-terrain-smoothing", { host });
         },
+    },
+    gridControl("tile", "Tile grid", "Outline every tile on the ground (faint)"),
+    gridControl("square", "Map square grid", "Outline every 64 x 64 map square on the ground"),
+    gridControl("chunk", "Chunk grid", "Outline every 8 x 8 chunk on the ground"),
+    {
+        id: "status-bar",
+        group: "scene",
+        label: "Status bar",
+        description: "The bar under the workspace: cursor tile, selection, frame time, draw calls",
+        get: (host) => isStatusBarVisible(host),
+        set: (host, value) => setStatusBarVisible(host, value),
     },
     {
         id: "brush-ghost",

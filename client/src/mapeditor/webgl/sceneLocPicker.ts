@@ -234,6 +234,11 @@ export class ObjectPickIndex {
         existing.splice(insertAt, 0, ref);
     }
 
+    /** Every object standing on a tile (top pick first): used by area tools such as the delete brush. */
+    listAt(level: number, sceneX: number, sceneY: number): readonly EditorObjectRef[] {
+        return this.byKey.get(pickTileKey(level, sceneX, sceneY)) ?? [];
+    }
+
     findAt(level: number, sceneX: number, sceneY: number): EditorObjectRef | undefined {
         return this.byKey.get(pickTileKey(level, sceneX, sceneY))?.[0];
     }

@@ -22,6 +22,8 @@ export type ProjectFileSystemErrorCode =
     | "READ_UNAVAILABLE"
     | "WRITE_UNAVAILABLE"
     | "ACCESS_DENIED"
+    /** The file is not what the caller last saw (changed, removed or already present); re-read and retry. */
+    | "CONFLICT"
     | "IO_FAILED";
 
 export class ProjectFileSystemError extends Error {
@@ -94,6 +96,20 @@ export function projectParentPath(path: string): string {
     return slash === -1 ? "" : normalized.slice(0, slash);
 }
 
+/** Guards for a write. Adapters that cannot honour one (for example a backup in the browser) ignore it. */
+export type ProjectWriteOptions = {
+    /**
+     * The modified time (`ProjectFileEntry.modifiedAt`) the caller last saw. If the file's time differs, or the file is
+     * gone, the write fails with `CONFLICT`. `null` means the file must not exist yet.
+     */
+    expectedModifiedAt?: number | null;
+    /** Keep a copy of the file being replaced where the platform supports it (the desktop app does; default true). */
+    backup?: boolean;
+};
+
+/** Something changed outside this app: project-relative paths (a path may be a folder). */
+export type ProjectFileChange = { paths: string[] };
+
 /**
  * Framework-neutral filesystem rooted at a user-selected project directory.
  *
@@ -111,8 +127,59 @@ export interface ProjectFileSystem {
     readText(path: string): Promise<string>;
     readBytes(path: string): Promise<Uint8Array>;
 
-    writeText(path: string, text: string): Promise<void>;
-    writeBytes(path: string, data: Uint8Array): Promise<void>;
+    writeText(path: string, text: string, options?: ProjectWriteOptions): Promise<void>;
+    writeBytes(path: string, data: Uint8Array, options?: ProjectWriteOptions): Promise<void>;
+
+    /**
+     * Calls `listener` when files change outside this app's own writes (only when `capabilities.watch`). Returns the
+     * function that stops watching.
+     */
+    watch?(listener: (change: ProjectFileChange) => void): () => void;
+}
+
+/** The `CONFLICT` error for a write whose guard failed. */
+export function conflictError(path: string, reason: "changed" | "removed" | "exists"): ProjectFileSystemError {
+    const text = reason === "changed" ? "changed on disk since it was read" : reason === "removed" ? "was removed since it was read" : "already exists";
+    return new ProjectFileSystemError("CONFLICT", `Project file "${path}" ${text}.`, path);
+}
+
+/** Checks a write's guard against the file's current modified time (undefined = no such file). */
+export function checkWriteGuard(path: string, current: number | undefined, options: ProjectWriteOptions | undefined): void {
+    if (!options || options.expectedModifiedAt === undefined) return;
+    if (options.expectedModifiedAt === null) {
+        if (current !== undefined) throw conflictError(path, "exists");
+        return;
+    }
+    if (current === undefined) throw conflictError(path, "removed");
+    if (Math.floor(current) !== Math.floor(options.expectedModifiedAt)) throw conflictError(path, "changed");
+}
+
+/**
+ * Reads a text file together with the modified time it had *before* the read, so a later `writeTextGuarded` fails if
+ * anything touched the file in between (statting first errs towards a false conflict, never a lost edit).
+ */
+export async function readTextStamped(fileSystem: ProjectFileSystem, path: string): Promise<{ text: string; modifiedAt: number | undefined }> {
+    const modifiedAt = (await fileSystem.stat(path))?.modifiedAt;
+    return { text: await fileSystem.readText(path), modifiedAt };
+}
+
+/**
+ * Writes text only if the file still has the modified time `readTextStamped` saw. A failed guard is reported through
+ * `onConflict` so callers can raise their own typed error; without a stamp (the platform reports no times) it is a plain write.
+ */
+export async function writeTextGuarded(
+    fileSystem: ProjectFileSystem,
+    path: string,
+    text: string,
+    modifiedAt: number | undefined,
+    onConflict: (error: ProjectFileSystemError) => Error,
+): Promise<void> {
+    try {
+        await fileSystem.writeText(path, text, modifiedAt === undefined ? undefined : { expectedModifiedAt: modifiedAt });
+    } catch (error) {
+        if (error instanceof ProjectFileSystemError && error.code === "CONFLICT") throw onConflict(error);
+        throw error;
+    }
 }
 
 /**

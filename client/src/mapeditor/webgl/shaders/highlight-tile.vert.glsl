@@ -19,9 +19,9 @@ uniform float u_tileX;
 uniform float u_tileY;
 uniform float u_level;
 
-/** 1 = draw at the flat height u_ghostHeight (brush ghost) instead of the stored terrain. */
+/** 1 = brush ghost with a stamped height: the tile's corner heights (SW, SE, NE, NW) replace the stored terrain. */
 uniform float u_ghostHeightOn;
-uniform float u_ghostHeight;
+uniform vec4 u_ghostHeights;
 /** Lift above the terrain surface in tiles: the plain highlight sits just under it, the depth-tested ghost just over. */
 uniform float u_yBias;
 /** 1 = brush ghost: colour comes from the four light-adjusted corner HSL values (SW, SE, NE, NW) in u_ghostHsl. */
@@ -93,7 +93,9 @@ void main() {
         v_ghostColor = vec3(1.0);
     }
 
-    float stored = u_ghostHeightOn > 0.5 ? u_ghostHeight : getHeightInterp(tilePos, uint(u_level));
+    vec2 tileLocal = tilePos - vec2(u_tileX, u_tileY);
+    float ghostHeight = mix(mix(u_ghostHeights.x, u_ghostHeights.y, tileLocal.x), mix(u_ghostHeights.w, u_ghostHeights.z, tileLocal.x), tileLocal.y);
+    float stored = u_ghostHeightOn > 0.5 ? ghostHeight : getHeightInterp(tilePos, uint(u_level));
     float height = -stored / 128.0;
 
     vec4 pos = vec4(tilePos.x, height + u_yBias, tilePos.y, 1.0);

@@ -3,6 +3,7 @@
     import Home from "@lucide/svelte/icons/home";
     import LayoutGrid from "@lucide/svelte/icons/layout-grid";
     import MapIcon from "@lucide/svelte/icons/map";
+    import Server from "@lucide/svelte/icons/server";
     import PanelLeft from "@lucide/svelte/icons/panel-left";
     import Settings from "@lucide/svelte/icons/settings";
 
@@ -19,6 +20,7 @@
         { href: "/", label: "Home", icon: Home },
         { href: "/map", label: "Map", icon: MapIcon },
         { href: "/interface", label: "Interface", icon: LayoutGrid },
+        { href: "/server", label: "Server", icon: Server },
     ];
 
     const navClass = (href: string): string =>

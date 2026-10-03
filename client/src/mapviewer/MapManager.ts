@@ -152,6 +152,10 @@ export class MapManager<T extends MapSquare> {
         this.renderBounds.fill(-1);
     }
 
+    getAllowedBounds(): { minX: number; minY: number; maxX: number; maxY: number } | undefined {
+        return this.allowedBounds;
+    }
+
     clearAllowedBounds(): void {
         this.allowedBounds = undefined;
         this.renderBounds.fill(-1);

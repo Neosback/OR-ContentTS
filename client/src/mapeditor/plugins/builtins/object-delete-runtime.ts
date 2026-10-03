@@ -131,3 +131,50 @@ export function deleteObjectRef(
         "object-delete",
     );
 }
+
+/**
+ * Deletes several objects as one undo step per map square and plane (an area delete is a single "Ctrl+Z").
+ * Returns how many were removed.
+ */
+export function deleteObjectRefs(
+    host: IEditorPluginHost,
+    renderer: WebGLMapEditorRenderer,
+    refs: readonly EditorObjectRef[],
+): number {
+    const groups = new Map<string, { map: EditorMapSquare; level: number; refs: EditorObjectRef[] }>();
+    for (const ref of refs) {
+        const map =
+            (renderer.mapManager.getMap(ref.mapX, ref.mapY) as EditorMapSquare | undefined) ??
+            (renderer.mapManager.getMapById(ref.mapId) as EditorMapSquare | undefined);
+        if (!map) continue;
+        const key = `${ref.mapId}:${ref.level}`;
+        const group = groups.get(key) ?? { map, level: ref.level, refs: [] };
+        group.refs.push(ref);
+        groups.set(key, group);
+    }
+    let removed = 0;
+    for (const { map, level, refs: group } of groups.values()) {
+        let count = 0;
+        recordEditObjectMutation(
+            host,
+            map,
+            level,
+            group.length === 1 ? "Delete object" : `Delete ${group.length} objects`,
+            () => {
+                // Two refs on one tile can return the same stored entry: keep each once so undo restores it once.
+                const unique = new Map<string, ReturnType<typeof snapshotObjectEntriesForRef>[number]>();
+                for (const ref of group) for (const entry of snapshotObjectEntriesForRef(map, ref)) unique.set(JSON.stringify(entry), entry);
+                return [...unique.values()];
+            },
+            () => {
+                count = 0;
+                for (const ref of group) if (deleteObjectRefCore(host, renderer, map, ref)) count++;
+                return count > 0;
+            },
+            () => [],
+            "object-delete",
+        );
+        removed += count;
+    }
+    return removed;
+}

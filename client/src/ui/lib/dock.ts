@@ -91,6 +91,12 @@ export interface StudioDockOptions {
     isRestoredLayoutValid?(api: DockviewApi): boolean;
     /** Right-click on a tab. */
     onTabContextMenu?(panelId: string, event: MouseEvent): void;
+    /**
+     * Content for the right end of a group's tab row (a toolbar). Called once for every group dockview creates; return
+     * undefined for groups that get nothing. The returned element is mounted by dockview and `dispose` runs when the
+     * group goes away.
+     */
+    headerActions?(group: DockviewGroupPanel): { element: HTMLElement; dispose(): void } | undefined;
     theme?: DockviewTheme;
     defaultRenderer?: "always" | "onlyWhenVisible";
 }
@@ -127,6 +133,14 @@ export function createStudioDock(container: HTMLElement, options: StudioDockOpti
         // dockview only consults createTabComponent for a named tab, so the default tab needs a name too.
         defaultTabComponent: DEFAULT_TAB,
         createTabComponent: ({ name }) => (name === FIXED_TAB ? new FixedTab() : new StudioTab(options.onTabContextMenu)),
+        createRightHeaderActionComponent: (group) => {
+            const made = options.headerActions?.(group);
+            return {
+                element: made?.element ?? document.createElement("div"),
+                init: () => undefined,
+                dispose: () => made?.dispose(),
+            };
+        },
     });
 
     // Measure now so default sizes are applied against the real container, not 0x0.

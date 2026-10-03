@@ -5,7 +5,7 @@ import type { EditorToolPlugin } from "./builtin-plugin-types";
 export const objectSelectorEditorTool: EditorToolPlugin = {
     id: "object-selector",
     name: "Select",
-    description: "Pick tiles and objects: click an object to select it, click bare ground to select a tile. R rotates, C copies.",
+    description: "Pick tiles and objects: click an object to select it, click bare ground to select a tile. R rotates, G moves, C copies, Delete removes.",
     icon: "mouse-pointer-2",
     workspaces: [{ panelId: "editor-object-selector", activateTab: true }],
     actions: [{ kind: "select-tool", tool: "object-selector" }],
@@ -40,6 +40,14 @@ export const objectSelectorEditorTool: EditorToolPlugin = {
             },
             action: () => true,
         },
+        editorCommandKeyBinding("object-selector.move-object", {
+            id: "move-object",
+            defaultChords: [{ code: "KeyG" }],
+        }),
+        editorCommandKeyBinding("object-selector.delete-selected", {
+            id: "delete-selected",
+            defaultChords: [{ code: "Delete" }, { code: "Backspace" }],
+        }),
         editorCommandKeyBinding("object-selector.copy-object", {
             id: "copy-object",
             defaultChords: [{ code: "KeyC" }],

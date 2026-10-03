@@ -35,7 +35,7 @@ describe("ProjectFileSystemCacheSource", () => {
                 game: "oldschool",
                 environment: "local",
                 revision: 240,
-                timestamp: "1970-01-01T00:00:00.000Z",
+                timestamp: expect.any(String),
                 size: 17,
             },
         ]);

@@ -21,3 +21,14 @@ describe("tool rail", () => {
         expect(visibleRailGroups(() => false)).toEqual([]);
     });
 });
+
+describe("railGroupsFor", () => {
+    it("keeps the chosen order, drops unavailable tools and breaks groups where the built-in groups change", async () => {
+        const { railGroupsFor } = await import("./tool-rail");
+        const all = () => true;
+        expect(railGroupsFor(["object-selector", "tile-brush", "height", "object-delete", "region-stamp"], all)).toEqual([["object-selector"], ["tile-brush", "height"], ["object-delete", "region-stamp"]]);
+        expect(railGroupsFor(["height", "tile-brush", "region-stamp"], all)).toEqual([["height", "tile-brush"], ["region-stamp"]]);
+        expect(railGroupsFor(["height", "tile-brush", "object-selector"], (tool) => tool !== "tile-brush")).toEqual([["height"], ["object-selector"]]);
+        expect(railGroupsFor([], all)).toEqual([]);
+    });
+});

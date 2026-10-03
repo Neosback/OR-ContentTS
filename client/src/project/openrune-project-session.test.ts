@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InMemoryProjectFileSystem } from "./in-memory-project-filesystem";
 import {
@@ -59,6 +59,8 @@ class ToggleReadFailureFileSystem implements ProjectFileSystem {
     failRscmRead = false;
 
     constructor(private readonly inner: ProjectFileSystem) {}
+
+    watch?: ProjectFileSystem["watch"] = (listener) => this.inner.watch!(listener);
 
     get capabilities(): ProjectFileSystemCapabilities {
         return this.inner.capabilities;
@@ -237,5 +239,84 @@ describe("OpenRuneProjectSession", () => {
 
         expect(session.snapshot?.capabilities.projectWrite).toBe(false);
         expect(session.snapshot?.capabilities.sourceEditing).toBe(false);
+    });
+
+    describe("watch", () => {
+        afterEach(() => vi.useRealTimers());
+
+        it("re-indexes once after a burst of source changes settles and reports the paths", async () => {
+            vi.useFakeTimers();
+            const fileSystem = new InMemoryProjectFileSystem(openRuneSeed());
+            const session = await openOpenRuneProjectSession(fileSystem);
+            const changes: Array<{ paths: string[]; cacheChanged: boolean; generation?: number }> = [];
+            const stop = session.watch((change) => changes.push({ paths: change.paths, cacheChanged: change.cacheChanged, generation: change.snapshot?.generation }), { debounceMs: 100 });
+
+            fileSystem.simulateExternalWrite(".data/gamevals/npc.rscm", "imp=100\ngoblin=101");
+            fileSystem.simulateExternalWrite(".data/raw-cache/server/shop.toml", "[[inventory]]\nid = \"inv.shop\"");
+            await vi.advanceTimersByTimeAsync(99);
+            expect(changes).toHaveLength(0);
+            await vi.advanceTimersByTimeAsync(2);
+
+            expect(changes).toEqual([
+                { paths: [".data/gamevals/npc.rscm", ".data/raw-cache/server/shop.toml"], cacheChanged: false, generation: 2 },
+            ]);
+            expect(session.snapshot?.gameVals.bySymbol.get("npc.goblin")?.id).toBe(101);
+            stop();
+        });
+
+        it("flags generated cache output without treating it as a source change", async () => {
+            vi.useFakeTimers();
+            const fileSystem = new InMemoryProjectFileSystem(openRuneSeed());
+            const session = await openOpenRuneProjectSession(fileSystem);
+            const changes: Array<{ paths: string[]; cacheChanged: boolean }> = [];
+            session.watch((change) => changes.push({ paths: change.paths, cacheChanged: change.cacheChanged }), { debounceMs: 50 });
+
+            fileSystem.simulateExternalWrite(".data/cache/SERVER/main_file_cache.dat2", new Uint8Array([1]));
+            await vi.advanceTimersByTimeAsync(60);
+
+            expect(changes).toEqual([{ paths: [], cacheChanged: true }]);
+        });
+
+        it("ignores unrelated files and stops listening once stopped", async () => {
+            vi.useFakeTimers();
+            const fileSystem = new InMemoryProjectFileSystem(openRuneSeed());
+            const session = await openOpenRuneProjectSession(fileSystem);
+            const changes: unknown[] = [];
+            const stop = session.watch((change) => changes.push(change), { debounceMs: 50 });
+
+            fileSystem.simulateExternalWrite("notes.txt", "hello");
+            await vi.advanceTimersByTimeAsync(100);
+            expect(changes).toHaveLength(0);
+
+            fileSystem.simulateExternalWrite(".data/gamevals/npc.rscm", "imp=100\nrat=102");
+            stop();
+            await vi.advanceTimersByTimeAsync(100);
+            expect(changes).toHaveLength(0);
+        });
+
+        it("reports a failed refresh and keeps the previous snapshot", async () => {
+            vi.useFakeTimers();
+            const inner = new InMemoryProjectFileSystem(openRuneSeed());
+            const fileSystem = new ToggleReadFailureFileSystem(inner);
+            const session = await openOpenRuneProjectSession(fileSystem);
+            const before = session.snapshot;
+            const changes: Array<{ error?: unknown }> = [];
+            session.watch((change) => changes.push({ error: change.error }), { debounceMs: 20 });
+
+            fileSystem.failRscmRead = true;
+            inner.simulateExternalWrite(".data/gamevals/npc.rscm", "imp=100\nrat=102");
+            await vi.advanceTimersByTimeAsync(30);
+
+            expect(changes).toHaveLength(1);
+            expect(changes[0].error).toBeInstanceOf(Error);
+            expect(session.snapshot).toBe(before);
+        });
+
+        it("does nothing when the file system cannot watch", async () => {
+            const fileSystem = new ToggleReadFailureFileSystem(new InMemoryProjectFileSystem(openRuneSeed()));
+            delete fileSystem.watch;
+            const session = await openOpenRuneProjectSession(fileSystem);
+            expect(() => session.watch(() => undefined)()).not.toThrow();
+        });
     });
 });

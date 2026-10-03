@@ -6,8 +6,11 @@ import type {
     OpenRunePackRoot,
     OpenRuneProjectIndex,
 } from "./openrune-project-index";
+import { sameDefinitionText } from "./definition-text";
 import {
+    readTextStamped,
     walkProjectDirectory,
+    writeTextGuarded,
     type ProjectFileSystem,
 } from "./project-filesystem";
 
@@ -51,7 +54,8 @@ export type OpenRuneConfigIssueCode =
     | "INVALID_INHERIT"
     | "UNRESOLVED_ID"
     | "UNRESOLVED_INHERIT"
-    | "DUPLICATE_TARGET";
+    | "DUPLICATE_TARGET"
+    | "IDENTICAL_DUPLICATE";
 
 export type OpenRuneConfigIssue = {
     code: OpenRuneConfigIssueCode;
@@ -529,9 +533,12 @@ export async function indexProjectOpenRuneConfigToml(
     for (const declarations of byTargetMutable.values()) {
         if (declarations.length < 2) continue;
         const first = declarations[0]!;
+        const identical = declarations.every((block) => sameDefinitionText(block.rawText, first.rawText));
         issues.push({
-            code: "DUPLICATE_TARGET",
-            message: `OpenRune config target "${canonicalTargetType(first.type)}" id ${first.resolvedId} is declared by multiple source blocks.`,
+            code: identical ? "IDENTICAL_DUPLICATE" : "DUPLICATE_TARGET",
+            message: identical
+                ? `OpenRune config target "${canonicalTargetType(first.type)}" id ${first.resolvedId} has ${declarations.length} identical copies; harmless, but one can be deleted.`
+                : `OpenRune config target "${canonicalTargetType(first.type)}" id ${first.resolvedId} is declared by multiple source blocks with different content.`,
             sourcePath: first.sourcePath,
             line: first.startLine,
             type: first.type,
@@ -658,7 +665,7 @@ export async function updateOpenRuneConfigField(
         );
     }
 
-    const text = await fileSystem.readText(expected.sourcePath);
+    const { text, modifiedAt } = await readTextStamped(fileSystem, expected.sourcePath);
     const current = locateCurrentBlock(expected.sourcePath, text, expected);
     const lineEnding = text.includes("\r\n") ? "\r\n" : "\n";
     const lines = text.split(/\r?\n/);
@@ -702,5 +709,11 @@ export async function updateOpenRuneConfigField(
         );
     }
 
-    await fileSystem.writeText(expected.sourcePath, lines.join(lineEnding));
+    await writeTextGuarded(fileSystem, expected.sourcePath, lines.join(lineEnding), modifiedAt, (error) =>
+        new OpenRuneConfigWriteError(
+            "STALE_SOURCE",
+            `OpenRune config block changed on disk while it was being edited (${error.message}). Re-index before writing.`,
+            expected.sourcePath,
+        ),
+    );
 }

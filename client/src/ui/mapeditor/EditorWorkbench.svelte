@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onDestroy, onMount, untrack } from "svelte";
+    import { mount, onDestroy, onMount, unmount, untrack } from "svelte";
+    import type { DockviewGroupPanel } from "dockview-core";
 
     import { perfLog } from "../../perf/gl-memory";
 
@@ -7,12 +8,16 @@
     import "../../mapeditor/MapEditorWorkbenchDock.css";
     import "../../mapeditor/MapEditorPanel.css";
     import { contextMenu } from "../components/context-menu/context-menu.svelte";
-    import { EditorState, provideEditorState } from "./editor-state.svelte";
+    import CustomizeBarDialog from "./CustomizeBarDialog.svelte";
+    import { EditorState, editorContext, provideEditorState } from "./editor-state.svelte";
+    import ViewportBar from "./panels/ViewportBar.svelte";
     import { createEditorPanels } from "./panels";
     import ObjectPropertiesWindow from "./panels/ObjectPropertiesWindow.svelte";
     import RegionStampCopyDialog from "./palettes/RegionStampCopyDialog.svelte";
+    import StatusBar from "./StatusBar.svelte";
     import TitleBar from "./TitleBar.svelte";
     import { Workbench } from "./workbench-controller.svelte";
+    import { isStatusBarVisible } from "../../mapeditor/status-bar-model";
     import type { IEditorPluginHost } from "../../mapeditor/plugins/editor-plugin-host";
     import type { ProjectSessionController } from "./project-session.svelte";
 
@@ -32,12 +37,24 @@
     let dockHost = $state<HTMLDivElement>();
     let workbench: Workbench | undefined;
 
+    /** The viewport bar sits in the right end of every tab row; it shows itself only where the 3D view is. */
+    function mountViewportBar(group: DockviewGroupPanel): { element: HTMLElement; dispose(): void } {
+        const element = document.createElement("div");
+        element.className = "h-full";
+        const instance = mount(ViewportBar, { target: element, props: { group }, context: editorContext(editor) });
+        return { element, dispose: () => void unmount(instance) };
+    }
+
     onMount(() => {
         perfLog("phase: workbench mount");
         editor.hud.start();
         if (!dockHost) return;
-        workbench = new Workbench(dockHost, host, createEditorPanels(editor), (panelId, event) =>
-            contextMenu.open(event, undefined, workbench?.menuFor(panelId) ?? []),
+        workbench = new Workbench(
+            dockHost,
+            host,
+            createEditorPanels(editor),
+            (panelId, event) => contextMenu.open(event, undefined, workbench?.menuFor(panelId) ?? []),
+            mountViewportBar,
         );
         editor.layout = workbench;
         // Bring the starting tool's palette tab forward on first entry.
@@ -54,6 +71,8 @@
         workbench?.dispose();
         editor.layout = undefined;
     });
+
+    const statusBarVisible = $derived(editor.read(() => isStatusBarVisible(host)));
 
     // Plugin enable flags may open/close panels.
     $effect(() => {
@@ -73,8 +92,12 @@
     <div class="map-editor-workbench-body">
         <div bind:this={dockHost} class="map-editor-workbench-dockview h-full w-full min-h-0 min-w-0"></div>
     </div>
+    {#if statusBarVisible}
+        <StatusBar />
+    {/if}
 </div>
 
 <!-- Mounted at workbench level so pressing C works even when the Region stamp panel is closed. -->
 <RegionStampCopyDialog />
 <ObjectPropertiesWindow />
+<CustomizeBarDialog />

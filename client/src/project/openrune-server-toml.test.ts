@@ -251,6 +251,16 @@ describe("inventory/shop server TOML", () => {
         );
     });
 
+    it("accepts restockCycles = -1 (never restocks) like the server codec", () => {
+        const parsed = parseOpenRuneServerToml(
+            ".data/raw-cache/server/shops/never.toml",
+            '[[inventory]]\nid = "inv.2handedshop"\n\n[[inventory.stock]]\nobj = "obj.bronze_2h_sword"\ncount = 20\nrestockCycles = -1',
+            { gameVals: gameVals() },
+        );
+        expect(parsed.issues).toEqual([]);
+        expect(parsed.inventories[0]?.stock[0]?.restockCycles).toBe(-1);
+    });
+
     it("serializes canonical shop inventory TOML that round-trips", () => {
         const text = serializeOpenRuneInventoryToml([
             {
@@ -340,12 +350,33 @@ describe("indexProjectOpenRuneServerToml", () => {
         expect(index.issues).toEqual([]);
     });
 
+    async function indexNpcDuplicates(rawText: string, packText: string) {
+        const fs = new InMemoryProjectFileSystem({
+            ".data/raw-cache/server/npcs.toml": rawText,
+            "content/test/pack/src/main/resources/pack/configs/npc.toml": packText,
+        });
+        return indexProjectOpenRuneServerToml(
+            fs,
+            {
+                rawServerSources: { root: ".data/raw-cache/server", tomlFiles: [".data/raw-cache/server/npcs.toml"] },
+                packRoots: [{ modulePath: "content/test/pack", path: "content/test/pack/src/main/resources/pack", configsPath: "content/test/pack/src/main/resources/pack/configs" }],
+            },
+            gameVals(),
+        );
+    }
+
+    it("calls exact copies of a block harmless, whatever the line endings", async () => {
+        const index = await indexNpcDuplicates('[[npc]]\r\nid = "npc.imp"\r\nname = "Imp"  ', '[[npc]]\nid = "npc.imp"\nname = "Imp"');
+        expect(index.issues.map((issue) => issue.code)).toEqual(["IDENTICAL_DUPLICATE"]);
+        expect(index.issues[0]).toMatchObject({ table: "npc", resolvedId: 100 });
+    });
+
     it("diagnoses duplicate resolved server targets across raw and pack-owned TOML", async () => {
         const fs = new InMemoryProjectFileSystem({
             ".data/raw-cache/server/npcs.toml":
-                '[[npc]]\nid = "npc.imp"',
+                '[[npc]]\nid = "npc.imp"\nname = "Imp"',
             "content/test/pack/src/main/resources/pack/configs/npc.toml":
-                '[[npc]]\nid = "npc.imp"',
+                '[[npc]]\nid = "npc.imp"\nname = "Different"',
         });
 
         const index = await indexProjectOpenRuneServerToml(
@@ -424,5 +455,46 @@ describe("OpenRune server source writes", () => {
         ).rejects.toMatchObject<Partial<OpenRuneServerWriteError>>({
             code: "STALE_SOURCE",
         });
+    });
+});
+
+
+describe("OpenRune server source write races", () => {
+    const sourcePath = ".data/raw-cache/server/npcs.toml";
+    const original = '[[npc]]\nid = "npc.imp"\ngiveChase = false\n';
+
+    /** Touches the file right after it is read, as an editor or Gradle task running at the same moment would. */
+    class TouchAfterReadFileSystem extends InMemoryProjectFileSystem {
+        override async readText(path: string): Promise<string> {
+            const text = await super.readText(path);
+            if (path === sourcePath) this.simulateExternalWrite(path, text);
+            return text;
+        }
+    }
+
+    it("turns a write that raced with another change into STALE_SOURCE and leaves the file alone", async () => {
+        const fs = new TouchAfterReadFileSystem({ [sourcePath]: original });
+        const block = parseOpenRuneServerToml(sourcePath, original).blocks[0]!;
+
+        await expect(updateOpenRuneServerField(fs, block, "giveChase", true)).rejects.toMatchObject({ code: "STALE_SOURCE" });
+        expect(await fs.readText(sourcePath)).toBe(original);
+    });
+
+    it("guards whole-file replacement the same way", async () => {
+        const fs = new TouchAfterReadFileSystem({ [sourcePath]: original });
+        await expect(replaceOpenRuneServerSourceFile(fs, sourcePath, "", original)).rejects.toMatchObject({ code: "STALE_SOURCE" });
+    });
+
+    it("reports SOURCE_EXISTS when a new source file appears before it is written", async () => {
+        class AppearsFileSystem extends InMemoryProjectFileSystem {
+            override async exists(path: string): Promise<boolean> {
+                const result = await super.exists(path);
+                if (!result) this.simulateExternalWrite(path, "# someone else\n");
+                return result;
+            }
+        }
+        const fs = new AppearsFileSystem();
+        await expect(replaceOpenRuneServerSourceFile(fs, sourcePath, original)).rejects.toMatchObject({ code: "SOURCE_EXISTS" });
+        expect(await fs.readText(sourcePath)).toBe("# someone else\n");
     });
 });

@@ -267,7 +267,7 @@ describe("indexProjectOpenRuneMapSources", () => {
             ".data/raw-cache/map/area/a.toml":
                 '[[area]]\nname = "Wilderness"\narea_id = "area.wilderness"\nlevels = [0]\n[[area.polygons]]\nvertices = [[3072, 3200], [3073, 3200], [3073, 3201]]',
             ".data/raw-cache/map/area/b.toml":
-                '[[area]]\nname = "Duplicate"\narea_id = "area.wilderness"\nlevels = [0]\n[[area.polygons]]\nvertices = [[3074, 3200], [3075, 3200], [3075, 3201]]',
+                '[[area]]\nname = "Duplicate"\narea_id = "area.wilderness"\nlevels = [0]\nexcludes = ["area.wilderness"]\n[[area.polygons]]\nvertices = [[3074, 3200], [3075, 3200], [3075, 3201]]',
         });
 
         const index = await indexProjectOpenRuneMapSources(
@@ -301,6 +301,24 @@ describe("indexProjectOpenRuneMapSources", () => {
                 }),
             ]),
         );
+    });
+});
+
+describe("shared area ids", () => {
+    it("lets many polygons share one area id when their include/exclude lists agree", async () => {
+        const polygon = "[[area.polygons]]\nvertices = [[3072, 3200], [3073, 3200], [3073, 3201]]";
+        const fs = new InMemoryProjectFileSystem({
+            ".data/raw-cache/map/area/multi.toml": [1, 2, 3]
+                .map((n) => `[[area]]\nname = "Zone ${n}"\narea_id = "area.wilderness"\nlevels = [0]\n${polygon}`)
+                .join("\n\n"),
+        });
+        const index = await indexProjectOpenRuneMapSources(
+            fs,
+            { rawMapSources: { root: ".data/raw-cache/map", areaRoot: ".data/raw-cache/map/area", npcTomlFiles: [], objTomlFiles: [], areaTomlFiles: [".data/raw-cache/map/area/multi.toml"] } },
+            gameVals(),
+        );
+        expect(index.areasBySymbol.get("area.wilderness")).toHaveLength(3);
+        expect(index.issues.filter((issue) => issue.code === "DUPLICATE_AREA_ID")).toEqual([]);
     });
 });
 

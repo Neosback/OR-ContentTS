@@ -9,6 +9,7 @@ import { TauriProjectFileSystem, describeIoCause } from "../../project/tauri-pro
  */
 export const APP_FILE_COMMANDS = [
     "fs_exists",
+    "fs_mkdir",
     "fs_stat",
     "fs_read_dir",
     "fs_read_file",
@@ -18,7 +19,7 @@ export const APP_FILE_COMMANDS = [
 ] as const;
 
 export interface AccessRow {
-    id: "read" | "write" | "delete" | "other";
+    id: "read" | "write" | "mkdir" | "delete" | "other";
     label: string;
     detail: string;
     allowed: boolean;
@@ -37,8 +38,14 @@ export function describePermissions(commands: readonly string[] = APP_FILE_COMMA
         {
             id: "write",
             label: "Write",
-            detail: "Create and overwrite files (project edits, exports)",
+            detail: "Create and overwrite files (project edits, exports); each overwrite is atomic and keeps a backup",
             allowed: has("write_file") && has("write_text"),
+        },
+        {
+            id: "mkdir",
+            label: "Create folders",
+            detail: "Make a missing folder inside a granted folder (new project files)",
+            allowed: has("mkdir"),
         },
         {
             id: "delete",
@@ -48,9 +55,9 @@ export function describePermissions(commands: readonly string[] = APP_FILE_COMMA
         },
         {
             id: "other",
-            label: "Rename, create folders, copy, delete folders",
+            label: "Rename, copy, delete folders",
             detail: "Not available",
-            allowed: ["rename", "mkdir", "copy", "remove_dir"].some(has),
+            allowed: ["rename", "copy", "remove_dir"].some(has),
         },
     ];
 }

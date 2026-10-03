@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod access;
 mod devlog;
+mod watch;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -9,6 +10,7 @@ pub fn run() {
     .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       app.manage(access::init(app.handle()));
+      app.manage(watch::Watchers::default());
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -28,7 +30,10 @@ pub fn run() {
       access::fs_read_file,
       access::fs_write_text,
       access::fs_write_file,
+      access::fs_mkdir,
       access::fs_remove,
+      watch::fs_watch_start,
+      watch::fs_watch_stop,
       devlog::dev_log,
     ])
     .run(tauri::generate_context!())

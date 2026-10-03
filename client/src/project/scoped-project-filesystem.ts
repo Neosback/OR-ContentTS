@@ -2,7 +2,9 @@ import {
     normalizeProjectPath,
     type ProjectFileEntry,
     type ProjectFileSystem,
+    type ProjectFileChange,
     type ProjectFileSystemCapabilities,
+    type ProjectWriteOptions,
 } from "./project-filesystem";
 
 /**
@@ -60,11 +62,24 @@ export class ScopedProjectFileSystem implements ProjectFileSystem {
         return this.inner.readBytes(this.resolve(path));
     }
 
-    async writeText(path: string, text: string): Promise<void> {
-        return this.inner.writeText(this.resolve(path), text);
+    async writeText(path: string, text: string, options?: ProjectWriteOptions): Promise<void> {
+        return this.inner.writeText(this.resolve(path), text, options);
     }
 
-    async writeBytes(path: string, data: Uint8Array): Promise<void> {
-        return this.inner.writeBytes(this.resolve(path), data);
+    async writeBytes(path: string, data: Uint8Array, options?: ProjectWriteOptions): Promise<void> {
+        return this.inner.writeBytes(this.resolve(path), data, options);
+    }
+
+    /** Changes inside the subfolder only, with paths relative to it. */
+    get watch(): ProjectFileSystem["watch"] {
+        const inner = this.inner.watch?.bind(this.inner);
+        if (!inner) return undefined;
+        return (listener) =>
+            inner((change) => {
+                const paths = change.paths
+                    .filter((path) => !this.prefix || path === this.prefix || path.startsWith(`${this.prefix}/`))
+                    .map((path) => this.relative(path));
+                if (paths.length > 0) listener({ paths });
+            });
     }
 }

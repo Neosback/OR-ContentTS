@@ -13,6 +13,7 @@
     import InterfaceEditorScreen from "./interface/InterfaceEditorScreen.svelte";
     import HomeScreen from "./screens/HomeScreen.svelte";
     import MapHubScreen from "./screens/MapHubScreen.svelte";
+    import ServerContentScreen from "./screens/server/ServerContentScreen.svelte";
     import Sidebar from "./shell/Sidebar.svelte";
     import DockLabScreen from "./dev/DockLabScreen.svelte";
 
@@ -29,11 +30,12 @@
     // Interface Editor uses the same Studio navigation shell as Map. Only
     // dedicated editor popouts should suppress the global sidebar.
     const hideSidebar = $derived(isPopout);
-    const fullBleed = $derived(isMapRoute || isInterfaceRoute || path === "/__dock");
+    const isServerRoute = $derived(path === "/server");
+    const fullBleed = $derived(isMapRoute || isInterfaceRoute || isServerRoute || path === "/__dock");
 
     // Unknown routes go home, like the React router's catch-all.
     $effect(() => {
-        const known = path === "/" || (import.meta.env.DEV && path === "/__dock") || path === "/cache-test" || isMapRoute || isInterfaceRoute;
+        const known = path === "/" || (import.meta.env.DEV && path === "/__dock") || path === "/cache-test" || isServerRoute || isMapRoute || isInterfaceRoute;
         if (!known) router.navigate("/", { replace: true });
     });
 </script>
@@ -69,6 +71,8 @@
                     <MapViewerScreen />
                 {:else if path.startsWith("/map/editor")}
                     <MapEditorScreen />
+                {:else if isServerRoute}
+                    <ServerContentScreen />
                 {:else if isInterfaceRoute}
                     <InterfaceEditorScreen />
                 {/if}

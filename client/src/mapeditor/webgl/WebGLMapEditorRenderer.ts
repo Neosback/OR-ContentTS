@@ -32,6 +32,7 @@ import {
 import { clamp } from "../../util/MathUtil";
 import { brushFootprint } from "../brush-footprint";
 import { planGhostTile } from "../brush-ghost";
+import { storedGrid } from "../grid-settings";
 import { INVALID_HSL_COLOR, adjustOverlayLight, adjustUnderlayLight, packHsl } from "../../rs/util/ColorUtil";
 import { paintTileShape } from "../tile-shape-paint";
 import type { MapEditorBrushType } from "../map-editor-kinds";
@@ -78,7 +79,18 @@ import {
     WIREFRAME_LINE_HALF_WIDTH,
     type WireframeModel,
 } from "./objectWireframeMesh";
-import { findLocForRef, getObjectSceneModelOffset, refreshSelectedObjectRef, syncMapObjectPickIndex, syncObjectRefFromLoc, worldTileToSceneTile } from "../plugins/builtins/object-transform-runtime";
+import {
+    findLocForRef,
+    getObjectSceneModelOffset,
+    moveSelectedObjectByTiles,
+    moveSelectedObjectToAnchor,
+    refreshSelectedObjectRef,
+    syncMapObjectPickIndex,
+    syncObjectRefFromLoc,
+    worldTileToSceneTile,
+} from "../plugins/builtins/object-transform-runtime";
+import { getObjectActionModel } from "../plugins/builtins/object-action-model";
+import { placeLocType, previewLocPlacement, replaceObject, type LocFootprint, type LocPlacementPreview } from "../plugins/builtins/object-edit-runtime";
 import {
     getCopyPreviewFootprintSceneBounds,
     getSourceMapForTemplate,
@@ -105,6 +117,8 @@ import { Model } from "../../rs/model/Model";
 import { ModelData } from "../../rs/model/ModelData";
 import { applyHeightSetRuntime, applyHeightToolRuntime } from "../plugins/builtins/height-edit-runtime";
 import { applyTileRenderFlagsRuntime } from "../plugins/builtins/tile-flags-edit-runtime";
+import { getObjectDeleteModel } from "../plugins/builtins/object-delete-model";
+import { deleteObjectRefs } from "../plugins/builtins/object-delete-runtime";
 import { getTileBrushFocus, getTileBrushModel } from "../plugins/builtins/tile-brush-model";
 import { getTileFlagsToolModel } from "../plugins/builtins/tile-flags-tool-model";
 import {
@@ -266,8 +280,14 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
     /** Last quantized client tick (20ms cadence) driving seq frame delays. */
     private lastClientTick = -1;
 
-    drawGrid: boolean = false;
-    drawChunkGrid: boolean = false;
+    drawGrid: boolean = storedGrid("square");
+    drawChunkGrid: boolean = storedGrid("chunk");
+    drawTileGrid: boolean = storedGrid("tile");
+    /** Faint white: 64 lines a side per map square would drown the ground at full strength. */
+    mapTileGridColor: vec4 = vec4.fromValues(1, 1, 1, 0.2);
+    tileGridVertexBuffer?: VertexBuffer;
+    tileGridVertexArray?: VertexArray;
+    tileGridDrawCall!: DrawCall;
 
     mapSquareGridColor: vec4 = vec4.fromValues(...DEFAULT_GIZMO_APPEARANCE.mapSquareGrid);
     mapChunkGridColor: vec4 = vec4.fromValues(...DEFAULT_GIZMO_APPEARANCE.chunkGrid);
@@ -342,7 +362,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.highlightTileDrawCall.uniform("u_footprintPass", 0);
         this.highlightTileDrawCall.uniform("u_boundarySegCount", 0);
         this.highlightTileDrawCall.uniform("u_ghostHeightOn", 0);
-        this.highlightTileDrawCall.uniform("u_ghostHeight", 0);
+        this.highlightTileDrawCall.uniform("u_ghostHeights", [0, 0, 0, 0]);
         this.highlightTileDrawCall.uniform("u_yBias", HIGHLIGHT_Y_BIAS);
         this.highlightTileDrawCall.uniform("u_ghostMode", 0);
         this.highlightTileDrawCall.uniform("u_ghostTexLayer", -1);
@@ -431,6 +451,25 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         return points;
     }
 
+    /** A line along every tile edge of a map square, one segment per tile so the lines follow the terrain. */
+    createTileGridPoints(): Uint16Array {
+        const points = new Uint16Array(65 * 64 * 4 * 2);
+        let offset = 0;
+        for (let line = 0; line <= 64; line++) {
+            for (let tile = 0; tile < 64; tile++) {
+                points[offset++] = tile * 128;
+                points[offset++] = line * 128;
+                points[offset++] = (tile + 1) * 128;
+                points[offset++] = line * 128;
+                points[offset++] = line * 128;
+                points[offset++] = tile * 128;
+                points[offset++] = line * 128;
+                points[offset++] = (tile + 1) * 128;
+            }
+        }
+        return points;
+    }
+
     initGrid(): void {
         const points = this.createGridPoints(false);
 
@@ -441,6 +480,13 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
         this.gridDrawCall = this.app
             .createDrawCall(this.gridProgram!, this.gridVertexArray)
+            .uniformBlock("SceneUniforms", this.sceneUniformBuffer!)
+            .primitive(PicoGL.LINES);
+
+        this.tileGridVertexBuffer = this.app.createVertexBuffer(PicoGL.UNSIGNED_SHORT, 2, this.createTileGridPoints());
+        this.tileGridVertexArray = this.app.createVertexArray().vertexAttributeBuffer(0, this.tileGridVertexBuffer);
+        this.tileGridDrawCall = this.app
+            .createDrawCall(this.gridProgram!, this.tileGridVertexArray)
             .uniformBlock("SceneUniforms", this.sceneUniformBuffer!)
             .primitive(PicoGL.LINES);
 
@@ -1301,9 +1347,20 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
         // this.app.disable(PicoGL.DEPTH_TEST);
 
-        if (this.drawGrid || this.drawChunkGrid) {
+        if (this.drawGrid || this.drawChunkGrid || this.drawTileGrid) {
             for (let i = 0; i < this.mapManager.visibleMapCount; i++) {
                 const map = this.mapManager.visibleMaps[i];
+
+                if (this.drawTileGrid) {
+                    this.app.enable(PicoGL.BLEND);
+                    this.app.blendFunc(PicoGL.SRC_ALPHA, PicoGL.ONE_MINUS_SRC_ALPHA);
+                    this.tileGridDrawCall.uniform("u_mapX", map.mapX);
+                    this.tileGridDrawCall.uniform("u_mapY", map.mapY);
+                    this.tileGridDrawCall.uniform("u_color", this.mapTileGridColor);
+                    this.tileGridDrawCall.texture("u_heightMap", map.heightMapTexture);
+                    this.tileGridDrawCall.draw();
+                    this.app.disable(PicoGL.BLEND);
+                }
 
                 if (this.drawChunkGrid) {
                     this.chunkGridDrawCall.uniform("u_mapX", map.mapX);
@@ -1347,6 +1404,7 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
 
         this.renderObjectPicking();
         this.renderObjectSelectorWireframes();
+        this.renderObjectActionGhosts();
         this.renderSelectToolTileHighlights();
         this.renderContextMenuObjectWireframe();
         this.renderObjectDeleteWireframes();
@@ -1525,6 +1583,20 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         call.uniform("u_outlineColor", [1, 1, 1, BRUSH_GHOST_ALPHA]);
         call.uniform("u_ghostMode", 1);
 
+        // World tiles under the brush (a stamped height moves each one's own vertex).
+        const footprint = new Set<number>();
+        if (heightOn) {
+            for (const [mapId, tiles] of hoveredTilesMap) {
+                const map = this.mapManager.getMapById(mapId);
+                if (!map) {
+                    continue;
+                }
+                for (const tileId of tiles) {
+                    footprint.add((map.mapX * 64 + (tileId >> 8)) * 20000 + map.mapY * 64 + (tileId & 0xff));
+                }
+            }
+        }
+
         let budget = GHOST_MAX_TILES;
         for (let i = 0; i < this.mapManager.visibleMapCount && budget > 0; i++) {
             const map = this.mapManager.visibleMaps[i] as EditorMapSquare;
@@ -1579,7 +1651,21 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 call.uniform("u_tileX", lx);
                 call.uniform("u_tileY", ly);
                 call.uniform("u_ghostHeightOn", plan.height === undefined ? 0 : 1);
-                call.uniform("u_ghostHeight", plan.height ?? 0);
+                if (plan.height !== undefined) {
+                    // A stamped height moves the vertex of every brushed tile; show each corner as it would end up.
+                    const corners: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+                    call.uniform(
+                        "u_ghostHeights",
+                        corners.map(([dx, dy]) => {
+                            const stored = scene.tileHeights[level][sx + dx][sy + dy];
+                            if (!footprint.has((worldX + dx) * 20000 + worldY + dy)) {
+                                return stored;
+                            }
+                            const minHeight = scene.getMinHeight(level, sx + dx, sy + dy);
+                            return Math.max(minHeight - 0xff * 8, Math.min(minHeight, plan.height!));
+                        }),
+                    );
+                }
                 call.uniform("u_highlightShapeMode", 1);
                 call.drawRanges(this.highlightTriangleRange);
 
@@ -2115,9 +2201,14 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
                 : undefined;
         }
 
+        this.processObjectActionRequests();
+
         const inputManager = this.host.inputManager;
         const leftDown = inputManager.isKeyDown("MouseLeft");
-        if (this.lastMouseLeftDown && !leftDown && !inputManager.isHolding()) {
+        const actionMode = getObjectActionModel(this.host).mode;
+        if (this.lastMouseLeftDown && !leftDown && !inputManager.isHolding() && actionMode !== undefined) {
+            this.finishObjectActionClick(actionMode);
+        } else if (this.lastMouseLeftDown && !leftDown && !inputManager.isHolding()) {
             if (this.host.isObjectCopyPlacementActive()) {
                 const template = this.host.getObjectCopyTemplate();
                 if (template && this.hoverWorldX !== -1 && this.hoverWorldY !== -1) {
@@ -2149,6 +2240,247 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.lastMouseLeftDown = leftDown;
     }
 
+    /** Queued panel/key actions on the selected object (replace, nudge, delete), run once per frame. */
+    private processObjectActionRequests(): void {
+        const model = getObjectActionModel(this.host);
+        for (const request of model.takeRequests()) {
+            if (request.type === "place-at") {
+                const preview = previewLocPlacement(this.host, this, request.locTypeId, request.rotation, request.level, request.worldX, request.worldY);
+                if (preview && placeLocType(this.host, this, preview)) {
+                    this.host.notifyWorkbenchStateChanged();
+                }
+                continue;
+            }
+            const selected = this.host.selectedObject;
+            if (!selected) {
+                continue;
+            }
+            if (request.type === "nudge") {
+                if (moveSelectedObjectByTiles(this.host, this, request.dx, request.dy)) {
+                    this.host.notifyWorkbenchStateChanged();
+                }
+            } else if (request.type === "delete-selected") {
+                if (deleteObjectRefs(this.host, this, [selected]) > 0) {
+                    this.host.clearSelectedObject();
+                    this.host.notifyWorkbenchStateChanged();
+                }
+            } else if (request.type === "replace") {
+                const replaced = replaceObject(this.host, this, selected, request.locTypeId);
+                if (replaced) {
+                    this.host.setSelectedObject({ ...replaced });
+                    model.setPreviewReplace(false);
+                    this.host.notifyWorkbenchStateChanged();
+                }
+            }
+        }
+    }
+
+    /** Left click while Move or Place is active: put the object down at the hovered tile. */
+    private finishObjectActionClick(mode: "move" | "place"): void {
+        if (this.hoverWorldX === -1 || this.hoverWorldY === -1) {
+            return;
+        }
+        const model = getObjectActionModel(this.host);
+        if (mode === "move") {
+            const selected = this.host.selectedObject;
+            const map = this.mapManager.getMap(Math.floor(this.hoverWorldX / 64), Math.floor(this.hoverWorldY / 64)) as EditorMapSquare | undefined;
+            if (!selected || !map) {
+                return;
+            }
+            if (map.mapX !== selected.mapX || map.mapY !== selected.mapY) {
+                this.host.debugText = "Move stays inside one map square: pick a tile in the same square (Esc cancels)";
+                return;
+            }
+            const { sceneX, sceneY } = worldTileToSceneTile(this.hoverWorldX, this.hoverWorldY, map);
+            if (moveSelectedObjectToAnchor(this.host, this, sceneX, sceneY)) {
+                model.cancel();
+            }
+            return;
+        }
+        const candidate = model.candidate;
+        if (candidate === undefined) {
+            return;
+        }
+        const preview = previewLocPlacement(this.host, this, candidate, model.placeRotation, this.host.getTilePickLevel(), this.hoverWorldX, this.hoverWorldY);
+        if (preview && placeLocType(this.host, this, preview)) {
+            this.host.notifyWorkbenchStateChanged();
+        }
+    }
+
+    private readonly objectGhostOkColor: vec4 = vec4.fromValues(0.35, 1, 0.45, 0.95);
+    private readonly objectGhostBadColor: vec4 = vec4.fromValues(1, 0.3, 0.3, 0.95);
+    private readonly objectFootprintOkFill: vec4 = vec4.fromValues(0.3, 1, 0.4, 0.2);
+    private readonly objectFootprintBadFill: vec4 = vec4.fromValues(1, 0.3, 0.3, 0.25);
+
+    /** Outlines the tiles an object would cover (scene-space bounds on `map`). */
+    private drawObjectFootprint(map: EditorMapSquare, bounds: LocFootprint, level: number, ok: boolean): void {
+        const fill = ok ? this.objectFootprintOkFill : this.objectFootprintBadFill;
+        const outline = ok ? this.objectGhostOkColor : this.objectGhostBadColor;
+        const tiles = new Set<string>();
+        const world = (sx: number, sy: number): [number, number] => [map.mapX * 64 + sx - map.borderSize, map.mapY * 64 + sy - map.borderSize];
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                tiles.add(overlayWorldKey(...world(x, y)));
+            }
+        }
+        this.beginTileHighlightPass(fill, outline, level, fill[3]);
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                const [wx, wy] = world(x, y);
+                this.drawWorldTileHighlightAt(wx, wy, level, this.edgeMaskForWorldTile(wx, wy, tiles));
+            }
+        }
+        this.endTileHighlightPass();
+    }
+
+    /** Ghosts for Move, Place and the Replace preview: the real model's outline where it would end up. */
+    private renderObjectActionGhosts(): void {
+        if (!this.host.isObjectSelectorToolActive() || !this.objectWireframeProgram || !this.sceneUniformBuffer) {
+            return;
+        }
+        const model = getObjectActionModel(this.host);
+        const selected = this.host.selectedObject;
+        const level = this.host.getTilePickLevel();
+        const wire: { ref: EditorObjectRef; color: vec4 }[] = [];
+        const footprints: { map: EditorMapSquare; bounds: LocFootprint; level: number; ok: boolean }[] = [];
+
+        const hoverMap =
+            this.hoverWorldX === -1 ? undefined : (this.mapManager.getMap(Math.floor(this.hoverWorldX / 64), Math.floor(this.hoverWorldY / 64)) as EditorMapSquare | undefined);
+
+        if (model.mode === "move" && selected && hoverMap && hoverMap.mapX === selected.mapX && hoverMap.mapY === selected.mapY) {
+            const { sceneX, sceneY } = worldTileToSceneTile(this.hoverWorldX, this.hoverWorldY, hoverMap);
+            const deltaX = sceneX - selected.anchorTileX;
+            const deltaY = sceneY - selected.anchorTileY;
+            wire.push({ ref: { ...selected, anchorTileX: sceneX, anchorTileY: sceneY, sceneX: selected.sceneX + deltaX * 128, sceneZ: selected.sceneZ + deltaY * 128 }, color: this.objectGhostOkColor });
+            wire.push({ ref: selected, color: this.objectSelectorDeleteColor });
+            footprints.push({ map: hoverMap, bounds: getCopyPreviewFootprintSceneBounds(selected, hoverMap, sceneX, sceneY), level: selected.level, ok: true });
+        } else if (model.mode === "place" && model.candidate !== undefined && this.hoverWorldX !== -1) {
+            const preview = previewLocPlacement(this.host, this, model.candidate, model.placeRotation, level, this.hoverWorldX, this.hoverWorldY);
+            if (preview) {
+                wire.push({ ref: preview.ref, color: preview.valid ? this.objectGhostOkColor : this.objectGhostBadColor });
+                footprints.push({ map: preview.map, bounds: preview.bounds, level, ok: preview.valid });
+            }
+        } else if (model.previewReplace && model.candidate !== undefined && selected?.kind === "loc") {
+            const map = this.mapManager.getMap(selected.mapX, selected.mapY) as EditorMapSquare | undefined;
+            const old = map ? findLocForRef(map, selected) : undefined;
+            if (map && old) {
+                const preview: LocPlacementPreview | undefined = previewLocPlacement(
+                    this.host,
+                    this,
+                    model.candidate,
+                    selected.rotation,
+                    selected.level,
+                    map.mapX * 64 + old.startX - map.borderSize,
+                    map.mapY * 64 + old.startY - map.borderSize,
+                );
+                wire.push({ ref: selected, color: this.objectSelectorDeleteColor });
+                if (preview) {
+                    wire.push({ ref: preview.ref, color: preview.valid ? this.objectGhostOkColor : this.objectGhostBadColor });
+                    footprints.push({ map, bounds: preview.bounds, level: selected.level, ok: preview.valid });
+                }
+            }
+        }
+        if (wire.length === 0) {
+            return;
+        }
+
+        this.app.disable(PicoGL.DEPTH_TEST);
+        this.app.disable(PicoGL.CULL_FACE);
+        this.app.enable(PicoGL.BLEND);
+        this.app.blendFunc(PicoGL.SRC_ALPHA, PicoGL.ONE_MINUS_SRC_ALPHA);
+        for (const { ref, color } of wire) {
+            this.drawObjectWireframe(ref, color);
+        }
+        this.app.disable(PicoGL.BLEND);
+        this.app.enable(PicoGL.CULL_FACE);
+        this.app.enable(PicoGL.DEPTH_TEST);
+        for (const f of footprints) {
+            this.drawObjectFootprint(f.map, f.bounds, f.level, f.ok);
+        }
+    }
+
+    /** What the Delete tool would remove right now (the hovered object, or everything under the brush). */
+    private objectDeleteTargets: EditorObjectRef[] = [];
+    private lastDeleteTargetsKey = "";
+    private lastDeleteLeftDown = false;
+
+    private forEachObjectOnWorldTile(worldX: number, worldY: number, level: number, visit: (ref: EditorObjectRef) => void): void {
+        const mapX = Math.floor(worldX / 64);
+        const mapY = Math.floor(worldY / 64);
+        const map = this.mapManager.getMap(mapX, mapY) as EditorMapSquare | undefined;
+        if (!map) {
+            return;
+        }
+        const sceneX = (((worldX % 64) + 64) % 64) + map.borderSize;
+        const sceneY = (((worldY % 64) + 64) % 64) + map.borderSize;
+        for (const ref of map.objectPickIndex.listAt(level, sceneX, sceneY)) {
+            visit(ref);
+        }
+    }
+
+    private collectObjectDeleteTargets(): EditorObjectRef[] {
+        const model = getObjectDeleteModel(this.host);
+        const out: EditorObjectRef[] = [];
+        if (this.hoverWorldX === -1 || this.hoverWorldY === -1) {
+            return out;
+        }
+        const seen = new Set<string>();
+        const add = (ref: EditorObjectRef): void => {
+            if (!model.allows(ref.kind) || !this.host.isPlaneVisible(ref.level)) {
+                return;
+            }
+            const key = this.objectRefDeleteHoverKey(ref);
+            if (!seen.has(key)) {
+                seen.add(key);
+                out.push(ref);
+            }
+        };
+        const level = this.host.getTilePickLevel();
+        if (model.mode === "single") {
+            const hovered = this.pickHoveredObject();
+            if (hovered && model.allows(hovered.kind)) {
+                add(hovered);
+            } else {
+                // The picked object is filtered out (or nothing was picked): take the first allowed object on the tile.
+                this.forEachObjectOnWorldTile(this.hoverWorldX, this.hoverWorldY, level, (ref) => {
+                    if (out.length === 0) {
+                        add(ref);
+                    }
+                });
+            }
+        } else {
+            this.forEachBrushOffset((dx, dy) => {
+                this.forEachObjectOnWorldTile(this.hoverWorldX + dx, this.hoverWorldY + dy, level, add);
+            });
+        }
+        return out.length > 300 ? out.slice(0, 300) : out;
+    }
+
+    private describeObjectRef(ref: EditorObjectRef): string {
+        try {
+            const name = this.host.locTypeLoader.load(ref.locTypeId).name;
+            return `${name && name !== "null" ? name : "Loc"} #${ref.locTypeId}`;
+        } catch {
+            return `Loc #${ref.locTypeId}`;
+        }
+    }
+
+    /** Removes the previewed objects as one undo step; returns whether anything was removed. */
+    deleteObjectDeleteTargets(): boolean {
+        const targets = this.objectDeleteTargets;
+        if (targets.length === 0) {
+            return false;
+        }
+        const removed = deleteObjectRefs(this.host, this, targets);
+        if (removed > 0) {
+            getObjectDeleteModel(this.host).addDeleted(removed);
+            this.objectDeleteTargets = [];
+            this.lastDeleteTargetsKey = "";
+            this.host.notifyWorkbenchStateChanged();
+        }
+        return removed > 0;
+    }
+
     private updateObjectDeleteState(): void {
         const deleteHeld = this.host.isObjectDeleteModeActive();
         if (deleteHeld !== this.lastObjectDeleteModeActive) {
@@ -2156,25 +2488,30 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
             this.host.notifyWorkbenchStateChanged();
         }
 
-        this.host.debugText = deleteHeld
-            ? "Delete — hover objects to remove"
-            : "Object Delete — hold Delete to erase hovered objects";
+        const model = getObjectDeleteModel(this.host);
+        this.host.debugText =
+            model.mode === "area"
+                ? "Delete area — click to remove everything under the brush · hold right button to sweep"
+                : "Delete — click an object to remove it · hold right button to sweep";
 
-        this.host.setHoveredObject(this.pickHoveredObject());
+        const targets = this.collectObjectDeleteTargets();
+        this.objectDeleteTargets = targets;
+        const key = targets.map((ref) => this.objectRefDeleteHoverKey(ref)).join("|");
+        this.host.setHoveredObject(targets[0] ? { ...targets[0] } : undefined);
+        model.setPreview(targets, (ref) => this.describeObjectRef(ref));
 
-        if (deleteHeld) {
-            const hovered = this.host.hoveredObject;
-            if (!hovered) {
-                this.lastDeleteHoverKey = undefined;
-            } else {
-                const hoverKey = this.objectRefDeleteHoverKey(hovered);
-                if (hoverKey !== this.lastDeleteHoverKey) {
-                    this.lastDeleteHoverKey = hoverKey;
-                    this.host.deleteHoveredObject();
-                }
-            }
+        const input = this.host.inputManager;
+        const leftDown = input.isKeyDown("MouseLeft");
+        const clicked = this.lastDeleteLeftDown && !leftDown && !input.isHolding();
+        this.lastDeleteLeftDown = leftDown;
+
+        if (clicked || deleteHeld) {
+            this.deleteObjectDeleteTargets();
+        } else if (input.isHolding() && !input.isAltDown() && key !== "" && key !== this.lastDeleteTargetsKey) {
+            // Sweeping with the right button (like painting): remove what the cursor reaches, once each.
+            this.deleteObjectDeleteTargets();
         } else {
-            this.lastDeleteHoverKey = undefined;
+            this.lastDeleteTargetsKey = key;
         }
     }
 
@@ -2297,16 +2634,27 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.app.enable(PicoGL.DEPTH_TEST);
     }
 
+    private readonly deleteAreaFill: vec4 = vec4.fromValues(0.95, 0.25, 0.25, 0.16);
+    private readonly deleteAreaOutline: vec4 = vec4.fromValues(1, 0.35, 0.35, 0.9);
+
     private renderObjectDeleteWireframes(): void {
         if (!this.host.isObjectDeleteToolActive()) {
             return;
         }
-        if (!this.objectWireframeProgram || !this.sceneUniformBuffer) {
-            return;
+        if (getObjectDeleteModel(this.host).mode === "area" && this.hoverWorldX !== -1 && this.hoverWorldY !== -1) {
+            // The footprint the next click clears.
+            const level = this.host.getTilePickLevel();
+            const tiles = new Set<string>();
+            this.forEachBrushOffset((dx, dy) => tiles.add(overlayWorldKey(this.hoverWorldX + dx, this.hoverWorldY + dy)));
+            this.beginTileHighlightPass(this.deleteAreaFill, this.deleteAreaOutline, level, this.deleteAreaFill[3]);
+            this.forEachBrushOffset((dx, dy) => {
+                const wx = this.hoverWorldX + dx;
+                const wy = this.hoverWorldY + dy;
+                this.drawWorldTileHighlightAt(wx, wy, level, this.edgeMaskForWorldTile(wx, wy, tiles));
+            });
+            this.endTileHighlightPass();
         }
-
-        const hovered = this.host.hoveredObject;
-        if (!hovered || !this.host.isPlaneVisible(hovered.level)) {
+        if (!this.objectWireframeProgram || !this.sceneUniformBuffer || this.objectDeleteTargets.length === 0) {
             return;
         }
 
@@ -2314,7 +2662,9 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.app.disable(PicoGL.CULL_FACE);
         this.app.enable(PicoGL.BLEND);
         this.app.blendFunc(PicoGL.SRC_ALPHA, PicoGL.ONE_MINUS_SRC_ALPHA);
-        this.drawObjectWireframe(hovered, this.objectSelectorDeleteColor);
+        for (const ref of this.objectDeleteTargets) {
+            this.drawObjectWireframe(ref, this.objectSelectorDeleteColor);
+        }
         this.app.disable(PicoGL.BLEND);
         this.app.enable(PicoGL.CULL_FACE);
         this.app.enable(PicoGL.DEPTH_TEST);
@@ -3909,6 +4259,11 @@ export class WebGLMapEditorRenderer extends MapEditorRenderer<EditorMapSquare> {
         this.gridVertexBuffer = undefined;
         this.gridVertexArray?.delete();
         this.gridVertexArray = undefined;
+
+        this.tileGridVertexBuffer?.delete();
+        this.tileGridVertexBuffer = undefined;
+        this.tileGridVertexArray?.delete();
+        this.tileGridVertexArray = undefined;
 
         this.chunkGridVertexBuffer?.delete();
         this.chunkGridVertexBuffer = undefined;

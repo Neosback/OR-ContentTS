@@ -1,11 +1,14 @@
 import {
+    checkWriteGuard,
     normalizeProjectPath,
     projectParentPath,
     projectPathName,
     ProjectFileSystemError,
     type ProjectFileEntry,
     type ProjectFileSystem,
+    type ProjectFileChange,
     type ProjectFileSystemCapabilities,
+    type ProjectWriteOptions,
 } from "./project-filesystem";
 
 export type InMemoryProjectFileSystemOptions = {
@@ -33,6 +36,9 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
 
     private readonly files = new Map<string, Uint8Array>();
     private readonly directories = new Set<string>([""]);
+    private readonly modified = new Map<string, number>();
+    private clock = 1000;
+    private readonly listeners = new Set<(change: ProjectFileChange) => void>();
 
     constructor(
         seed: InMemoryProjectFileSeed = {},
@@ -41,7 +47,7 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
         this.capabilities = {
             read: true,
             write: options.writable ?? true,
-            watch: false,
+            watch: true,
         };
 
         for (const [rawPath, value] of Object.entries(seed)) {
@@ -55,7 +61,27 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
                 );
             }
             this.files.set(path, typeof value === "string" ? encoder.encode(value) : cloneBytes(value));
+            this.modified.set(path, this.tick());
         }
+    }
+
+    /** A strictly increasing fake modified time, so every write is visible to the write guard. */
+    private tick(): number {
+        return ++this.clock;
+    }
+
+    watch(listener: (change: ProjectFileChange) => void): () => void {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    /** Test helper: a write that did not come through this app (another program saving the file), which watchers hear about. */
+    simulateExternalWrite(path: string, data: string | Uint8Array): void {
+        const normalized = this.requireFilePath(path);
+        this.ensureParentDirectories(normalized);
+        this.files.set(normalized, typeof data === "string" ? encoder.encode(data) : cloneBytes(data));
+        this.modified.set(normalized, this.tick());
+        for (const listener of this.listeners) listener({ paths: [normalized] });
     }
 
     async list(path = ""): Promise<ProjectFileEntry[]> {
@@ -122,11 +148,11 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
         return cloneBytes(data);
     }
 
-    async writeText(path: string, text: string): Promise<void> {
-        await this.writeBytes(path, encoder.encode(text));
+    async writeText(path: string, text: string, options?: ProjectWriteOptions): Promise<void> {
+        await this.writeBytes(path, encoder.encode(text), options);
     }
 
-    async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    async writeBytes(path: string, data: Uint8Array, options?: ProjectWriteOptions): Promise<void> {
         this.requireWrite();
         const normalized = this.requireFilePath(path);
         if (this.directories.has(normalized)) {
@@ -153,7 +179,9 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
             );
         }
 
+        checkWriteGuard(normalized, this.modified.get(normalized), options);
         this.files.set(normalized, cloneBytes(data));
+        this.modified.set(normalized, this.tick());
     }
 
     private requireRead(): void {
@@ -225,6 +253,7 @@ export class InMemoryProjectFileSystem implements ProjectFileSystem {
             path,
             kind: "file",
             size: data.byteLength,
+            modifiedAt: this.modified.get(path),
         };
     }
 

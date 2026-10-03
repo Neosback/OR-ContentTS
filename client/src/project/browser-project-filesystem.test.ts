@@ -170,16 +170,33 @@ describe("browser project access selection", () => {
     });
 
     it("treats picker cancellation as no selection", async () => {
+        let clock = 0;
         expect(
             await selectBrowserProjectDirectory(
                 {},
                 {
+                    now: () => clock,
                     showDirectoryPicker: async () => {
+                        clock += 4_000; // the person looked at the dialog and closed it
                         throw domError("AbortError");
                     },
                 },
             ),
         ).toBeUndefined();
+    });
+
+    it("explains a picker that is refused instantly instead of silently doing nothing", async () => {
+        await expect(
+            selectBrowserProjectDirectory(
+                {},
+                {
+                    now: () => 0,
+                    showDirectoryPicker: async () => {
+                        throw domError("AbortError");
+                    },
+                },
+            ),
+        ).rejects.toMatchObject({ code: "READ_UNAVAILABLE", message: expect.stringContaining("desktop app") });
     });
 
     it("directs unsupported browsers to the import/download fallback", async () => {
