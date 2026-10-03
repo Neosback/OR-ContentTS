@@ -61,6 +61,21 @@ describe("interfaceEntryFromDecodedCache", () => {
         expect(sourceRoot.children[0]?.packedId).toBeUndefined();
     });
 
+
+    it("normalizes missing text fields to client-safe renderer defaults", () => {
+        const decoded = decodedFixture();
+        const entry = interfaceEntryFromDecodedCache(decoded);
+        const text = entry.components["1"]!;
+
+        expect(text.textFont).toBe(-1);
+        expect(text.text).toBe("");
+        expect(text.secondaryText).toBe("");
+        expect(text.textLineHeight).toBe(0);
+        expect(text.textAlignH).toBe(0);
+        expect(text.textAlignV).toBe(0);
+        expect(text.textShadow).toBe(false);
+    });
+
     it("normalizes embedded interface-parent payloads for the local renderer", () => {
         const entry = interfaceEntryFromDecodedCache(decodedFixture());
 
