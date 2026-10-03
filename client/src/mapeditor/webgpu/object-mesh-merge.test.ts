@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { SLOT_INFO_STRIDE, SLOT_VERTEX_STRIDE } from "../webgl/loader/object-slot-mesh";
+import {
+    PRIORITY_GROUP_WORDS,
+    SLOT_INFO_STRIDE,
+    SLOT_VERTEX_STRIDE,
+} from "../webgl/loader/object-slot-mesh";
 import type { EditorMapObjectChunkData } from "../webgl/loader/EditorMapObjectChunkData";
 import { mergeStaticObjectChunks } from "./object-mesh-merge";
 
@@ -11,6 +15,7 @@ function chunk(
     opaque: number[],
     alpha: number[],
     priorities: number[],
+    priorityGroups: number[] = [],
 ): EditorMapObjectChunkData {
     const vertices = new Uint8Array(vertexCount * SLOT_VERTEX_STRIDE);
     const words = new Uint32Array(vertices.buffer);
@@ -27,6 +32,7 @@ function chunk(
         staticOpaqueCount: opaque.length,
         staticAlphaCount: alpha.length,
         faceRenderPriorities: Uint8Array.from(priorities),
+        priorityGroups: Uint32Array.from(priorityGroups),
         animIndices: new Int32Array(0),
         slotInfo,
         slotCount,
@@ -37,9 +43,25 @@ function chunk(
 describe("mergeStaticObjectChunks", () => {
     it("offsets vertices, slots and indices per chunk and keeps opaque before transparent", () => {
         const merged = mergeStaticObjectChunks([
-            chunk(0, 3, 2, [0, 1, 2], [2, 1, 0], [2, 10]),
+            chunk(
+                0,
+                3,
+                2,
+                [0, 1, 2],
+                [2, 1, 0],
+                [2, 10],
+                [1, 0, 1, 1, 1],
+            ),
             undefined,
-            chunk(5, 4, 3, [0, 2, 3], [1, 2, 3], [4, 11]),
+            chunk(
+                5,
+                4,
+                3,
+                [0, 2, 3],
+                [1, 2, 3],
+                [4, 11],
+                [2, 0, 1, 1, 1],
+            ),
         ]);
 
         expect(merged.opaqueCount).toBe(6);
@@ -55,6 +77,11 @@ describe("mergeStaticObjectChunks", () => {
         expect(merged.slotInfo[2 * SLOT_INFO_STRIDE]).toBe(500);
         // Priorities follow the same map-wide opaque-then-alpha ordering as the merged index buffer.
         expect(Array.from(merged.faceRenderPriorities)).toEqual([2, 4, 10, 11]);
+        expect(merged.priorityGroups.length).toBe(2 * PRIORITY_GROUP_WORDS);
+        expect(Array.from(merged.priorityGroups)).toEqual([
+            1, 0, 1, 2, 1,
+            4, 1, 1, 3, 1,
+        ]);
     });
 
     it("handles no chunks", () => {
@@ -62,5 +89,6 @@ describe("mergeStaticObjectChunks", () => {
         expect(merged.opaqueCount + merged.alphaCount + merged.slotCount).toBe(0);
         expect(merged.words.length).toBe(0);
         expect(merged.faceRenderPriorities.length).toBe(0);
+        expect(merged.priorityGroups.length).toBe(0);
     });
 });
