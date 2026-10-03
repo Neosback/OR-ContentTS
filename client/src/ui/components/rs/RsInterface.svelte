@@ -84,9 +84,11 @@
     let containerHeight = $state(0);
     let manager: InterfaceManager | null = null;
     let hoverPick: ComponentType | null = null;
+    let hoveredEventComponents = new Set<ComponentType>();
     let heldComponent: ComponentType | null = null;
     let pointerX = 0;
     let pointerY = 0;
+    let pointerInside = false;
     let renderRaf = 0;
     let clientTickTimer = 0;
     let eventDispatcher: WidgetEventDispatcher | null = null;
@@ -124,6 +126,88 @@
             x: (event.clientX - rect.left) * (canvas.width / rect.width || 1),
             y: (event.clientY - rect.top) * (canvas.height / rect.height || 1),
         };
+    }
+
+    function componentsAt(data: InterfaceEntry, x: number, y: number): ComponentType[] {
+        const currentManager = manager;
+        if (!currentManager) return [];
+        const hits: ComponentType[] = [];
+        for (const component of collectAllComponents(data)) {
+            const bounds = currentManager.getComponentDrawBoundsFor(component);
+            if (!bounds) continue;
+            if (x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height) continue;
+            hits.push(component);
+        }
+        return hits;
+    }
+
+    function relativeEventPosition(component: ComponentType, x: number, y: number): { x: number; y: number } {
+        const bounds = manager?.getComponentDrawBoundsFor(component);
+        return bounds ? { x: x - bounds.x, y: y - bounds.y } : { x, y };
+    }
+
+    function hasHoverListeners(component: ComponentType): boolean {
+        return !!(component.onMouseOver || component.onMouseLeave || component.onMouseRepeat);
+    }
+
+    function hasPressListeners(component: ComponentType): boolean {
+        return !!(component.onClick || component.onHold || component.onClickRepeat || component.onRelease);
+    }
+
+    function pickPressComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
+        const hits = componentsAt(data, x, y);
+        for (let i = hits.length - 1; i >= 0; i--) {
+            if (hasPressListeners(hits[i]!)) return hits[i]!;
+        }
+        return null;
+    }
+
+    function pickScrollListenerAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
+        const hits = componentsAt(data, x, y);
+        for (let i = hits.length - 1; i >= 0; i--) {
+            if (hits[i]!.onScrollWheel) return hits[i]!;
+        }
+        return null;
+    }
+
+    function updateHoverEvents(data: InterfaceEntry, x: number, y: number): void {
+        const nextHits = componentsAt(data, x, y).filter(hasHoverListeners);
+        const next = new Set(nextHits);
+
+        for (const previous of hoveredEventComponents) {
+            if (next.has(previous)) continue;
+            const position = relativeEventPosition(previous, x, y);
+            void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+
+        for (const component of nextHits) {
+            if (hoveredEventComponents.has(component)) continue;
+            const position = relativeEventPosition(component, x, y);
+            void eventDispatcher?.dispatchPointer(component, "mouseOver", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+
+        hoveredEventComponents = next;
+        hoverPick = pickComponentAt(data, x, y);
+        Interpreter.mousedOverWidgetIf1 = hoverPick;
+    }
+
+    function clearHoverEvents(): void {
+        for (const component of hoveredEventComponents) {
+            const position = relativeEventPosition(component, pointerX, pointerY);
+            void eventDispatcher?.dispatchPointer(component, "mouseLeave", {
+                mouseX: position.x,
+                mouseY: position.y,
+            });
+        }
+        hoveredEventComponents = new Set<ComponentType>();
+        hoverPick = null;
+        Interpreter.mousedOverWidgetIf1 = null;
     }
 
     function pickComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
@@ -311,6 +395,10 @@
         const dispatcher = new WidgetEventDispatcher();
         eventDispatcher = dispatcher;
 
+        // The client invokes var-transmit listeners with trigger lists once when a
+        // group becomes active, before ordinary changed-id processing begins.
+        void dispatcher.dispatchInitialVarTransmit(data);
+
         const tick = (): void => {
             state.clientCycle = (state.clientCycle + 1) | 0;
 
@@ -319,23 +407,28 @@
             void dispatcher.dispatchTransmits(data, state);
             void dispatcher.dispatchTimer(data);
 
-            const hovered = hoverPick;
-            if (hovered) {
+            // Re-hit-test every client cycle. Runtime scripts can move/show/hide widgets
+            // while the pointer is stationary, which can itself cause enter/leave events.
+            if (pointerInside) updateHoverEvents(data, pointerX, pointerY);
+
+            for (const hovered of hoveredEventComponents) {
+                const position = relativeEventPosition(hovered, pointerX, pointerY);
                 void dispatcher.dispatchPointer(hovered, "mouseRepeat", {
-                    mouseX: pointerX,
-                    mouseY: pointerY,
+                    mouseX: position.x,
+                    mouseY: position.y,
                 });
             }
 
             const clicked = Interpreter.clickedWidget;
             if (clicked) {
+                const position = relativeEventPosition(clicked, pointerX, pointerY);
                 void dispatcher.dispatchPointer(clicked, "hold", {
-                    mouseX: pointerX,
-                    mouseY: pointerY,
+                    mouseX: position.x,
+                    mouseY: position.y,
                 });
                 void dispatcher.dispatchPointer(clicked, "clickRepeat", {
-                    mouseX: pointerX,
-                    mouseY: pointerY,
+                    mouseX: position.x,
+                    mouseY: position.y,
                 });
             }
         };
@@ -357,47 +450,25 @@
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;
         hoverPick = null;
+        hoveredEventComponents = new Set<ComponentType>();
         heldComponent = null;
+        pointerInside = false;
     });
 
     function onMouseMove(event: MouseEvent): void {
         const position = localPosition(event);
         pointerX = position.x;
         pointerY = position.y;
+        pointerInside = true;
         setInterfaceMousePosition(position.x, position.y);
         if (!interactiveMode || !interfaceData) return;
-
-        const previous = hoverPick;
-        const next = pickComponentAt(interfaceData, position.x, position.y);
-        if (next !== previous) {
-            if (previous) {
-                void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
-                    mouseX: position.x,
-                    mouseY: position.y,
-                });
-            }
-            hoverPick = next;
-            Interpreter.mousedOverWidgetIf1 = next;
-            if (next) {
-                void eventDispatcher?.dispatchPointer(next, "mouseOver", {
-                    mouseX: position.x,
-                    mouseY: position.y,
-                });
-            }
-        }
+        updateHoverEvents(interfaceData, position.x, position.y);
     }
 
     function onMouseLeave(): void {
         setInterfaceMousePosition(0, 0);
-        const previous = hoverPick;
-        if (previous !== null) {
-            void eventDispatcher?.dispatchPointer(previous, "mouseLeave", {
-                mouseX: pointerX,
-                mouseY: pointerY,
-            });
-            hoverPick = null;
-            Interpreter.mousedOverWidgetIf1 = null;
-        }
+        pointerInside = false;
+        clearHoverEvents();
     }
 
     function onWheel(event: WheelEvent): void {
@@ -407,12 +478,12 @@
         pointerX = position.x;
         pointerY = position.y;
 
-        const target = pickComponentAt(interfaceData, position.x, position.y);
+        const target = pickScrollListenerAt(interfaceData, position.x, position.y);
         if (target) {
+            const relative = relativeEventPosition(target, position.x, position.y);
             void eventDispatcher?.dispatchPointer(target, "scrollWheel", {
-                mouseX: position.x,
-                mouseY: position.y,
-                field1063: Math.trunc(event.deltaY),
+                mouseX: relative.x,
+                mouseY: event.deltaY > 0 ? 1 : -1,
             });
         }
 
@@ -426,13 +497,14 @@
         const position = localPosition(event);
         pointerX = position.x;
         pointerY = position.y;
-        const picked = pickComponentAt(interfaceData, position.x, position.y);
+        const picked = pickPressComponentAt(interfaceData, position.x, position.y);
         heldComponent = picked;
         Interpreter.clickedWidget = picked;
         if (picked) {
+            const relative = relativeEventPosition(picked, position.x, position.y);
             void eventDispatcher?.dispatchPointer(picked, "click", {
-                mouseX: position.x,
-                mouseY: position.y,
+                mouseX: relative.x,
+                mouseY: relative.y,
             });
         }
     }
@@ -445,9 +517,10 @@
             pointerY = position.y;
         }
         if (released) {
+            const relative = relativeEventPosition(released, pointerX, pointerY);
             void eventDispatcher?.dispatchPointer(released, "release", {
-                mouseX: pointerX,
-                mouseY: pointerY,
+                mouseX: relative.x,
+                mouseY: relative.y,
             });
         }
         heldComponent = null;
@@ -466,6 +539,9 @@
         clientTickTimer = 0;
         eventDispatcher?.dispose();
         eventDispatcher = null;
+        hoveredEventComponents = new Set<ComponentType>();
+        heldComponent = null;
+        pointerInside = false;
         manager = null;
         Interpreter.mousedOverWidgetIf1 = null;
         Interpreter.clickedWidget = null;
