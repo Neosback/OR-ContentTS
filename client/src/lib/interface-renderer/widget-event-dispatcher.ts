@@ -174,6 +174,21 @@ export class WidgetEventDispatcher {
     return this.tail;
   }
 
+  dispatchOnLoad(entry: InterfaceEntry, interfaceId: number): Promise<void> {
+    const iface = interfaceId & 0xffff;
+    for (const component of collectComponents(entry)) {
+      if (component.hide) continue;
+      if (
+        typeof component.packedId === "number"
+        && ((component.packedId >>> 16) & 0xffff) !== iface
+      ) {
+        continue;
+      }
+      if (component.onLoad) void this.enqueue(component, component.onLoad);
+    }
+    return this.tail;
+  }
+
   dispatchInitialVarTransmit(entry: InterfaceEntry): Promise<void> {
     for (const component of collectVisibleComponents(entry)) {
       if (
