@@ -12,6 +12,7 @@ import { emitCs2RuntimeLog } from "./cs2-console-sink";
 import { handleObjectOpcode } from "./object-opcodes";
 import { handleSocialComparatorOpcode } from "./social-opcodes";
 import { createDynamicWidget, type RuntimeWidget } from "./runtime-widget";
+import { handleEnumOpcode } from "./enum-opcodes";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
@@ -114,141 +115,8 @@ function asCs2String(v: unknown): string {
   return String(v);
 }
 
-function readNumberish(obj: Record<string, unknown>, keys: readonly string[], fallback = 0): number {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "number" && Number.isFinite(v)) return v | 0;
-    if (typeof v === "string" && v.trim() !== "") {
-      const n = Number(v);
-      if (Number.isFinite(n)) return n | 0;
-    }
-  }
-  return fallback;
-}
-
-function readStringish(obj: Record<string, unknown>, keys: readonly string[], fallback = ""): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "string") return v;
-  }
-  return fallback;
-}
-
-function looksLikeEnumDef(v: unknown): v is Record<string, unknown> {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
-  const o = v as Record<string, unknown>;
-  return (
-    "values" in o
-    || "defaultString" in o
-    || "defaultInt" in o
-    || "outputType" in o
-    || "outputtype" in o
-    || "inputType" in o
-    || "inputtype" in o
-  );
-}
-
-function normalizeEnumDef(raw: unknown): Cs2EnumDef | null {
-  if (!looksLikeEnumDef(raw)) return null;
-  const o = raw as Record<string, unknown>;
-  const inputType = readNumberish(o, ["inputType", "inputtype", "keyType", "keytype"], 0);
-  const outputType = readNumberish(o, ["outputType", "outputtype", "valueType", "valuetype"], 0);
-  const defaultInt = readNumberish(o, ["defaultInt", "defaultint", "defaultValueInt", "defaultValue"], 0);
-  const defaultString = readStringish(o, ["defaultString", "defaultstring", "defaultValueString"], "");
-
-  const intValues = new Map<number, number>();
-  const stringValues = new Map<number, string>();
-
-  const values = o.values;
-  if (values && typeof values === "object" && !Array.isArray(values)) {
-    for (const [k, v] of Object.entries(values as Record<string, unknown>)) {
-      const key = Number(k);
-      if (!Number.isFinite(key)) continue;
-      if (typeof v === "number" && Number.isFinite(v)) intValues.set(key | 0, v | 0);
-      else if (typeof v === "string") stringValues.set(key | 0, v);
-      else if (v && typeof v === "object" && !Array.isArray(v)) {
-        const child = v as Record<string, unknown>;
-        if (typeof child.value === "number" && Number.isFinite(child.value)) intValues.set(key | 0, child.value | 0);
-        else if (typeof child.value === "string") stringValues.set(key | 0, child.value);
-      }
-    }
-  }
-
-  const keys = Array.isArray(o.keys) ? o.keys : null;
-  const intVals = Array.isArray(o.intValues) ? o.intValues : null;
-  const strVals = Array.isArray(o.stringValues) ? o.stringValues : null;
-  if (keys) {
-    for (let i = 0; i < keys.length; i++) {
-      const keyRaw = keys[i];
-      const key = typeof keyRaw === "number" && Number.isFinite(keyRaw) ? (keyRaw | 0) : Number(keyRaw);
-      if (!Number.isFinite(key)) continue;
-      const iv = intVals?.[i];
-      if (typeof iv === "number" && Number.isFinite(iv)) intValues.set(key, iv | 0);
-      const sv = strVals?.[i];
-      if (typeof sv === "string") stringValues.set(key, sv);
-    }
-  }
-
-  return { inputType, outputType, defaultInt, defaultString, intValues, stringValues };
-}
-
-async function fetchEnumDef(enumId: number): Promise<Cs2EnumDef | null> {
-  const cached = enumDefCache.get(enumId);
-  if (cached) return cached;
-
-  const promise = (async () => {
-    const { scriptRev, cacheHeaders } = getCs2RuntimeContext();
-    const rev = encodeURIComponent(String(scriptRev));
-    const urls = [
-      `/api/cache-proxy/cache?type=enum&id=${enumId}&rev=${rev}`,
-      `/api/cache-proxy/diff/config/enums/content?base=${rev}&rev=${rev}&id=${enumId}`,
-    ];
-
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, { headers: cacheHeaders, cache: "force-cache" });
-        if (!r.ok) continue;
-        const payload = (await r.json()) as Record<string, unknown>;
-
-        const candidates: unknown[] = [];
-        if (payload.snapshot) candidates.push(payload.snapshot);
-        if (payload.enum) candidates.push(payload.enum);
-        if (payload.data) candidates.push(payload.data);
-        if (payload.snapshots && typeof payload.snapshots === "object" && !Array.isArray(payload.snapshots)) {
-          const snapshots = payload.snapshots as Record<string, unknown>;
-          candidates.push(snapshots[String(enumId)]);
-        }
-        candidates.push(payload[String(enumId)]);
-        candidates.push(payload);
-
-        for (const c of candidates) {
-          const normalized = normalizeEnumDef(c);
-          if (normalized) return normalized;
-        }
-      } catch {
-      }
-    }
-
-    return null;
-  })();
-
-  enumDefCache.set(enumId, promise);
-  return promise;
-}
-
 export let scriptDotWidget: ComponentType | null = null;
 export let scriptActiveWidget: ComponentType | null = null;
-
-type Cs2EnumDef = {
-  inputType: number;
-  outputType: number;
-  defaultInt: number;
-  defaultString: string;
-  intValues: Map<number, number>;
-  stringValues: Map<number, string>;
-};
-
-const enumDefCache = new Map<number, Promise<Cs2EnumDef | null>>();
 
 function invalidateWidgetRuntime(_w: ComponentType | null): void {
 }
@@ -1600,42 +1468,7 @@ export function method3416(var0: number, var1: Script, var2: boolean): number {
 async function method1973(var0: number, var1: Script, var2: boolean): Promise<number> {
   void var1;
   void var2;
-
-  if (var0 === ScriptOpcodes.ENUM_STRING) {
-    Interpreter.Interpreter_intStackSize -= 2;
-    const enumId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
-    const key = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
-    const def = await fetchEnumDef(enumId);
-    const value = def?.stringValues.get(key) ?? def?.defaultString ?? "";
-    Interpreter.Interpreter_stringStack[++Interpreter.Interpreter_stringStackSize - 1] = value;
-    return 1;
-  } else if (var0 === ScriptOpcodes.ENUM) {
-    Interpreter.Interpreter_intStackSize -= 4;
-    const inputType = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize]!;
-    const outputType = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 1]!;
-    const enumId = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 2]!;
-    const key = Interpreter.Interpreter_intStack[Interpreter.Interpreter_intStackSize + 3]!;
-    const def = await fetchEnumDef(enumId);
-
-    const typeMatches = !!def && (def.inputType === 0 || def.inputType === inputType) && (def.outputType === 0 || def.outputType === outputType);
-    const wantsString = outputType === 115 || outputType === "s".charCodeAt(0);
-    if (wantsString) {
-      const value = typeMatches ? (def!.stringValues.get(key) ?? def!.defaultString) : "null";
-      Interpreter.Interpreter_stringStack[++Interpreter.Interpreter_stringStackSize - 1] = value;
-    } else {
-      const value = typeMatches ? (def!.intValues.get(key) ?? def!.defaultInt) : 0;
-      Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = value | 0;
-    }
-    return 1;
-  } else if (var0 === ScriptOpcodes.ENUM_GETOUTPUTCOUNT) {
-    const enumId = Interpreter.Interpreter_intStack[--Interpreter.Interpreter_intStackSize]!;
-    const def = await fetchEnumDef(enumId);
-    const count = def ? Math.max(def.intValues.size, def.stringValues.size) : 0;
-    Interpreter.Interpreter_intStack[++Interpreter.Interpreter_intStackSize - 1] = count;
-    return 1;
-  } else {
-    return 2;
-  }
+  return handleEnumOpcode(var0);
 }
 
 export async function method3270(var0: number, var1: Script, var2: boolean): Promise<number> {
