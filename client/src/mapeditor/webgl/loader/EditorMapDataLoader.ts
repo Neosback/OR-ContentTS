@@ -304,6 +304,7 @@ function collectObjectChunkTransferables(chunks: EditorMapObjectChunkData[]): Tr
         transferables.push(
             chunk.vertices.buffer,
             chunk.indices.buffer,
+            chunk.faceRenderPriorities.buffer,
             chunk.animIndices.buffer,
             chunk.slotInfo.buffer,
         );
@@ -456,12 +457,18 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
             createModelGroups(modelGroupMap, instancedModels, false);
         } else if (opaqueFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModelPass(model, false, undefined, opaqueFaces);
+            const faceRenderPriorities = sceneBuf.addModelPass(
+                model,
+                false,
+                undefined,
+                opaqueFaces,
+            );
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {
                 offset: indexOffset,
                 elements: elementCount,
+                faceRenderPriorities,
                 instances: models,
             };
 
@@ -471,6 +478,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
                 const drawCommandLod: DrawCommand = {
                     offset: indexOffset,
                     elements: elementCount,
+                    faceRenderPriorities,
                     instances: lodModels,
                 };
                 sceneBuf.drawCommandsLod.push(drawCommandLod);
@@ -482,12 +490,18 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
             createModelGroups(modelGroupMap, instancedModels, true);
         } else if (transparentFaces.length > 0) {
             const indexOffset = sceneBuf.indexByteOffset();
-            sceneBuf.addModelPass(model, true, undefined, transparentFaces);
+            const faceRenderPriorities = sceneBuf.addModelPass(
+                model,
+                true,
+                undefined,
+                transparentFaces,
+            );
             const elementCount = (sceneBuf.indexByteOffset() - indexOffset) / 4;
 
             const drawCommand: DrawCommand = {
                 offset: indexOffset,
                 elements: elementCount,
+                faceRenderPriorities,
                 instances: models,
             };
 
@@ -497,6 +511,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
                 const drawCommandLod: DrawCommand = {
                     offset: indexOffset,
                     elements: elementCount,
+                    faceRenderPriorities,
                     instances: lodModels,
                 };
                 sceneBuf.drawCommandsLodAlpha.push(drawCommandLod);

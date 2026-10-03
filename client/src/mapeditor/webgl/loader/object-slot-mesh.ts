@@ -37,6 +37,8 @@ export interface SlotMesh {
     indices: Int32Array;
     staticOpaqueCount: number;
     staticAlphaCount: number;
+    /** One original OSRS face render priority per static triangle, in the same opaque-then-alpha order as indices. */
+    faceRenderPriorities: Uint8Array;
     /** Animation frame geometry (never drawn directly; the current frame of each loc is copied into a dynamic range). */
     animIndices: Int32Array;
     /** SLOT_INFO_STRIDE uint16 per slot. */
@@ -144,6 +146,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
 
     // Phase 1: decide every emit job (and write the slot records). Nothing is copied yet.
     const jobs = new GrowableU32(256);
+    const staticPrioritiesByJob: (Uint8Array | undefined)[] = [];
     let jobCount = 0;
     const addJob = (firstElement: number, count: number, slot: number, target: number): number => {
         jobs.push(firstElement);
@@ -159,7 +162,8 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
             for (const instance of cmd.instances) {
                 const slot = slotCount++;
                 writeSlotInfo(slotInfo, slot, instance);
-                addJob(cmd.offset / 4, cmd.elements, slot, TARGET_STATIC);
+                const job = addJob(cmd.offset / 4, cmd.elements, slot, TARGET_STATIC);
+                staticPrioritiesByJob[job] = cmd.faceRenderPriorities;
             }
         }
     };
@@ -204,6 +208,27 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
         if (job < opaqueJobEnd) staticOpaqueCount += jobLengths[job];
         else staticAlphaCount += jobLengths[job];
     }
+    const staticTriangleCount = (staticOpaqueCount + staticAlphaCount) / 3;
+    const faceRenderPriorities = new Uint8Array(staticTriangleCount).fill(0xff);
+    let priorityCursor = 0;
+    for (let job = 0; job < staticJobEnd; job++) {
+        const elementCount = jobLengths[job];
+        if (elementCount % 3 !== 0) {
+            throw new Error(`slot mesh static job ${job} has non-triangle element count ${elementCount}`);
+        }
+        const triangleCount = elementCount / 3;
+        const priorities = staticPrioritiesByJob[job];
+        if (priorities) {
+            if (priorities.length !== triangleCount) {
+                throw new Error(
+                    `slot mesh priority count mismatch for job ${job}: ${priorities.length} priorities for ${triangleCount} triangles`,
+                );
+            }
+            faceRenderPriorities.set(priorities, priorityCursor);
+        }
+        priorityCursor += triangleCount;
+    }
+
     // Where each animation job's indices start inside `animIndices`.
     const animStart = new Uint32Array(jobCount);
     let animCursor = 0;
@@ -230,6 +255,7 @@ export function buildSlotMesh(sceneBuf: SceneBuffer, animated: LocAnimatedData[]
         indices: new Int32Array(output.staticIndices.buffer, output.staticIndices.byteOffset, output.staticIndices.length),
         staticOpaqueCount,
         staticAlphaCount,
+        faceRenderPriorities,
         animIndices: new Int32Array(output.animIndices.buffer, output.animIndices.byteOffset, output.animIndices.length),
         slotInfo: slotInfo.slice(0, Math.max(slotCount, 1) * SLOT_INFO_STRIDE),
         slotCount,
