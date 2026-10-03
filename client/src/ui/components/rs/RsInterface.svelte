@@ -211,6 +211,15 @@
         Interpreter.mousedOverWidgetIf1 = null;
     }
 
+    function componentLocalPosition(component: ComponentType, x: number, y: number): { x: number; y: number } {
+        const bounds = manager?.getComponentDrawBoundsFor(component);
+        if (!bounds) return { x, y };
+        return {
+            x: x - bounds.x,
+            y: y - bounds.y,
+        };
+    }
+
     function pickComponentAt(data: InterfaceEntry, x: number, y: number): ComponentType | null {
         const currentManager = manager;
         if (!currentManager) return null;
