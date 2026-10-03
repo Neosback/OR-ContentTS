@@ -10,10 +10,11 @@
         setMockClientVarp,
         snapshotMockClientChanges,
     } from "../../../lib/interface-renderer/mock-client-state";
+    import type { Cs1SimState } from "../../../lib/interface-renderer/cs1-interpreter";
     import { Button } from "../../components/ui/button";
     import { Input } from "../../components/ui/input";
     import { Label } from "../../components/ui/label";
-    import type { InterfaceEditorState } from "../interface-editor-editor.svelte";
+    import type { InterfaceEditorState } from "../interface-editor-state.svelte";
 
     let { state: editor }: { state: InterfaceEditorState } = $props();
 
@@ -63,7 +64,7 @@
         return Number.isFinite(parsed) ? parsed : fallback;
     }
 
-    function mutate(mutator: Parameters<InterfaceEditorState["mutateMockClientState"]>[0]): void {
+    function mutate(mutator: (client: Cs1SimState) => void): void {
         editor.mutateMockClientState(mutator);
     }
 
