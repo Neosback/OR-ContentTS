@@ -149,7 +149,7 @@ The Studio's portable GameVal registry/project index should preserve provenance 
 - generated RSCM output;
 - cache/runtime representation when available.
 
-The current backend already proves that GameVal/RSCM-aware indexing can be done without changing the checkout. Equivalent normal project indexing should live in TypeScript so web/Tauri workflows do not require the service.
+The backend proves that GameVal/RSCM-aware indexing can be done without changing the checkout. Equivalent normal project indexing now lives in TypeScript and is the default web/Tauri path; the backend is not required for this metadata.
 
 ## Content/pack isolation
 
@@ -245,22 +245,28 @@ Static project inspection and editor functionality must remain useful without a 
 
 ## Current integration priorities
 
-The next integration work is not OpenRune runtime modification and not backend-first transport.
+The local-first foundation that this document originally proposed is now largely implemented.
 
-Priorities are:
+Completed:
 
-1. framework-neutral `ProjectFileSystem`;
-2. direct Tauri project filesystem adapter;
-3. optional browser File System Access adapter;
-4. TypeScript RSCM/GameVal registry and project index;
-5. source-aware OpenRune config/server/map TOML adapters;
-6. TypeScript terrain/static-loc encoders;
-7. portable raw/region package export;
-8. optional `StudioBackendClient` for explicit Gradle/OpenRune build/test/map-publication/verification;
-9. bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication into LIVE;
-10. normal OpenRune cache build to derive SERVER;
-11. lazy web/Tauri backend transports only for backend-only actions;
-12. generic writable JS5/DAT2 support only later if standalone workflows justify it.
+- framework-neutral `ProjectFileSystem`;
+- Tauri and browser File System Access adapters;
+- TypeScript RSCM/GameVal registry and project index;
+- source-aware config/server/map TOML adapters;
+- retained OpenRune project session/runtime;
+- local Interface metadata;
+- core rev-240 NPC/Obj/Param decoder parity.
+
+Current order:
+
+1. DBTable/DBRow/DBColumn decoding and remaining decoder parity;
+2. TypeScript terrain/static-loc encoders plus portable package export;
+3. explicit `StudioBackendClient` build bridge for allowlisted OpenRune build/test/verification actions;
+4. bounded OpenRune-FileStore `PackMaps + PackWorldMap` publication into LIVE;
+5. normal OpenRune cache build to derive/update SERVER;
+6. lazy web/Tauri backend transports only for backend-only actions.
+
+OpenRune runtime modification remains out of scope.
 
 ## Confidence boundary
 
