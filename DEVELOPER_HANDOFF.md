@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #63 browser/OpenRune setup checkpoint:
+As of the PR #67 local-CS2-cache checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -21,6 +21,10 @@ As of the PR #63 browser/OpenRune setup checkpoint:
 - Raw map source discovery now mirrors OpenRune's current packers exactly: only direct `.toml` children of `.data/raw-cache/map/npcs`, `objs`, and `area` are active because the packers use non-recursive `Files.list()`.
 - OpenRune server TOML support now mirrors `PackServerConfig`'s registered table families across both `.data/raw-cache/server/**/*.toml` and pack-owned `pack/configs/**/*.toml`. It preserves raw/nested source, resolves symbolic ids through the GameVal registry, surfaces duplicate resolved targets instead of inventing precedence, and provides a typed inventory/shop stock view plus guarded source writes.
 - Interface selection is local-cache-first. The Interface Workbench no longer makes a redundant `/api/cache-proxy/interface/:id` request, so normal interface browsing does not require the old cache proxy or port 8090.
+- CS2 object-definition opcodes 4200-4212 are cache-backed through the active `ObjTypeLoader`; membership, actions, price, note/placeholder transforms, and object search no longer require backend/cache-proxy data.
+- CS2 social comparator opcodes 3628-3657 model client stack semantics locally; preview execution does not require live friends/ignore/Friends Chat state, while an optional runtime adapter can supply simulated state.
+- Runtime-created interface widgets now use fresh client-parity Widget defaults instead of inheriting parent rendering state. The renderer also normalizes missing text defaults and treats `textFont = -1` as the valid unassigned-font sentinel.
+- CS2 enum opcodes `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now load enum definitions directly from the selected cache through `EnumTypeLoader`. The old enum `/api/cache-proxy` lookup path is removed.
 - Cache & Project Setup has two explicit user-facing modes:
   - **Basic cache:** cache-only operation; browser imports the selected cache into IndexedDB, while Tauri reads the selected cache directory directly through `ProjectFileSystemCacheSource`;
   - **OpenRune project:** both desktop and Chromium File System Access environments can open one OpenRune Server repository root. Desktop stores the native path; browser mode stores the granted `FileSystemDirectoryHandle` separately in IndexedDB and keeps only serializable access metadata in the profile. Both feed the same `ProjectFileSystem` / `OpenRuneProjectSession` layers.
@@ -288,6 +292,10 @@ These PRs establish the current baseline:
 | #61 | Bound the active OpenRune setup to one retained project session, reused it for LIVE cache resolution, and made Reload project refresh the shared source graph |
 | #62 | Reworked the 2D world map into a virtualized canvas tile renderer with on-demand Cache Storage reads, display-resolution decoding, bounded bitmap residency, and explicit disposal |
 | #63 | Enabled capability-based OpenRune project setup in Chromium browsers, persisted directory handles, unified browser/desktop project resolution, and added fresh-checkout bootstrap health states |
+| #64 | Added cache-backed CS2 object opcodes 4200-4212 using the active selected-cache `ObjTypeLoader` |
+| #65 | Added client-semantic social comparator opcodes 3628-3657 with an optional simulated social-state adapter |
+| #66 | Replaced CC_CREATE parent cloning with client-parity runtime widget defaults and normalized no-font/text defaults |
+| #67 | Removed CS2 enum cache-proxy reads; enum opcodes now use the active selected-cache `EnumTypeLoader` |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -528,7 +536,7 @@ The portable filesystem/discovery/parser foundation is now substantially complet
 
 1. unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence — completed in PR #55;
 2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
-3. move remaining Interface/CS2 cache-proxy lookups, especially enum definitions, behind local `CacheSystem` loaders;
+3. extend local cache/runtime parity next (Interface GameVal/RSCM metadata and rev-240/DBTable/DBRow coverage) before adding optional backend enrichment;
 4. OpenRune PackConfig definition TOML adapter — completed in PR #56; NPC/ground-Obj/Area map-source TOML adapter — completed in PR #57; PackServerConfig/server-shop TOML adapter — completed in PR #58;
 5. add TypeScript terrain file-0 and static-loc file-1 encoders;
 6. add portable raw/region package export;
@@ -671,7 +679,7 @@ The backend launch/connection contract is implemented:
 
 The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, and active retained runtime binding are now in place. The next major source/publication work is the TypeScript terrain file-0 encoder, followed by static-loc file-1 encoding and golden round-trip fixtures.
 
-For Interface work, keep reads local-first: decoded interface data already comes from `InterfaceViewer`; move remaining CS2 enum/cache-proxy lookups to local cache loaders before adding any optional backend enrichment.
+For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, and enum definitions now come from the selected cache. Build future metadata/parity features on those local loaders before adding optional backend enrichment.
 
 For cache access, preserve the platform split:
 - browser universal fallback = one-time folder import into IndexedDB;
