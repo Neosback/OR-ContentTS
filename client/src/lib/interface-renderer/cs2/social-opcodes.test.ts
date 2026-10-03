@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Interpreter } from "./Interpreter";
-import { handleSocialComparatorOpcode } from "./social-opcodes";
+import { handleSocialComparatorOpcode, handleSocialOpcode } from "./social-opcodes";
 import {
   applyCs2RuntimeFromSim,
   type Cs2SocialComparator,
   type Cs2SocialListKind,
   type Cs2SocialRuntime,
+  type Cs2SocialState,
 } from "./runtime-context";
 import { ScriptOpcodes } from "./ScriptOpcodes";
 
@@ -15,8 +16,9 @@ type Event =
   | { type: "add"; list: Cs2SocialListKind; comparator: Cs2SocialComparator; reversed: boolean }
   | { type: "sort"; list: Cs2SocialListKind };
 
-function installRuntime(events: Event[]): void {
+function installRuntime(events: Event[], state?: Cs2SocialState): void {
   const runtime: Cs2SocialRuntime = {
+    state,
     removeComparator(list) {
       events.push({ type: "remove", list });
     },
@@ -39,6 +41,57 @@ beforeEach(() => {
   Interpreter.Interpreter_intStackSize = 0;
   Interpreter.Interpreter_intStack.fill(0);
   applyCs2RuntimeFromSim(null, "test", {}, null);
+});
+
+describe("CS2 social state opcodes", () => {
+  it("treats Friends Chat count as valid empty mock client state", () => {
+    expect(handleSocialOpcode(ScriptOpcodes.CLAN_GETCHATCOUNT)).toBe(1);
+    expect(Interpreter.Interpreter_intStackSize).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(0);
+  });
+
+  it("reads Friends Chat and friend data from an injected mock client state", () => {
+    const events: Event[] = [];
+    installRuntime(events, {
+      localPlayerName: "Local",
+      friends: [
+        { name: "Friend", previousName: "OldFriend", world: 302, rank: 5, isOnline: true },
+      ],
+      ignores: [{ name: "Ignored" }],
+      friendsChat: {
+        displayName: "Studio Chat",
+        ownerName: "Owner",
+        minKick: 2,
+        rank: 4,
+        members: [
+          { name: "Local", world: 301, rank: 7, isSelf: true },
+          { name: "Friend", world: 302, rank: 5, isFriend: true },
+        ],
+      },
+    });
+
+    expect(handleSocialOpcode(ScriptOpcodes.CLAN_GETCHATCOUNT)).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(2);
+
+    Interpreter.Interpreter_intStackSize = 1;
+    Interpreter.Interpreter_intStack[0] = 1;
+    expect(handleSocialOpcode(ScriptOpcodes.CLAN_GETCHATUSERNAME)).toBe(1);
+    expect(Interpreter.Interpreter_stringStack[0]).toBe("Friend");
+
+    Interpreter.Interpreter_intStackSize = 1;
+    Interpreter.Interpreter_intStack[0] = 0;
+    expect(handleSocialOpcode(ScriptOpcodes.FRIEND_GETNAME)).toBe(1);
+    expect(Interpreter.Interpreter_stringStack.slice(0, 2)).toEqual(["Friend", "OldFriend"]);
+  });
+
+  it("consumes query operands with client-compatible stack effects", () => {
+    Interpreter.Interpreter_stringStackSize = 1;
+    Interpreter.Interpreter_stringStack[0] = "Nobody";
+    expect(handleSocialOpcode(ScriptOpcodes.FRIEND_TEST)).toBe(1);
+    expect(Interpreter.Interpreter_stringStackSize).toBe(0);
+    expect(Interpreter.Interpreter_intStackSize).toBe(1);
+    expect(Interpreter.Interpreter_intStack[0]).toBe(0);
+  });
 });
 
 describe("CS2 social comparator opcodes", () => {
