@@ -81,6 +81,7 @@ export function packModelOffsets(
     transparent: boolean,
     offsets: Int32Array,
     reuseVertices = true,
+    depthSource: FaceDepthSource = getFaceDepthSource(),
 ): Uint32Array {
     return packer.add_model_offsets(
         model.faceCount,
