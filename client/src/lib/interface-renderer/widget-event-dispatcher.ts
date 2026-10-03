@@ -28,6 +28,10 @@ type RuntimeTransmitWidget = ComponentType & {
   onClanTransmit?: ComponentScriptArg[] | null;
 };
 
+function componentRuntimeId(component: ComponentType): number {
+  return typeof component.packedId === "number" ? component.packedId : component.id;
+}
+
 function collectComponents(entry: InterfaceEntry): ComponentType[] {
   const out: ComponentType[] = [];
   const seen = new Set<ComponentType>();
@@ -43,6 +47,24 @@ function collectComponents(entry: InterfaceEntry): ComponentType[] {
 
   for (const component of Object.values(entry.components)) visit(component);
   return out;
+}
+
+function collectVisibleComponents(entry: InterfaceEntry): ComponentType[] {
+  const all = collectComponents(entry);
+  const byRuntimeId = new Map(all.map((component) => [componentRuntimeId(component), component]));
+
+  const isEffectivelyHidden = (component: ComponentType): boolean => {
+    const visited = new Set<ComponentType>();
+    let current: ComponentType | undefined = component;
+    while (current && !visited.has(current)) {
+      visited.add(current);
+      if (current.hide) return true;
+      current = byRuntimeId.get(current.layer);
+    }
+    return false;
+  };
+
+  return all.filter((component) => !isEffectivelyHidden(component));
 }
 
 export function normalizeWidgetScriptArgs(raw: unknown): unknown[] | null {
@@ -137,8 +159,7 @@ export class WidgetEventDispatcher {
   }
 
   dispatchInitialVarTransmit(entry: InterfaceEntry): Promise<void> {
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
+    for (const component of collectVisibleComponents(entry)) {
       if (
         component.onVarTransmit
         && component.onVarTransmitList != null
@@ -151,8 +172,7 @@ export class WidgetEventDispatcher {
   }
 
   dispatchTimer(entry: InterfaceEntry): Promise<void> {
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
+    for (const component of collectVisibleComponents(entry)) {
       if (component.onTimer) void this.enqueue(component, component.onTimer);
     }
     return this.tail;
@@ -161,8 +181,7 @@ export class WidgetEventDispatcher {
   dispatchTransmits(entry: InterfaceEntry, state: MockClientState): Promise<MockClientChangeSnapshot> {
     const changes = consumeMockClientChanges(state);
 
-    for (const component of collectComponents(entry)) {
-      if (component.hide) continue;
+    for (const component of collectVisibleComponents(entry)) {
 
       if (
         component.onVarTransmit
