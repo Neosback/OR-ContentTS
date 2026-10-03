@@ -37,6 +37,8 @@ As of the PR #69 rev-240 core-decoder checkpoint:
 - The old pinned OpenRS2 development-cache bootstrap (`cache-target.json` / `ensure-cache`) and user-facing Studio-local-cache preset section have been removed. The range-backed Vite source remains only as an internal development capability.
 - Tauri user-approved filesystem scope is persisted across launches through `tauri-plugin-persisted-scope`.
 - The current synchronous cache engine still materializes active DAT/DAT2/index bytes into the webview's JS memory through `MemoryStore`. Direct-disk Tauri loading removes persistent duplication, not the runtime memory copy. True lazy/random-access disk decoding is a later cache-engine refactor.
+- Interface metadata now comes through the framework-neutral `InterfaceMetadataSource`: selected-cache GameVals plus the retained OpenRune project's unified GameVal/RSCM registry, with provenance, alternates, and mismatch diagnostics. Basic Cache activation clears project metadata.
+- Core rev-240 NPC/Obj/Param decoding is aligned to the current OpenRune FileStore baseline in PR #69, including `CacheVarLiteral` IDs, modern NPC sound/overlap fields, Obj subops/entity ops, and byte-alignment regression fixtures.
 - The Kotlin backend is still intentionally **not** the universal cache/project transport. It should start lazily only for JVM/OpenRune-only operations such as Gradle build/test, FileStore map publication, and parity verification.
 
 
@@ -50,7 +52,7 @@ The legacy TypeScript `server/` has been removed from this repository.
 
 OpenRune Server is now an external compatibility/reference target. We may inspect it to understand FileStore, cache/build behavior, GameVals, project structure, and runtime semantics, but normal Content Studio development should not add Studio-specific endpoints or required patches to OpenRune Server.
 
-The separate backend now lives under `backend/` in this repository. It was moved from the temporary `Neosback/rspsi` development repository in PR #34. `backend/` is the canonical source; do not dual-edit or re-import from the old repository. Its current codebase is validated and healthy. Packaging plus the startup/discovery contract are the next backend integration boundary.
+The separate backend now lives under `backend/` in this repository. It was moved from the temporary `Neosback/rspsi` development repository in PR #34. `backend/` is the canonical source; do not dual-edit or re-import from the old repository. Its codebase is validated and healthy, and the launch/discovery contract is already implemented. The next backend-facing work is a narrow explicit build/publish bridge, not general file transport.
 
 The intended direction is:
 
@@ -534,17 +536,18 @@ Important OpenRune map findings:
 - the current OpenRune Server LIVE task list does not register `PackMaps`;
 - `PackMaps` records changed squares in memory and `PackWorldMap` consumes them, so Studio map publication should run both in one bounded JVM operation.
 
-The portable filesystem/discovery/parser foundation is now substantially complete. Continue in this order:
+The portable filesystem/discovery/parser foundation is substantially complete. Continue in this order:
 
-1. unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence — completed in PR #55;
-2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
-3. core rev-240 NPC/Obj/Param parity is complete in PR #69; add DBTable/DBRow next, then continue the remaining lossy/missing decoder audit before optional backend enrichment;
-4. OpenRune PackConfig definition TOML adapter — completed in PR #56; NPC/ground-Obj/Area map-source TOML adapter — completed in PR #57; PackServerConfig/server-shop TOML adapter — completed in PR #58;
-5. add TypeScript terrain file-0 and static-loc file-1 encoders;
-6. add portable raw/region package export;
-7. add bounded backend `PackMaps + PackWorldMap` publication into LIVE;
-8. run the explicit normal OpenRune build when SERVER output is requested;
-9. verify LIVE/SERVER outputs.
+1. **DBTable/DBRow decoder support next.** Reuse the PR #69 `CacheVarLiteral` model; implement DBTable/DBRow/DBColumn as local cache definitions with fixture-level byte-alignment tests.
+2. Continue the remaining lossy/missing decoder audit only after DBTable/DBRow is green.
+3. Bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement; IndexedDB import remains the universal browser fallback.
+4. Add TypeScript terrain file-0 and static-loc file-1 encoders with golden round-trip fixtures.
+5. Add portable raw/region package export.
+6. Add the first narrow backend publication feature: bounded `PackMaps + PackWorldMap` into LIVE.
+7. Add/finish the explicit Studio build bridge around the allowlisted OpenRune `:or-cache:buildCache` operation when the user requests generated LIVE/SERVER output.
+8. Verify LIVE/SERVER outputs and surface publish/build diagnostics.
+
+Already complete and not to be reimplemented: unified GameVal registry (#55), PackConfig adapter (#56), NPC/ground-Obj/Area map-source adapters (#57), PackServerConfig/server-shop adapter (#58), project session/runtime/setup (#59–#63), Interface/CS2 local-cache work (#64–#68), and core rev-240 NPC/Obj/Param parity (#69).
 
 A deeper optional optimization is an async/random-access cache store so Tauri can avoid materializing the full active DAT2 file in JS memory. Do not block source/editor integration on that refactor.
 
@@ -679,9 +682,37 @@ The backend launch/connection contract is implemented:
 - stable backend/API protocol identity through status;
 - retained Host/Origin/token protections.
 
-The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, and active retained runtime binding are now in place. The next major source/publication work is the TypeScript terrain file-0 encoder, followed by static-loc file-1 encoding and golden round-trip fixtures.
+The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, active retained runtime binding, Interface metadata projection, and core rev-240 NPC/Obj/Param parity are in place. **The immediate next code PR should be DBTable/DBRow decoding**, not backend publication or terrain encoding.
 
 For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, and enum definitions come from the selected cache; symbolic names/provenance now come from the selected cache plus the retained OpenRune project metadata layer. The next Interface/cache priority is DBTable/DBRow decoding, followed by the remaining lossy/missing decoder audit before optional backend enrichment.
+
+### Next-developer checklist and traps
+
+Before changing code:
+
+1. Confirm `main` is clean and there are no open PRs. Start one focused PR from the latest `main`.
+2. Treat `OpenRune-Server-main/` and external OpenRune repositories as **read-only references**. Never patch OpenRune Server to make Studio work.
+3. For DB work, compare against the **current** OpenRune-FileStore implementations of:
+   - `DBTableCodec.kt`
+   - `DBRowCodec.kt`
+   - `DBTableType.kt`
+   - `DBRowType.kt`
+   - `DBColumnType.kt`
+   - `CacheVarLiteral.kt`
+   - `ByteBufExt.kt`
+4. Reuse `client/src/rs/config/CacheVarLiteral.ts`; do not create another script-var/DB type registry.
+5. `ConfigType.OSRS.dbRow = 38` and `ConfigType.OSRS.dbTable = 39` already exist. `IndexType.OSRS.dbTableIndex = 21` is a separate index and should not be confused with config archives 38/39.
+6. OpenRune DB codecs use **unsigned-short-smart** IDs. The existing TS `ByteBuffer.readUnsignedSmart()` appears structurally similar, but verify exact semantics with fixtures before aliasing/reusing it. OpenRune's current rule is one byte for values < 128, otherwise unsigned-short with bit 15 cleared.
+7. DBRow opcode 4 uses OpenRune's little 7-bit continuation `readVarInt()`; TS `ByteBuffer` does not currently expose that helper. Implement and test the exact OpenRune behavior rather than substituting a different varint format.
+8. DB cells are typed by `CacheVarLiteral.baseType`: integer -> int32, long -> int64/BigInt, string -> NUL-terminated string. Array literals are not supported by OpenRune's current DB cell helper either; fail explicitly instead of guessing.
+9. DBTable opcode 1 has an initial column-count byte, then repeated settings until `255`; the high bit means defaults are present and the low 7 bits are the column id.
+10. DBRow opcode 3 has a column-array length, then repeated column IDs until `255`; each column carries type IDs, tuple count, and typed cells. Tests must verify a following opcode still decodes correctly.
+11. Keep loaders attached to the **selected cache**, not the OpenRune project source tree or backend. Project RSCM/GameVals provide symbolic metadata/provenance; binary DB contents come from the selected cache.
+12. Preserve Basic Cache operation. No OpenRune project, backend, RSCM, or GameVal source should be required merely to decode DBTable/DBRow.
+13. Do not weaken unknown-opcode behavior globally. Add explicit supported formats and byte-alignment tests.
+14. Do not start `StudioBackendClient`, Build Cache, PackMaps, or generic writable-DAT2 work inside the DB decoder PR. Those are separate later slices.
+
+After implementation, update this handoff, `ROADMAP.md`, and `docs/OPENRUNE_FIRST_PARTY_SUPPORT.md` and run the complete client validation gate before merge.
 
 For cache access, preserve the platform split:
 - browser universal fallback = one-time folder import into IndexedDB;
