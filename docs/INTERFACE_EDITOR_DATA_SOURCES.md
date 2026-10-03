@@ -1,417 +1,214 @@
 # Interface Editor data sources
 
-## Purpose
+This document records the **current** Interface Editor data-authority model after PRs #53 and #64-#69.
 
-This document records where the Interface Editor gets its data today, what GameVals are doing, and how the Studio backend can enrich the editor with OpenRune project metadata without making OpenRune Server part of the editor runtime.
+The central rule is:
 
-The key rule is:
+> Binary runtime semantics come from the selected cache. OpenRune project GameVals/RSCM add symbolic identity, provenance, and diagnostics; they do not replace the cache as runtime truth.
 
-> Interface structure comes from the selected cache. Symbolic names and source provenance may enrich that structure, but must not silently replace cache-authoritative identities.
+No OpenRune Server modification and no Kotlin backend are required for ordinary Interface browsing, CS2 preview, or project-aware symbolic metadata.
 
-## Current frontend data path
+## 1. Current runtime path
 
-The Interface Editor opens the active Studio cache and keeps interface selection on the same local decoded path:
+The Interface Editor opens interfaces from the active `LoadedCache`:
 
 ```text
-active cache profile
-    -> resolveActiveProfileCache(...)
-    -> InterfaceViewer
-       -> CacheSystem
-       -> cache index 3
-       -> ComponentDecoder
-       -> decoded interface/component data
-       -> InterfaceViewer.getInterfaceEntry(id)
-       -> Interface Workbench / renderer
+selected cache
+  -> CacheSystem
+     -> index 3 interfaces
+     -> client scripts
+     -> varbits
+     -> ObjType loader
+     -> EnumType loader
+  -> InterfaceViewer
+  -> InterfaceEditorState
+  -> Svelte Interface panels
 ```
 
-Selecting an interface must not make a second HTTP request to a cache server. Earlier versions called `/api/cache-proxy/interface/:id` after already decoding index 3 locally; that made ordinary interface selection fail with HTTP 503 whenever the optional cache-server proxy was unavailable. The workbench now adapts the already-decoded cache object directly.
+Interface selection is local. It must not make a second HTTP request to a cache server or cache proxy.
 
-Primary files:
+The old `/api/cache-proxy/interface/:id` selection path was removed in PR #53.
 
-- `client/src/ui/interface/InterfaceEditorScreen.svelte`
-- `client/src/interface/InterfaceViewer.ts`
-- `client/src/rs/config/components/ComponentDecoder.ts`
-- `client/src/ui/interface/interface-editor-state.svelte.ts`
+## 2. Binary authority
 
-### Cache index 3: authoritative interface structure
+### Interface/component structure
 
-`ComponentDecoder` reads interface groups and component files directly from cache index 3.
+Cache index 3 is authoritative for:
 
-That data drives:
+- interface groups;
+- component IDs;
+- parent/child relationships;
+- widget type;
+- geometry/layout;
+- text/sprite/model fields;
+- scripts/listeners;
+- IF3/legacy structure.
 
-- interface/component ids;
-- component types;
-- position and size;
-- parent/layer relationships;
-- text;
-- sprites and models referenced by components;
-- colors and visibility;
-- legacy/IF3 detection;
-- CS1 instructions;
-- IF3 hooks/events;
-- component operations.
+GameVals are not needed to decode interface binary structure.
 
-The Interface Editor does not require GameVals to decode this structure.
+### CS2 preview/runtime support
 
-### Other cache-backed data
+The current local cache runtime also supplies:
 
-`InterfaceViewer` also prepares:
+- client scripts;
+- varbit definitions;
+- object definitions through `ObjTypeLoader`;
+- enum definitions through `EnumTypeLoader`.
 
-- sprites from the DAT2 sprite index;
-- client scripts from the DAT2 client-script index;
-- varbit definitions through the cache varbit loader.
+Recent parity work includes:
 
-These support preview/runtime behavior independently from GameVals.
+- PR #64: object opcodes 4200-4212;
+- PR #65: social comparator opcodes 3628-3657;
+- PR #66: client-parity runtime-widget defaults;
+- PR #67: local cache-backed enum opcodes;
+- PR #69: rev-240 core NPC/Obj/Param decoder parity.
 
-## Current GameVal usage
+Do not reintroduce network/cache-proxy reads for data already available from the selected `CacheSystem`.
 
-GameVals are read from cache index 24 when that index exists.
+## 3. Cache GameVals
 
-Primary files:
+When cache index 24 exists, `GameVals` provide cache-matched friendly names for interfaces and components.
+
+Relevant code:
 
 - `client/src/rs/config/gameval/GameVals.ts`
 - `client/src/rs/config/gameval/GameValGroupType.ts`
 - `client/src/rs/config/gameval/impl/Interface.ts`
 
-For interfaces, the relevant GameVal groups are:
+Cache GameVals improve discoverability but are not required for rendering or decoding.
 
-- `IFTYPES` (group 13);
-- `IFTYPES_V2` (group 14 for newer revisions).
+If no friendly name exists, numeric IDs remain valid and visible.
 
-The decoder supports both interface names and component names.
+## 4. OpenRune project metadata
 
-### What the Interface Editor uses today
+The active `OpenRuneProjectSession` builds a unified project GameVal registry from:
 
-`InterfaceEditorState.buildEntries()` loads the interface GameVal group and uses it to turn a numeric interface id into a friendly interface name.
+- base `gamevals.dat`;
+- generated `gamevals_generated.dat`;
+- module/project `gamevals.toml`;
+- `.data/gamevals/*.rscm`.
 
-Conceptually:
+The registry preserves:
 
-```text
-548 -> "some_interface_name"
-```
-
-If no GameVal name is available, the editor falls back to:
-
-```text
-Interface 548
-```
-
-So GameVals currently improve discoverability, but they are not required for decoding or rendering an interface.
-
-### What is available but not used yet
-
-The cache GameVal representation also exposes named child/interface components.
-
-The current component tree does not use those names. It primarily shows:
-
-- numeric component id;
-- generic decoded component type such as Container, Text, Sprite, Model, etc.
-
-A useful local-only improvement is therefore already available without the backend:
-
-```text
-before:
-12  Text
-
-after:
-12  logout_button  · Text
-```
-
-The numeric id should remain visible because it is the stable cache identity.
-
-### ComponentDecoder cleanup candidate
-
-`ComponentDecoder` currently receives a `GameVals` instance, but its present decode implementation does not use that field.
-
-That constructor dependency is legacy/dead coupling at the moment. It can be removed in a focused cleanup once tests confirm no compatibility behavior relies on it.
-
-It should not be expanded merely to make GameVals responsible for binary interface decoding.
-
-## OpenRune project metadata
-
-Two OpenRune project sources are useful to the Interface Editor. The existing Studio backend already indexes them, but normal web/Tauri integration should also index them in portable TypeScript through the project-filesystem layer:
-
-### 1. Source GameVals
-
-The backend scans:
-
-```text
-content/**/src/main/resources/gamevals.toml
-```
-
-and records:
-
-- namespace;
-- symbolic name;
-- numeric id;
-- qualified name;
+- effective symbol -> ID mappings;
+- every contributing declaration;
 - source path;
-- owning content module.
+- source line where available;
+- Gradle module provenance;
+- duplicate/conflict diagnostics;
+- base-ID reservation ceilings.
 
-This is valuable because it provides source provenance, not just a display label.
+This is portable TypeScript work. It does not require the backend.
 
-### 2. Generated RSCM mappings
+## 5. InterfaceMetadataSource
 
-The backend also scans:
+PR #68 added the framework-neutral metadata projection:
 
-```text
-.data/gamevals/*.rscm
-```
+`client/src/interface/interface-metadata-source.ts`
 
-Each RSCM filename becomes the namespace and each entry contributes a symbolic name -> numeric id mapping.
-
-The backend records these as `generated-rscm` entries.
-
-Primary backend files:
-
-- `backend/StudioService/src/main/kotlin/com/openrune/studio/service/openrune/OpenRuneContentIndexer.kt`
-- `backend/StudioService/src/main/kotlin/com/openrune/studio/service/openrune/OpenRuneContentResolver.kt`
-- `backend/StudioService/src/main/kotlin/com/openrune/studio/service/project/ProjectIndexService.kt`
-
-Existing API capabilities include:
-
-- project content indexing;
-- symbolic content resolution;
-- source indexing;
-- explicit index refresh.
-
-No OpenRune Server modification is required.
-
-## Runtime model: browser vs Tauri
-
-The cache/interface domain model should stay identical across platforms. The difference is only how bytes and project files enter the TypeScript layer.
-
-### Plain web
-
-Preferred order:
+It combines:
 
 ```text
-selected cache
-    -> imported IndexedDB CacheSource
-       or browser File System Access CacheSource when available
-    -> CacheSystem / InterfaceViewer
-
-selected OpenRune project
-    -> BrowserProjectFileSystem when showDirectoryPicker is available
-       or import/download compatibility mode
-    -> TypeScript project/GameVal/RSCM/source adapters
+selected-cache GameVals
+        +
+active OpenRune GameValRegistry
+        |
+        v
+InterfaceMetadataSource
+        |
+        +-- interface friendly name
+        +-- component symbolic name
+        +-- numeric identity
+        +-- source provenance
+        +-- alternate symbols
+        +-- conflict/mismatch diagnostics
 ```
 
-The browser must not require a locally running OpenRune Server or Kotlin service just to browse interfaces, maps, GameVals, or project source. Browser deployments cannot spawn Gradle or a JVM sidecar themselves, so build/publish actions should either be unavailable or explicitly connect to an optional Studio backend.
+The Svelte panels consume this projection rather than parsing RSCM/TOML directly.
 
-### Tauri desktop
+### Authority rules
 
-Preferred order:
+1. Numeric interface/component IDs are always retained.
+2. Decoded widget type/structure remains cache authoritative.
+3. Cache GameVal names are the closest labels to the selected cache.
+4. OpenRune project symbols enrich names/provenance.
+5. Project metadata may be shown even when it differs from the cache, but the mismatch must be diagnosed instead of silently redefining runtime identity.
+6. Alternate/conflicting project symbols are retained rather than discarded.
+7. Basic Cache mode works without project metadata.
 
-```text
-selected OpenRune checkout
-    -> TauriProjectFileSystem
-    -> direct source/GameVal/RSCM access
-    -> filesystem-backed CacheSource for .data/cache/LIVE
-    -> CacheSystem / InterfaceViewer
+## 6. Active-project lifecycle
 
-explicit Build / Publish / Verify
-    -> lazy Studio backend sidecar
-    -> allowlisted OpenRune Gradle/FileStore operation
-```
+`active-openrune-project-runtime.ts` owns the retained project session.
 
-Tauri should therefore be the best local OpenRune experience: no cache import copy is necessary once a filesystem-backed CacheSource is added, and no backend process should start until the user invokes a JVM/OpenRune-only operation.
+Important behavior:
 
-### Shared invariant
+- activating an OpenRune profile publishes its session/snapshot;
+- refreshing the project advances the snapshot atomically;
+- switching OpenRune roots clears the old visible runtime before the replacement is published;
+- switching to Basic Cache clears the active OpenRune runtime;
+- Interface metadata subscriptions rebuild from the new snapshot.
 
-Svelte panels should not know whether the active cache came from IndexedDB, browser File System Access, Tauri filesystem access, or a static development range server. They should receive the same `LoadedCache` / `InterfaceViewer` contracts.
+This prevents project A metadata from leaking into project B or into Basic Cache mode.
 
-The next platform improvement after the local interface-selection fix is a `ProjectFileSystem`-backed `CacheSource` so both Tauri and capable browsers can open `.data/cache/LIVE` directly from an OpenRune checkout. Tauri can then layer lazy backend build/publish actions on top without making the backend the read path.
+## 7. What the UI shows
 
-## Recommended authority model
+The Interface list and component tree retain numeric IDs while showing symbolic names when available.
 
-The Interface Editor should distinguish four kinds of information.
+Component rows may show:
 
-| Data | Preferred authority | Why |
-| --- | --- | --- |
-| Interface/component structure | selected cache index 3 | exact data being rendered |
-| Interface/component cache labels | selected cache index 24 GameVals | best match for the exact cache revision |
-| OpenRune project symbolic identity | RSCM / `gamevals.toml` through TypeScript project index | project-aware symbol mapping |
-| Source provenance/navigation | `gamevals.toml` + portable source search; optional JVM analysis | knows module/path/references without making backend mandatory |
+- numeric component ID;
+- symbolic component name;
+- decoded component type;
+- metadata warning indicator;
+- source/provenance information on hover.
 
-### Precedence rule
+Runtime-created dynamic widgets are not assigned static source metadata merely because they share a parent interface.
 
-For labels attached to the currently loaded cache:
+## 8. Backend role
 
-1. use cache GameVals when available;
-2. enrich with matching OpenRune project symbols/provenance;
-3. fall back to numeric ids.
+The optional Kotlin backend may eventually add JVM/compiler-aware analysis that the portable project index cannot provide.
 
-Do not blindly let a connected OpenRune project rename the active cache's interfaces/components unless the mapping is known to refer to the same id/revision/content identity.
+It must **not** be required for:
 
-A project checkout and a browser-loaded cache can be out of sync.
+- interface selection;
+- binary interface decoding;
+- cache GameVal labels;
+- project GameVal/RSCM metadata;
+- CS2 object/enum lookups;
+- ordinary source provenance.
 
-## Recommended frontend seam
+Any future enrichment belongs behind the same framework-neutral metadata/domain seam.
 
-Do not put filesystem, backend, or RSCM parsing logic directly into Svelte panels.
+Svelte must not directly call Ktor endpoints or parse arbitrary OpenRune project files.
 
-Introduce a framework-neutral metadata seam when implementation begins, for example:
+## 9. Known follow-up work
 
-```ts
-interface InterfaceMetadataSource {
-    getInterface(id: number): Promise<InterfaceMetadata | undefined>;
-    getComponent(interfaceId: number, componentId: number): Promise<ComponentMetadata | undefined>;
-}
-```
+The immediate cache-definition priority is:
 
-A metadata result should be able to carry more than a string:
+1. DBTable/DBRow/DBColumn decoding;
+2. remaining lossy/missing-definition parity work;
+3. only then optional JVM enrichment where it adds unique value.
 
-```ts
-interface InterfaceMetadata {
-    id: number;
-    cacheName?: string;
-    projectSymbols?: ProjectSymbol[];
-}
+For DB support, see the exact takeover notes in `DEVELOPER_HANDOFF.md`.
 
-interface ProjectSymbol {
-    namespace: string;
-    name: string;
-    qualifiedName: string;
-    sourceType: "plugin-toml" | "generated-rscm";
-    sourcePath?: string;
-    modulePath?: string;
-}
-```
+Other Interface-specific follow-ups may include:
 
-Exact naming can change. Preserve the separation of concerns.
+- provenance badges instead of hover-only provenance;
+- Open source / Find references actions;
+- source-aware Interface authoring when OpenRune has an authoritative source representation;
+- additional CS2 opcode families as real previews encounter them.
 
-Potential implementations:
+## 10. Do not regress these invariants
 
-- `CacheGameValInterfaceMetadataSource`
-- `OpenRuneProjectInterfaceMetadataSource` backed by the TypeScript GameVal/project index;
-- an optional JVM enrichment source if a future feature needs compiler-aware data;
-- a small composite source that merges them under the authority rules above.
+Do not:
 
-The Interface Editor should still work when only the cache-backed implementation is available.
+- require RSCM for cache-only Interface use;
+- let GameVals own binary interface decoding;
+- hide numeric IDs behind symbolic names;
+- silently let project metadata override selected-cache runtime identity;
+- parse project files directly in Svelte;
+- reintroduce cache-proxy HTTP reads for local cache data;
+- require the backend for ordinary Interface metadata;
+- modify OpenRune Server to expose Studio-specific Interface endpoints.
 
-## Portable project-index improvements
-
-The main missing piece is a frontend-friendly, id-oriented query shape in the TypeScript GameVal/project index.
-
-### A. Add id-oriented GameVal lookup
-
-The Interface Editor normally starts from numeric cache identities.
-
-The portable registry should support bounded lookup by:
-
-- namespace + id;
-- optionally namespace + name;
-- source type;
-- module.
-
-This avoids requiring a backend connection merely to label one editor panel.
-
-### B. Preserve provenance in lookup results
-
-For each match, retain:
-
-- numeric id;
-- namespace;
-- symbolic name;
-- source type;
-- source path;
-- module path;
-- whether the result came from source TOML, generated RSCM, or loaded-cache GameVals.
-
-This enables:
-
-- symbolic labels;
-- source badges;
-- Open source;
-- Find references;
-- alias display;
-- conflict diagnostics;
-- explanation of why a name was chosen.
-
-### C. Reconcile source TOML and generated RSCM
-
-Do not collapse source TOML and generated RSCM into one anonymous map too early.
-
-Useful states include:
-
-- TOML + RSCM agree;
-- source declaration exists but generated RSCM is missing/stale;
-- generated RSCM exists without a source declaration;
-- multiple symbols map to the same id;
-- one symbol maps to conflicting ids.
-
-Those are useful Content Studio diagnostics and can be derived in TypeScript.
-
-### D. Associate metadata with project/cache identity
-
-When a local OpenRune checkout is connected through `ProjectFileSystem`, the Studio can compare:
-
-- project root identity/fingerprint;
-- LIVE/SERVER cache identity when available;
-- selected frontend cache identity;
-- project index generation/fingerprint.
-
-Only then should project symbols be treated as trusted enrichment for the active cache.
-
-The optional backend may provide additional FileStore/JVM verification, but project metadata should not require it.
-
-## Interface Editor improvements enabled by this model
-
-### Near term, frontend-only
-
-1. Show cache GameVal component names in the component tree.
-2. Include both symbolic name and numeric id in search.
-3. Keep component type visible as secondary information.
-4. Remove the unused `ComponentDecoder -> GameVals` constructor dependency if tests confirm it is dead.
-
-### After ProjectFileSystem / GameValRegistry
-
-1. Add an `InterfaceMetadataSource` project adapter.
-2. Query project RSCM/TOML symbols for selected interfaces/components.
-3. Show provenance badges such as `cache`, `RSCM`, or `source`.
-4. Add "Open source" / "Find references" actions when source provenance exists.
-5. Surface symbol conflicts/stale generated mappings as diagnostics rather than guessing.
-6. Allow search by project symbol as well as numeric id/cache name.
-7. Add optional backend/JVM enrichment only if it provides analysis the portable source index cannot.
-
-### Later editing/publish work
-
-If the Interface Editor becomes a source editor rather than only a cache/interface editor, edits should target authoritative OpenRune interface/pack/GameVal sources through `ProjectFileSystem` and let OpenRune's existing packers produce LIVE/SERVER outputs.
-
-Do not directly rewrite generated RSCM as the default source-authoring workflow unless OpenRune defines that generated file as authoritative for the specific operation.
-
-Preferred direction:
-
-```text
-Interface Editor semantic change
-    -> Studio domain contract
-    -> TypeScript validation
-    -> authoritative OpenRune interface/pack/GameVal source through ProjectFileSystem
-    -> explicit OpenRune build when publication is requested
-    -> generated LIVE
-    -> derived SERVER when relevant
-    -> optional output verification
-```
-
-## Non-goals
-
-- making GameVals responsible for decoding interface binary structure;
-- requiring RSCM files for offline/browser Interface Editor use;
-- making Svelte components parse arbitrary OpenRune project files directly;
-- requiring the backend for ordinary RSCM/TOML project metadata;
-- modifying OpenRune Server to expose Interface Editor endpoints;
-- allowing project metadata from a mismatched checkout to silently override loaded-cache identities.
-
-## Practical next implementation slice
-
-The recommended order is:
-
-1. use existing cache GameVal child names locally in the component tree;
-2. implement the shared TypeScript `GameValRegistry` / OpenRune project index;
-3. define the framework-neutral `InterfaceMetadataSource` contract;
-4. implement `OpenRuneProjectInterfaceMetadataSource` on top of the portable project index;
-5. merge cache and project metadata with explicit provenance and conflict handling;
-6. add source navigation/reference tooling;
-7. add optional JVM/backend enrichment only where it materially improves the result.
-
-This produces immediate UI value while preserving offline behavior and the zero-required-OpenRune-changes invariant.
+When Interface editing becomes source-authoring, update authoritative OpenRune source through `ProjectFileSystem` and let OpenRune's existing build/pack workflow produce generated cache output.
