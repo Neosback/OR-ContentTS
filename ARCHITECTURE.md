@@ -54,7 +54,7 @@ command / tool interaction
   -> named edit transaction
      -> typed mutations
         -> undo/redo history
-        -> future Edit Format v1 / project persistence
+        -> Edit Format v1 / project persistence
 ```
 
 Transactions are framework-neutral TypeScript. Current mutation kinds cover map tiles and map objects; future content types such as NPC spawns, zones, shops, interfaces, and definitions should extend the mutation union rather than introducing separate save/undo systems.
@@ -83,7 +83,7 @@ The Content Studio backend is a **separate local service**, not OpenRune Server 
 
 OpenRune Server (`Neosback/OpenRune-Server`) is an external compatibility/reference target. The backend may use OpenRune libraries and inspect a user's OpenRune project, but normal Content Studio development must not require Studio-specific modifications to OpenRune Server.
 
-The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend currently compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, and builds a runnable StudioService distribution. Packaging and startup/discovery contracts are the next integration boundary before the frontend depends on it at runtime.
+The separate backend now lives under `backend/` in this monorepo. It was moved from the temporary `Neosback/rspsi` development repository in PR #34; `backend/` is the canonical source. The backend compiles, passes protocol/API/security/OpenRune-indexing/Gradle-process tests, builds a runnable StudioService distribution, and has a stable launch/discovery contract. The next backend-facing product work is an explicit, narrow build/publish bridge rather than making the backend part of ordinary reads or editing.
 
 The backend is intentionally narrow. Portable capabilities belong in framework-neutral TypeScript first, while OpenRune-owned source formats remain authoritative for OpenRune project publication.
 
@@ -119,18 +119,18 @@ Cache Repository / map viewer / map editor
               |
      profile source resolution
               |
-          CacheSource
-          /         \
-StaticRangeCacheSource   IndexedDbProfileCacheSource
-          |
- future filesystem-backed CacheSource adapters
+                         CacheSource
+              /              |                 \
+StaticRangeCacheSource  IndexedDbProfileCacheSource  ProjectFileSystemCacheSource
+                                                    /                         \
+                                      TauriProjectFileSystem     browser File System Access
 ```
 
-`client/src/cache/cache-source.ts` defines the shared loaded-cache contract and load options. `StaticRangeCacheSource` owns the Studio-served `/caches` source and preserves HTTP Range-capable loading through `CacheFiles`. `IndexedDbProfileCacheSource` adapts browser-imported cache files to the same contract.
+`client/src/cache/cache-source.ts` defines the shared loaded-cache contract and load options. `StaticRangeCacheSource` owns the Studio-served `/caches` source and preserves HTTP Range-capable loading through `CacheFiles`. `IndexedDbProfileCacheSource` adapts browser-imported cache files to the same contract. `ProjectFileSystemCacheSource` is implemented for direct filesystem-backed cache access, including Tauri OpenRune/LIVE and Basic-cache paths and capable browser File System Access flows.
 
 Persisted `server:<cache-name>` profile ids remain supported as a compatibility binding, but the prefix is resolved by the cache-source layer rather than by IndexedDB storage. `profile-cache-store.ts` only stores imported cache bytes.
 
-`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. Future OpenRune-local adapters should implement `CacheSource` without adding platform branches to Svelte screens. Prefer browser File System Access or Tauri filesystem adapters when the platform can read the cache directly. A backend-backed cache adapter is optional diagnostic/parity infrastructure, not the default local path.
+`client/src/mapviewer/Caches.ts` remains a compatibility facade for existing runtime callers; it is no longer the architectural owner of cache acquisition. OpenRune-local access goes through `ProjectFileSystemCacheSource` without adding platform branches to Svelte screens. Prefer browser File System Access or Tauri filesystem adapters when the platform can read the cache directly. A backend-backed cache adapter remains optional diagnostic/parity infrastructure, not the default local path.
 
 ### World data
 
@@ -294,15 +294,20 @@ From `backend/`:
 The Interface Editor has an explicit data-authority model. Full details live in
 `docs/INTERFACE_EDITOR_DATA_SOURCES.md`.
 
+Current implementation through PR #69:
+
 - cache index 3 is authoritative for decoded interface/component structure;
+- client scripts, varbits, objects, and enums used by CS2 preview come from the selected cache;
 - cache index 24 GameVals provide cache-matched interface/component names when available;
-- OpenRune `.data/gamevals/*.rscm` and source `gamevals.toml` are project-aware metadata/provenance supplied through the separate Studio backend;
-- project metadata must not silently override a browser-loaded cache unless the project/cache identities are known to match;
-- future backend enrichment belongs behind a framework-neutral `InterfaceMetadataSource`-style domain seam, not direct Svelte/Ktor/RSCM coupling;
-- the Interface Editor must remain usable with cache-only metadata when the backend is unavailable.
+- the retained `OpenRuneProjectSession` supplies the portable unified GameVal registry built from base/generated DAT, module `gamevals.toml`, and RSCM;
+- `InterfaceMetadataSource` merges cache labels with project symbols/provenance without replacing numeric ids or decoded component types;
+- the UI keeps alternate/conflicting symbols and mismatch diagnostics visible instead of silently choosing project metadata as runtime truth;
+- switching to Basic Cache clears retained OpenRune project metadata, and switching OpenRune roots replaces the active snapshot atomically;
+- no Kotlin backend is required for ordinary Interface metadata.
 
-The backend already indexes source GameVals and generated RSCM mappings. A future interface-oriented adapter should add bounded id-oriented lookup with provenance/conflict information, then merge it with cache GameVals under the authority rules above.
+Optional backend/JVM enrichment is permitted only if it adds information the portable project index cannot provide. It belongs behind the same framework-neutral metadata seam, not directly in Svelte.
 
+The next Interface/cache decoder work is DBTable/DBRow support and the remaining lossy/missing-definition audit. Do not reintroduce cache-proxy reads for data already available from the selected `CacheSystem`.
 
 ## OpenRune map/cache ownership
 
