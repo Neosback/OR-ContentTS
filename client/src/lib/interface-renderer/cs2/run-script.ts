@@ -11,6 +11,7 @@ import { getCs2RuntimeContext } from "./runtime-context";
 import { emitCs2RuntimeLog } from "./cs2-console-sink";
 import { handleObjectOpcode } from "./object-opcodes";
 import { handleSocialComparatorOpcode } from "./social-opcodes";
+import { createDynamicWidget, type RuntimeWidget } from "./runtime-widget";
 
 export let rootScriptEvent: ScriptEvent | null = null;
 export let currentScript: Script | null = null;
@@ -238,7 +239,6 @@ async function fetchEnumDef(enumId: number): Promise<Cs2EnumDef | null> {
 export let scriptDotWidget: ComponentType | null = null;
 export let scriptActiveWidget: ComponentType | null = null;
 
-type RuntimeWidget = ComponentType & { childIndex?: number; __dynamicCreated?: boolean };
 type Cs2EnumDef = {
   inputType: number;
   outputType: number;
@@ -390,47 +390,7 @@ function getWidgetChild(entry: InterfaceEntry, parentId: number, childIndex: num
 }
 
 function makeWidgetLikeJava(parent: RuntimeWidget, type: number, childIndex: number): RuntimeWidget {
-  const parentPacked = widgetPackedId(parent);
-  const next: RuntimeWidget = {
-    ...parent,
-    type,
-    layer: parentPacked,
-    id: parentPacked,
-    packedId: parentPacked,
-    childIndex,
-    v3: true,
-    children: null,
-    __dynamicCreated: true,
-  };
-  next.cs1Comparisons = null;
-  next.cs1ComparisonValues = null;
-  next.cs1Instructions = null;
-  next.onLoad = null;
-  next.onMouseOver = null;
-  next.onMouseLeave = null;
-  next.onTargetLeave = null;
-  next.onTargetEnter = null;
-  next.onVarTransmit = null;
-  next.onInvTransmit = null;
-  next.onStatTransmit = null;
-  next.onTimer = null;
-  next.onOp = null;
-  next.onMouseRepeat = null;
-  next.onClick = null;
-  next.onClickRepeat = null;
-  next.onRelease = null;
-  next.onHold = null;
-  next.onDrag = null;
-  next.onDragComplete = null;
-  next.onScrollWheel = null;
-  next.onVarTransmitList = null;
-  next.onInvTransmitList = null;
-  next.onStatTransmitList = null;
-  next.op = [];
-  next.opBase = "";
-  next.targetVerb = "";
-  next.targetBase = "";
-  return next;
+  return createDynamicWidget(widgetPackedId(parent), type, childIndex);
 }
 
 function prepareParentForCcCreate(parent: RuntimeWidget, childIndex: number, requireNew: boolean, script: Script): boolean {
