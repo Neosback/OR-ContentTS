@@ -1,5 +1,7 @@
 # OpenRune server data review (generated read-only from OpenRune-Server-main)
 
+> **Snapshot/reference only:** this is a point-in-time audit of a reference OpenRune checkout, not live project state and not a Studio-owned source file. Re-run the relevant project indexing/validation against the user's current checkout before acting on any listed conflict or range issue.
+
 ## Conflicting duplicates (same id, different content)
 
 - npc npc.0_50_49_saltfish (#1530): .data/raw-cache/server/npcs.toml:7  vs  .data/raw-cache/server/npcs.toml:3869  | differs in: respawnRate, contentGroup
