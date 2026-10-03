@@ -38,6 +38,17 @@ describe("prioritySortOrder", () => {
         expect(Array.from(prioritySortOrder(priorities, depths, ordinals))).toEqual([1, 2, 0]);
     });
 
+
+
+    it("re-evaluates dynamic priority placement when camera depths change", () => {
+        const priorities = Uint8Array.from([10, 1, 2, 0]);
+        const nearCamera = Int32Array.from([100, 60, 40, 80]);
+        const movedCamera = Int32Array.from([10, 60, 40, 80]);
+
+        expect(Array.from(prioritySortOrder(priorities, nearCamera))).toEqual([0, 3, 1, 2]);
+        expect(Array.from(prioritySortOrder(priorities, movedCamera))).toEqual([3, 1, 2, 0]);
+    });
+
     it("rejects invalid OSRS face priorities", () => {
         expect(() => prioritySortOrder(Uint8Array.from([12]), Int32Array.from([1]))).toThrow(
             /invalid render priority/,
