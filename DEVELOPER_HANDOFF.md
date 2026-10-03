@@ -7,7 +7,7 @@ This document is the current engineering handoff for developers continuing OpenR
 
 ### Current repository status
 
-As of the PR #68 interface-metadata checkpoint:
+As of the PR #69 rev-240 core-decoder checkpoint:
 
 - `backend/` is the canonical optional Studio backend source. The temporary `Neosback/rspsi` repository is migration history only.
 - OpenRune Server remains an external compatibility/reference target and requires **zero Studio-specific source changes**.
@@ -297,6 +297,7 @@ These PRs establish the current baseline:
 | #66 | Replaced CC_CREATE parent cloning with client-parity runtime widget defaults and normalized no-font/text defaults |
 | #67 | Removed CS2 enum cache-proxy reads; enum opcodes now use the active selected-cache `EnumTypeLoader` |
 | #68 | Added framework-neutral Interface metadata enrichment from selected-cache GameVals plus active OpenRune GameVal/RSCM provenance, conflicts, and symbolic component names |
+| #69 | Brought core NPC/Obj/Param decoding to the current OpenRune rev-240 baseline, added CacheVarLiteral ids, fixed modern entity-op alignment, and added byte-alignment regression fixtures |
 
 Do not reintroduce systems replaced by these PRs.
 
@@ -537,7 +538,7 @@ The portable filesystem/discovery/parser foundation is now substantially complet
 
 1. unified GameVal registry across base DAT, generated DAT, module `gamevals.toml`, and RSCM with explicit provenance/precedence — completed in PR #55;
 2. bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement;
-3. extend local cache/runtime parity next with rev-240 decoder coverage plus DBTable/DBRow before adding optional backend enrichment;
+3. core rev-240 NPC/Obj/Param parity is complete in PR #69; add DBTable/DBRow next, then continue the remaining lossy/missing decoder audit before optional backend enrichment;
 4. OpenRune PackConfig definition TOML adapter — completed in PR #56; NPC/ground-Obj/Area map-source TOML adapter — completed in PR #57; PackServerConfig/server-shop TOML adapter — completed in PR #58;
 5. add TypeScript terrain file-0 and static-loc file-1 encoders;
 6. add portable raw/region package export;
@@ -680,7 +681,7 @@ The backend launch/connection contract is implemented:
 
 The portable filesystem/discovery layer, unified GameVal registry, PackConfig definition adapter, OpenRune NPC/ground-Obj/Area map-source adapters, PackServerConfig/server-shop TOML adapter, framework-neutral OpenRune project session, and active retained runtime binding are now in place. The next major source/publication work is the TypeScript terrain file-0 encoder, followed by static-loc file-1 encoding and golden round-trip fixtures.
 
-For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, and enum definitions come from the selected cache; symbolic names/provenance now come from the selected cache plus the retained OpenRune project metadata layer. The next Interface/cache priority is decoder parity (rev 240, then DBTable/DBRow) before optional backend enrichment.
+For Interface work, keep reads local-first: decoded interfaces, client scripts, varbits, object definitions, and enum definitions come from the selected cache; symbolic names/provenance now come from the selected cache plus the retained OpenRune project metadata layer. The next Interface/cache priority is DBTable/DBRow decoding, followed by the remaining lossy/missing decoder audit before optional backend enrichment.
 
 For cache access, preserve the platform split:
 - browser universal fallback = one-time folder import into IndexedDB;
