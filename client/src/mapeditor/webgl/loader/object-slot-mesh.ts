@@ -41,6 +41,8 @@ export interface SlotMesh {
     staticAlphaCount: number;
     /** One original OSRS face render priority per static triangle, in the same opaque-then-alpha order as indices. */
     faceRenderPriorities: Uint8Array;
+    /** Original model face index per static triangle, aligned with faceRenderPriorities. */
+    faceOrdinals: Uint32Array;
     /**
      * PRIORITY_GROUP_WORDS uint32 per model instance:
      * [slot, opaqueFirstTriangle, opaqueTriangleCount, alphaFirstTriangle, alphaTriangleCount].
