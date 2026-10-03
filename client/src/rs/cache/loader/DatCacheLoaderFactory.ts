@@ -1,4 +1,6 @@
 import { BasTypeLoader, DummyBasTypeLoader } from "../../config/bastype/BasTypeLoader";
+import { DbRowTypeLoader } from "../../config/db/DbRowTypeLoader";
+import { DbTableTypeLoader } from "../../config/db/DbTableTypeLoader";
 import {
     DatFloorTypeLoader,
     FloorTypeLoader,
@@ -114,6 +116,14 @@ export class DatCacheLoaderFactory implements CacheLoaderFactory {
     }
 
     getQuestTypeLoader(): QuestTypeLoader | undefined {
+        return undefined;
+    }
+
+    getDbRowTypeLoader(): DbRowTypeLoader | undefined {
+        return undefined;
+    }
+
+    getDbTableTypeLoader(): DbTableTypeLoader | undefined {
         return undefined;
     }
 
