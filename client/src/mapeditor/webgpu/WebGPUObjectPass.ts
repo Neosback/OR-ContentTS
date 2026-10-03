@@ -370,7 +370,11 @@ export class WebGPUObjectPass {
         const sortedIndexBuffer = device.createBuffer({
             label: `map ${id} priority-sorted indices`,
             size: mesh.indices.byteLength,
-            usage: GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            usage:
+                GPUBufferUsage.INDEX |
+                GPUBufferUsage.STORAGE |
+                GPUBufferUsage.COPY_DST |
+                GPUBufferUsage.COPY_SRC,
         });
         // The compute pass only rewrites explicit-priority model ranges. Everything else stays byte-for-byte
         // identical to the reference index stream.
