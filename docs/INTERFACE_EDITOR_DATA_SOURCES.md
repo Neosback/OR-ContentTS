@@ -203,10 +203,14 @@ The Interface runtime remains framework-neutral. PR #73 and PR #74 now provide:
 - the PR #73 mock client state harness for varps/varbits, varcs, skills, item containers, social state, player/client flags and other script-visible state;
 - the PR #74 event dispatcher for initial/changed var transmits, inventory/stat transmits, timers and interactive pointer hooks, with serialized client cycles and trigger filtering.
 
+PR #78 adds the UI/runtime separation on top of those seams:
+
+- Edit mode keeps cache-backed authoring definitions separate and pauses runtime CS2 hooks;
+- Simulation mode uses an isolated runtime graph, so CS2-created children and property mutations do not become serializable authoring changes;
+- the State Debugger changes the shared mock state for varps/varbits, Varcs, skills, item containers and client/player fields and exposes pending transmit activity.
+
 Next, keep building on those seams rather than replacing them:
 
-- add explicit Edit and Simulation modes so runtime-created components can be inspected without accidentally treating them as serializable cache definitions;
-- add a State Debugger panel that changes mock state and immediately exposes the resulting PR #74 hook activity;
 - broaden CS2 opcode coverage from real cache scripts while retaining correct int/string stack effects and runtime-created widget semantics;
 - add an optional declarative mock network layer for testing button-to-state round trips without requiring OpenRune Server.
 
