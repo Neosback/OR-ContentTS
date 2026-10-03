@@ -336,7 +336,7 @@ Completed frontend/local foundation includes:
 
 Continue in this order:
 
-1. finish DBTable/DBRow/DBColumn decoding and the remaining decoder parity audit in TypeScript;
+1. continue the remaining decoder-lossiness/missing-type parity audit in TypeScript now that PR #71 completes DBTable/DBRow/DBColumn decoding;
 2. add TypeScript terrain/static-loc encoders and portable region/raw-map export;
 3. keep OpenRune-owned TOML/GameVal/pack source updates local through `ProjectFileSystem`;
 4. narrow `StudioBackendClient` to explicit bounded JVM operations;
