@@ -10,9 +10,15 @@ import {
     STORAGE_KEY,
     type CacheType,
 } from "../../lib/cache-types";
-import type { InterfaceEntry } from "../../lib/interface-renderer/component-types";
+import {
+    cloneInterfaceEntryForSimulation,
+    type InterfaceEntry,
+} from "../../lib/interface-renderer/component-types";
 import { Cs1Interpreter, type Cs1SimState } from "../../lib/interface-renderer/cs1-interpreter";
-import { mergeMockClientState } from "../../lib/interface-renderer/mock-client-state";
+import {
+    clearMockClientChanges,
+    mergeMockClientState,
+} from "../../lib/interface-renderer/mock-client-state";
 import {
     makeCs2LogLine,
     setCs2ConsoleSink,
@@ -40,6 +46,7 @@ import type {
     InterfaceContextMenuEvent,
     InterfaceLegacyFilter,
     InterfaceListEntry,
+    InterfaceRuntimeMode,
     RsInterfaceMode,
     StateSetter,
     TreeRow,
@@ -91,12 +98,13 @@ export class InterfaceEditorState {
     showOverlays = $state(true);
     showViewportBorder = $state(false);
     showPixelGrid = $state(false);
-    interactiveMode = $state(false);
+    runtimeMode = $state<InterfaceRuntimeMode>("edit");
     showGeneratedTreeRows = $state(false);
 
     isInterfaceLoaded = $state(false);
     interfaceLoadError = $state<string | null>(null);
     interfaceData = $state<InterfaceEntry | null>(null);
+    simulationInterfaceData = $state<InterfaceEntry | null>(null);
     selectedComponentNodeKey = $state<string | null>(null);
 
     cs1SimState = $state<Cs1SimState>(Cs1Interpreter.defaultState());
@@ -155,12 +163,23 @@ export class InterfaceEditorState {
         });
     }
 
+    get previewInterfaceData(): InterfaceEntry | null {
+        return this.runtimeMode === "simulate"
+            ? this.simulationInterfaceData ?? this.interfaceData
+            : this.interfaceData;
+    }
+
+    get interactiveMode(): boolean {
+        return this.runtimeMode === "simulate";
+    }
+
     get componentTreeRows(): TreeRow[] {
         void this.metadataVersion;
-        if (!this.interfaceData || this.selectedId == null) return [];
+        const data = this.previewInterfaceData;
+        if (!data || this.selectedId == null) return [];
         return flattenTree(
             buildComponentTree(
-                this.interfaceData,
+                data,
                 this.selectedId,
                 this.metadataSource,
             ),
@@ -187,8 +206,9 @@ export class InterfaceEditorState {
     }
 
     get rootWidgetV3(): boolean | null {
-        if (!this.interfaceData || this.selectedId == null) return null;
-        return getRootWidgetV3(this.interfaceData, this.selectedId);
+        const data = this.previewInterfaceData;
+        if (!data || this.selectedId == null) return null;
+        return getRootWidgetV3(data, this.selectedId);
     }
 
     get cs1ForCanvas(): Cs1SimState | null {
@@ -239,12 +259,35 @@ export class InterfaceEditorState {
         this.viewportColor = applySetter(this.viewportColor, value);
     };
 
+    setRuntimeMode: StateSetter<InterfaceRuntimeMode> = (value) => {
+        const next = applySetter(this.runtimeMode, value);
+        if (next === this.runtimeMode) return;
+
+        if (next === "simulate") {
+            clearMockClientChanges(this.cs1SimState);
+            this.simulationInterfaceData = this.interfaceData
+                ? cloneInterfaceEntryForSimulation(this.interfaceData)
+                : null;
+        } else {
+            this.simulationInterfaceData = null;
+        }
+
+        this.runtimeMode = next;
+        this.selectedComponentNodeKey = null;
+        this.cs2RedrawNonce++;
+    };
+
     setInteractiveMode: StateSetter<boolean> = (value) => {
-        this.interactiveMode = applySetter(this.interactiveMode, value);
+        const next = applySetter(this.interactiveMode, value);
+        this.setRuntimeMode(next ? "simulate" : "edit");
     };
 
     setInterfaceData: StateSetter<InterfaceEntry | null> = (value) => {
-        this.interfaceData = applySetter(this.interfaceData, value);
+        if (this.runtimeMode === "simulate") {
+            this.simulationInterfaceData = applySetter(this.simulationInterfaceData, value);
+        } else {
+            this.interfaceData = applySetter(this.interfaceData, value);
+        }
     };
 
     setSelectedComponentNodeKey: StateSetter<string | null> = (value) => {
@@ -358,6 +401,7 @@ export class InterfaceEditorState {
         this.isInterfaceLoaded = false;
         this.interfaceLoadError = null;
         this.interfaceData = null;
+        this.simulationInterfaceData = null;
         this.selectedComponentNodeKey = null;
         this.cs2LogLines = [];
 
@@ -379,24 +423,32 @@ export class InterfaceEditorState {
             if (controller.signal.aborted || selectedId !== this.selectedId) return;
 
             this.interfaceData = data;
-            setCs1InterfaceEntry(data);
+            this.simulationInterfaceData =
+                this.runtimeMode === "simulate"
+                    ? cloneInterfaceEntryForSimulation(data)
+                    : null;
+            const runtimeData = this.previewInterfaceData ?? data;
+            setCs1InterfaceEntry(runtimeData);
             applyCs2RuntimeFromSim(
                 this.cs1SimState,
                 this.revision,
                 cacheProxyHeaders(this.selectedCacheType),
                 this.varbitDefinitionLookup,
-                data,
+                runtimeData,
                 undefined,
                 undefined,
                 this.viewer.clientScriptIndex,
                 this.viewer.objTypeLoader,
                 this.viewer.enumTypeLoader,
             );
-            await openInterface(1, selectedId, 1);
+            await openInterface(1, selectedId, 1, false);
             if (controller.signal.aborted || selectedId !== this.selectedId) return;
 
             this.interfaceData = { ...data, components: { ...data.components } };
-            const entryAfter = getCs2RuntimeContext().interfaceEntry ?? data;
+            if (this.runtimeMode === "simulate" && this.simulationInterfaceData == null) {
+                this.simulationInterfaceData = cloneInterfaceEntryForSimulation(this.interfaceData);
+            }
+            const entryAfter = getCs2RuntimeContext().interfaceEntry ?? runtimeData;
             const diagnostics = await collectOnLoadScriptDiagnostics(entryAfter, selectedId);
             if (controller.signal.aborted || selectedId !== this.selectedId) return;
             this.cs2LogLines = [
