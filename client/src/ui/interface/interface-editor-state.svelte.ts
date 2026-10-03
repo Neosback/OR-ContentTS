@@ -308,6 +308,20 @@ export class InterfaceEditorState {
         this.cs1SimState = mergeMockClientState(previous, next);
     };
 
+    mutateMockClientState = (mutator: (state: Cs1SimState) => void): void => {
+        const current = this.cs1SimState;
+        mutator(current);
+        // Replace the root reference so Svelte consumers refresh while preserving
+        // the harness-owned Varps/Varcs/change-journal instances.
+        this.cs1SimState = { ...current };
+        this.cs2RedrawNonce++;
+    };
+
+    resetMockClientState = (): void => {
+        this.cs1SimState = Cs1Interpreter.defaultState();
+        this.cs2RedrawNonce++;
+    };
+
     setCs2RedrawNonce: StateSetter<number> = (value) => {
         this.cs2RedrawNonce = applySetter(this.cs2RedrawNonce, value);
     };
