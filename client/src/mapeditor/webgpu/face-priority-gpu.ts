@@ -6,6 +6,7 @@ export const GPU_PRIORITY_GROUP_WORDS = 6;
 
 export interface PrioritySortGpuData {
     priorities: Uint32Array;
+    ordinals: Uint32Array;
     groups: Uint32Array;
     scratchFaces: number;
 }
@@ -16,6 +17,7 @@ export interface PrioritySortGpuData {
  */
 export function buildPrioritySortGpuData(mesh: StaticObjectMesh): PrioritySortGpuData {
     const priorities = Uint32Array.from(mesh.faceRenderPriorities);
+    const ordinals = Uint32Array.from(mesh.faceOrdinals);
     const groupCount = mesh.priorityGroups.length / PRIORITY_GROUP_WORDS;
     const groups = new Uint32Array(groupCount * GPU_PRIORITY_GROUP_WORDS);
     let scratchFaces = 0;
@@ -35,5 +37,5 @@ export function buildPrioritySortGpuData(mesh: StaticObjectMesh): PrioritySortGp
         scratchFaces += opaqueCount + alphaCount;
     }
 
-    return { priorities, groups, scratchFaces };
+    return { priorities, ordinals, groups, scratchFaces };
 }
