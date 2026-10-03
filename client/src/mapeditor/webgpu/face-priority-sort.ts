@@ -7,15 +7,17 @@
 export function prioritySortOrder(
     priorities: ArrayLike<number>,
     depths: ArrayLike<number>,
+    ordinals?: ArrayLike<number>,
 ): Uint32Array {
-    if (priorities.length !== depths.length) {
-        throw new Error(`priority/depth length mismatch: ${priorities.length} != ${depths.length}`);
+    if (priorities.length !== depths.length || (ordinals && ordinals.length !== priorities.length)) {
+        throw new Error("priority/depth/ordinal length mismatch");
     }
 
     const depthOrder = Array.from({ length: priorities.length }, (_, face) => face);
     depthOrder.sort((a, b) => {
         const delta = depths[b] - depths[a];
-        return delta !== 0 ? delta : a - b;
+        if (delta !== 0) return delta;
+        return (ordinals?.[a] ?? a) - (ordinals?.[b] ?? b);
     });
 
     const buckets: number[][] = Array.from({ length: 12 }, () => []);
