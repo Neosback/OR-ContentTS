@@ -32,6 +32,7 @@ function chunk(
         staticOpaqueCount: opaque.length,
         staticAlphaCount: alpha.length,
         faceRenderPriorities: Uint8Array.from(priorities),
+        faceOrdinals: Uint32Array.from(priorities.map((_, index) => chunkId * 100 + index)),
         priorityGroups: Uint32Array.from(priorityGroups),
         animIndices: new Int32Array(0),
         slotInfo,
@@ -77,6 +78,7 @@ describe("mergeStaticObjectChunks", () => {
         expect(merged.slotInfo[2 * SLOT_INFO_STRIDE]).toBe(500);
         // Priorities follow the same map-wide opaque-then-alpha ordering as the merged index buffer.
         expect(Array.from(merged.faceRenderPriorities)).toEqual([2, 4, 10, 11]);
+        expect(Array.from(merged.faceOrdinals)).toEqual([0, 500, 1, 501]);
         expect(merged.priorityGroups.length).toBe(2 * PRIORITY_GROUP_WORDS);
         expect(Array.from(merged.priorityGroups)).toEqual([
             1, 0, 1, 2, 1,
@@ -89,6 +91,7 @@ describe("mergeStaticObjectChunks", () => {
         expect(merged.opaqueCount + merged.alphaCount + merged.slotCount).toBe(0);
         expect(merged.words.length).toBe(0);
         expect(merged.faceRenderPriorities.length).toBe(0);
+        expect(merged.faceOrdinals.length).toBe(0);
         expect(merged.priorityGroups.length).toBe(0);
     });
 });
