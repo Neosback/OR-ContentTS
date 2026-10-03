@@ -173,8 +173,8 @@ Next:
 - [x] Remove the pinned OpenRS2 startup cache target/bootstrap and the user-facing Studio-local-cache preset path.
 - [ ] Bind browser File System Access cache-directory handles to `ProjectFileSystemCacheSource` as an optional no-copy enhancement; IndexedDB import remains the universal browser fallback.
 - [x] Move Interface/CS2 enum lookups behind the selected cache: `ENUM_STRING`, `ENUM`, and `ENUM_GETOUTPUTCOUNT` now use a local `EnumTypeLoader`; the old enum cache-proxy path is removed.
-- [ ] Show cache GameVal child/component names in the Interface Editor tree while retaining numeric ids and decoded component types.
-- [ ] Add a framework-neutral Interface metadata source backed first by the TypeScript GameValRegistry/project index.
+- [x] Show cache GameVal and OpenRune project component names in the Interface Editor tree while retaining numeric ids and decoded component types.
+- [x] Add a framework-neutral Interface metadata source backed by selected-cache GameVals plus the TypeScript OpenRune GameValRegistry/project index, with provenance/conflict diagnostics.
 - [ ] Add optional backend/JVM metadata enrichment only where it provides information the portable index cannot.
 
 - [ ] Definitions editor for objects, NPCs, items and configs.
