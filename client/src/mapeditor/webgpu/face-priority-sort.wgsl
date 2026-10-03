@@ -68,6 +68,7 @@ struct ScratchFace {
 @group(2) @binding(3) var<storage, read> priorityGroups: array<u32>;
 @group(2) @binding(4) var<storage, read> vertexWords: array<u32>;
 @group(2) @binding(5) var<storage, read_write> scratchFaces: array<ScratchFace>;
+@group(2) @binding(6) var<storage, read> faceOrdinals: array<u32>;
 
 fn decodeModelInfo(slot: u32) -> ModelInfo {
     let base = slot * 4u;
@@ -258,7 +259,11 @@ fn sortPriorityGroup(@builtin(global_invocation_id) invocation: vec3<u32>) {
                 break;
             }
             let previous = scratchFaces[scratchOffset + j - 1u];
-            if (previous.depth >= key.depth) {
+            let depthOrdered = previous.depth > key.depth;
+            let tieOrdered =
+                previous.depth == key.depth &&
+                faceOrdinals[previous.triangle] <= faceOrdinals[key.triangle];
+            if (depthOrdered || tieOrdered) {
                 break;
             }
             scratchFaces[scratchOffset + j] = previous;
