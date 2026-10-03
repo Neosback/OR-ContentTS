@@ -266,7 +266,7 @@ function buildObjectChunkMesh(
     // Starts small (the buffer grows on demand): 64 chunks x 100k vertices x 12 B was ~77 MB of mostly empty
     // memory per region, and all of it was transferred to the main thread.
     let t = performance.now();
-    const objectSceneBuf = new SceneBuffer(workerState.textureLoader, textureIndexMap, 2048);
+    const objectSceneBuf = new SceneBuffer(workerState.textureLoader, textureIndexMap, 2048, workerState.faceDepth);
     const packer = createMeshPacker(textureIndexMap, (id) => workerState.textureLoader.isTransparent(id), 2048);
     if (packer) objectSceneBuf.useMeshPacker(packer);
     const sceneLocs = getSceneLocsForChunk(
@@ -418,7 +418,7 @@ function addSceneModels(sceneBuf: SceneBuffer, sceneModels: SceneModel[]): void 
     const modelGroupMap: Map<number, ModelMergeGroup> = new Map();
     for (const models of groupedModels.values()) {
         const model = models[0].model;
-        const faces = getModelFaces(model);
+        const faces = getModelFaces(model, workerState.faceDepth);
         const opaqueFaces: ModelFace[] = [];
         const transparentFaces: ModelFace[] = [];
         for (const face of faces) {
