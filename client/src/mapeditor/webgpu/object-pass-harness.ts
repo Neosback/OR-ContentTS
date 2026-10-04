@@ -3,7 +3,13 @@ import type { MapEditor } from "../MapEditor";
 import type { EditorMapSquare } from "../webgl/EditorMapSquare";
 import type { WebGLMapEditorRenderer } from "../webgl/WebGLMapEditorRenderer";
 import { mergeStaticObjectChunks } from "./object-mesh-merge";
-import { WebGPUObjectPass, type ObjectPassFrame, type ObjectPassTextures } from "./WebGPUObjectPass";
+import {
+    WebGPUObjectPass,
+    type ObjectIndexSource,
+    type ObjectPassFrame,
+    type ObjectPassTextures,
+} from "./WebGPUObjectPass";
+import type { PrioritySortValidation } from "./face-priority-validation";
 
 /**
  * Dev-only A/B harness for the WebGPU object pass. It reads the data the WebGL2 editor already holds (object chunk
@@ -12,17 +18,44 @@ import { WebGPUObjectPass, type ObjectPassFrame, type ObjectPassTextures } from 
  *
  *   await __webgpuHarness()      // from the console; returns the controller (also at window.__webgpuObjectPass)
  *   harness.setMode("diff")      // overlay | only | diff | off
- *   harness.stats                // frame cost, draw calls, GPU time when available
+ *   harness.stats                // CPU, compute GPU and render GPU time when available
+ *   harness.setIndexSource("priority") // draw compute-sorted indices; "original" is the default
+ *   harness.setMode("diff")      // compare the selected WebGPU stream against WebGL2
+ *   await harness.validatePriorities() // GPU priority sort vs CPU RuneLite reference for visible maps
+ *   await harness.sampleTimings(120)    // median/p95 priority-compute and render GPU cost
  */
 export type HarnessMode = "off" | "overlay" | "only" | "diff";
+
+export interface PriorityValidationResult extends PrioritySortValidation {
+    mapId: number;
+}
+
+export interface ObjectPassTimingSummary {
+    samples: number;
+    computeMedianMs: number;
+    computeP95Ms: number;
+    renderMedianMs: number;
+    renderP95Ms: number;
+    totalMedianMs: number;
+    totalP95Ms: number;
+}
 
 export interface ObjectPassHarness {
     readonly pass: WebGPUObjectPass;
     readonly overlay: HTMLCanvasElement;
     readonly stats: WebGPUObjectPass["stats"];
     setMode(mode: HarnessMode): void;
+    setIndexSource(source: ObjectIndexSource): void;
+    getIndexSource(): ObjectIndexSource;
     /** Draws one frame now (the harness also draws every animation frame while the page is visible). */
     renderOnce(): void;
+    /**
+     * Runs one real WebGPU frame, reads back the compute-sorted indices and GPU-computed face depths, then compares
+     * every visible map against the independent CPU RuneLite priority-order reference.
+     */
+    validatePriorities(): Promise<PriorityValidationResult[]>;
+    /** Samples timestamp-query results over real animation frames. Requires an adapter with timestamp-query support. */
+    sampleTimings(sampleCount?: number): Promise<ObjectPassTimingSummary>;
     stop(): void;
 }
 
@@ -147,6 +180,85 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
         pass.render(frameFor(performance.now() * 0.001), visible);
     };
 
+    const validatePriorities = async (): Promise<PriorityValidationResult[]> => {
+        layout();
+        const visible = syncMaps();
+
+        // Queue a fresh frame immediately before readback so the comparison uses the current camera, map edits and
+        // contouring data. WebGPU queue ordering guarantees the following readback copies happen after this compute.
+        pass.render(frameFor(performance.now() * 0.001), visible);
+
+        const results: PriorityValidationResult[] = [];
+        for (const mapId of visible) {
+            const validation = await pass.validatePrioritySort(mapId);
+            if (validation) {
+                results.push({ mapId, ...validation });
+            }
+        }
+
+        const mismatches = results.filter((result) => !result.matches);
+        if (mismatches.length === 0) {
+            console.info(
+                `[webgpu harness] priority sort: GPU == RuneLite CPU reference for ${results.length} visible map(s)`,
+            );
+        } else {
+            console.error(
+                `[webgpu harness] priority sort mismatch in ${mismatches.length}/${results.length} visible map(s)`,
+                mismatches,
+            );
+        }
+        return results;
+    };
+
+    const percentile = (values: number[], fraction: number): number => {
+        const sorted = [...values].sort((a, b) => a - b);
+        const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1);
+        return sorted[Math.max(index, 0)];
+    };
+
+    const sampleTimings = async (sampleCount = 120): Promise<ObjectPassTimingSummary> => {
+        if (!Number.isInteger(sampleCount) || sampleCount < 1) {
+            throw new RangeError("sampleCount must be a positive integer");
+        }
+        if (!pass.hasGpuTimestamps()) {
+            throw new Error("This WebGPU adapter does not support timestamp-query");
+        }
+        if (stopped || mode === "off") {
+            throw new Error("The WebGPU harness must be running and visible to sample timings");
+        }
+
+        const compute: number[] = [];
+        const render: number[] = [];
+        const total: number[] = [];
+        let lastGpuSample = pass.stats.gpuSamples;
+
+        while (compute.length < sampleCount) {
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            if (pass.stats.gpuSamples === lastGpuSample) continue;
+            lastGpuSample = pass.stats.gpuSamples;
+
+            const computeMs = pass.stats.computeGpuMs;
+            const renderMs = pass.stats.renderGpuMs;
+            const totalMs = pass.stats.gpuMs;
+            if (computeMs === undefined || renderMs === undefined || totalMs === undefined) continue;
+            compute.push(computeMs);
+            render.push(renderMs);
+            total.push(totalMs);
+        }
+
+        const summary: ObjectPassTimingSummary = {
+            samples: compute.length,
+            computeMedianMs: percentile(compute, 0.5),
+            computeP95Ms: percentile(compute, 0.95),
+            renderMedianMs: percentile(render, 0.5),
+            renderP95Ms: percentile(render, 0.95),
+            totalMedianMs: percentile(total, 0.5),
+            totalP95Ms: percentile(total, 0.95),
+        };
+        console.table(summary);
+        return summary;
+    };
+
     const loop = (): void => {
         if (stopped) return;
         renderOnce();
@@ -163,7 +275,16 @@ export async function startObjectPassHarness(editor: MapEditor): Promise<ObjectP
             mode = next;
             applyMode();
         },
+        setIndexSource(source) {
+            pass.setIndexSource(source);
+            console.info(`[webgpu harness] object indices: ${source}`);
+        },
+        getIndexSource() {
+            return pass.getIndexSource();
+        },
         renderOnce,
+        validatePriorities,
+        sampleTimings,
         stop() {
             stopped = true;
             cancelAnimationFrame(raf);
